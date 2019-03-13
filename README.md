@@ -3,9 +3,9 @@
 Headers and utilities for laboratory measurements and machine control with the 
 [LabJack T7](https://labjack.com/products)
 
-By Christopher R. Martin
-Assistant Professor of Mechanical Engineering
-Penn State University
+By Christopher R. Martin<br>
+Assistant Professor of Mechanical Engineering<br>
+Penn State University<br>
  [crm28@psu.edu](mailto:crm28@psu.edu)
 
 Version 3.04
@@ -572,8 +572,7 @@ These are the compiler constants provided by `lconfig.h`.
 |--------|:-----:|-------------|
 | TWOPI  | 6.283185307179586 | 2*pi comes in handy for signal calculations
 | LCONF_VERSION | 3.00 | The floating point version
-| LCONF_MAX_STR | 32   | The longest character string permitted when reading or writing values and parameters
-| LCONF_MAX_READ | "%32s" | Format string used for reading parameters and values
+| LCONF_MAX_STR | 128  | The longest character string permitted when reading or writing values and parameters
 | LCONF_MAX_STCH | 15     | Maximum number of stream channels (both input and output  permitted in the DEVCONF struct
 | LCONF_MAX_AOCH | 1      | Highest analog output channel number allowed
 | LCONF_MAX_NAOCH | 2     | Maximum number of analog output channels allowed
