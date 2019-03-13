@@ -1,4 +1,23 @@
 
+/*
+  This file is part of the LCONFIG laboratory configuration system.
+
+    LCONFIG is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    LCONFIG is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+
+    Authored by C.Martin crm28@psu.edu
+*/
+
 #include <stdio.h>      // 
 #include <stdlib.h>     // for rand, malloc, and free
 #include <string.h>     // for strncmp and strncpy
@@ -9,6 +28,7 @@
 #include <stdint.h>     // being careful about bit widths
 #include <sys/sysinfo.h>    // for ram overload checking
 #include "lconfig.h"
+
 
 
 // macros for writing lines to configuration files in WRITE_CONFIG()

@@ -1,20 +1,23 @@
 /*
 .
-.   Tools for loading laboratory configuration files
-.
-.   (c) 2017
-.   Released under GPLv3.0
-.   Chris Martin
-.   Assistant Professor of Mechanical Engineering
-.   Penn State University, Altoona College
-.
-.   Tested on the Linux kernal 4.4.0
-.   Linux Mint 18.1
-.   LJ Exoderiver v2.5.3
-.   LJM Library 1.14.4
-.   LibLabjackUSB 2.6.0
-.   T7 Firmware 1.0188
-.
+
+/*
+  This file is part of the LCONFIG laboratory configuration system.
+
+    LCONFIG is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    LCONFIG is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+
+    Authored by C.Martin crm28@psu.edu
 */
 
 
@@ -22,9 +25,10 @@
 Use the commands below to compile your code in a *nix environment
 You're on your own in Windows.  If you're in Windows, just about
 everything should work, but the show_config() function may give
-strange results.
+strange results, and start_data_stream() may need some tweaking.
 
-$gcc your_code.c -lm -lLabJackM -o your_exec.bin
+$gcc -c lconfig.c -o lconfig.o
+$gcc your_code.c lconfig.o -lm -lLabJackM -o your_exec.bin
 $chmod a+x your_exec.bin
 */
 
@@ -107,7 +111,8 @@ with init_data_file() and write_data_file() utilities.
 - Added the .bylabel dictionary to the dfile python objects
 
 ** 3.04
-2/2019
+3/2019
+- Forked off LCNOFIG from LAB to eliminate specialized files.
 - Wrote and proofed drun and dburst generic data collection binaries
 - Re-wrote python data loading support; shifted to dictionary-based config
 - 3.03 added the AICAL parameters, but they were not fully tested, nor

@@ -11,6 +11,7 @@ Penn State University
 Version 3.04
 
 - [About](#about)
+- [License](#license)
 - [Getting started](#start)
 - [Anatomy of an LCONFIG configuration file](#config)
 - [Anatomy of a data file](#data)
@@ -31,7 +32,7 @@ There are two binaries, `drun` and `dburst`, that do most of the jobs I need in 
 
 While I do my best to keep this README up to date, the authoritative documentation for the behavior of LCONFIG is contained in `lconfig.h`.  Each function has comments that defines its behavior, and there are even some examples that indicate how the functions should be used.  There is also a changelog commented at the top of the header.
 
-### Features
+## Features
 LCONFIG allows automatic configuration and control of most of the T7's advanced features with a few added features for easier post-processing of the data.
 
 - Stream sample rate configuration
@@ -71,6 +72,9 @@ LCONFIG allows automatic configuration and control of most of the T7's advanced 
 - Error handling
     - Messages to STDERR include the funciton's name and a description of the failure
     - Each error message uniquely identifies a location in the code
+
+## <a name="license"></a> License
+This software is released under the [GNU General Public License version 3.0](https://www.gnu.org/licenses/gpl-3.0.en.html).  LCONFIG is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 ## <a name="start"></a> Getting started
 
