@@ -1,5 +1,3 @@
-/*
-.
 
 /*
   This file is part of the LCONFIG laboratory configuration system.
@@ -39,7 +37,7 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LCONF_VERSION 3.04   // Track modifications in the header
+#define LCONF_VERSION 3.05   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LCONF_VERSION
@@ -120,6 +118,11 @@ with init_data_file() and write_data_file() utilities.
 - Added support for string parsing; inside of "" parameters can be 
     capital letters, and whitespace is allowed.
 - Lengthened the longest supported string to 80 characters.
+
+** 3.05
+3/2019
+- Added mandatory quotes when writing string parameters to config and
+	data files
 */
 
 #define TWOPI 6.283185307179586

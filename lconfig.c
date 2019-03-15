@@ -32,16 +32,16 @@
 
 
 // macros for writing lines to configuration files in WRITE_CONFIG()
-#define write_str(param,child) dconf[devnum].child[0]!='\0' ? fprintf(ff, "%s %s\n", #param, dconf[devnum].child) : (int) 0
+#define write_str(param,child) dconf[devnum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].child) : (int) 0
 #define write_int(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].child)
 #define write_flt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].child)
-#define write_aistr(param,child) dconf[devnum].aich[ainum].child[0]!='\0' ? fprintf(ff, "%s %s\n", #param, dconf[devnum].aich[ainum].child) : (int) 0
+#define write_aistr(param,child) dconf[devnum].aich[ainum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].aich[ainum].child) : (int) 0
 #define write_aiint(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].aich[ainum].child)
 #define write_aiflt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].aich[ainum].child)
-#define write_aostr(param,child) dconf[devnum].aoch[aonum].child[0]!='\0' ? fprintf(ff, "%s %s\n", #param, dconf[devnum].aoch[aonum].child) : (int) 0
+#define write_aostr(param,child) dconf[devnum].aoch[aonum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].aoch[aonum].child) : (int) 0
 #define write_aoint(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].aoch[aonum].child)
 #define write_aoflt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].aoch[aonum].child)
-#define write_fiostr(param,child) dconf[devnum].fioch[fionum].child[0]!='\0' ? fprintf(ff, "%s %s\n", #param, dconf[devnum].fioch[fionum].child) : (int) 0
+#define write_fiostr(param,child) dconf[devnum].fioch[fionum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].fioch[fionum].child) : (int) 0
 #define write_fioint(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].fioch[fionum].child)
 #define write_fioflt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].fioch[fionum].child)
 // macro for testing strings
