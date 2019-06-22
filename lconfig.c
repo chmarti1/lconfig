@@ -47,6 +47,38 @@
 // macro for testing strings
 #define streq(a,b) strncmp(a,b,LCONF_MAX_STR)==0
 
+// Macros for error handling
+#define loadfail(){\
+    fprintf(stderr,"LOAD: Devnum: %d, File Name: \"%s\"",\
+                    devnum,filename);\
+    fclose(ff);\
+    return LCONF_ERROR;\
+}
+
+#define openfail(){\
+    fprintf(stderr,"OPEN: Devnum: %d, IP: %s, Serial: %s, Name: \"%s\"\n",\
+            devnum, dconf[devnum].ip, dconf[devnum].serial, dconf[devnum].name);\
+    LJM_ErrorToString(err, err_str);\
+    fprintf(stderr,"LJM Error Code: %s\n",err_str);\
+    close_config(dconf, devnum);\
+    return LCONF_ERROR;\
+}
+
+#define uploadfail(){\
+    fprintf(stderr,"UPLOAD: Devnum: %d, IP: %s, Serial: %s, Name: \"%s\"\n",\
+            devnum, dconf[devnum].ip, dconf[devnum].serial, dconf[devnum].name);\
+    LJM_ErrorToString(err, err_str);\
+    fprintf(stderr,"LJM Error Code: %s\n",err_str);\
+    return LCONF_ERROR;\
+}
+
+#define startfail(){\
+    fprintf(stderr,"START_DATA_STREAM: Devnum: %d, IP: %s, Serial: %s, Name: \"%s\"\n",\
+            devnum, dconf[devnum].ip, dconf[devnum].serial, dconf[devnum].name);\
+    LJM_ErrorToString(err, err_str);\
+    fprintf(stderr,"%s\n",err_str);\
+    return LCONF_ERROR;\
+}
 
 /*....................
 .   Globals
@@ -197,7 +229,11 @@ void init_config(DEVCONF* dconf){
     int ainum, aonum, metanum, fionum;
     // Global configuration
     dconf->connection = -1;
+    dconf->connection_act = -1;
+    dconf->device = LJM_dtANY;
+    dconf->device_act = -1;
     dconf->serial[0] = '\0';
+    dconf->name[0] = '\0';
     dconf->ip[0] = '\0';
     dconf->gateway[0] = '\0';
     dconf->subnet[0] = '\0';
@@ -227,6 +263,8 @@ void init_config(DEVCONF* dconf){
         dconf->aich[ainum].label[0] = '\0';
         dconf->aich[ainum].calunits[0] = '\0';
     }
+    // Digital input streaming
+    dconf->distream = 0;
     // Analog Outputs
     dconf->naoch = 0;
     for(aonum=0; aonum<LCONF_MAX_NAOCH; aonum++){
@@ -374,13 +412,15 @@ void clean_buffer(RINGBUFFER* RB){
 ......................................*/
 
 int nistream_config(DEVCONF* dconf, const unsigned int devnum){
-    int out, fionum;
+    int out;
     out = dconf[devnum].naich;
+    if(dconf[devnum].distream)
+        out += 1;
     return out;
 }
 
 int nostream_config(DEVCONF* dconf, const unsigned int devnum){
-    int out, fionum;
+    int out;
     out = dconf[devnum].naoch;
     return out;
 }
@@ -391,6 +431,70 @@ int ndev_config(DEVCONF* dconf, const unsigned int devmax){
         if(dconf[ii].connection<0)
             return ii;
     return devmax;
+}
+
+void aichan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
+    switch(dconf[devnum].device_act){
+    case LJM_dtT4:
+        *min = 0;
+        *max = 11;
+    break;
+    case LJM_dtT7:
+        *min = 0;
+        *max = 14;
+    break;
+    default:
+        *min = -1;
+        *max = -1;
+    }
+}
+
+void aochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
+    switch(dconf[devnum].device_act){
+    case LJM_dtT4:
+        *min = 0;
+        *max = 1;
+    break;
+    case LJM_dtT7:
+        *min = 0;
+        *max = 1;
+    break;
+    default:
+        *min = -1;
+        *max = -1;
+    }
+}
+
+void efchan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
+    switch(dconf[devnum].device_act){
+    case LJM_dtT4:
+        *min = 4;
+        *max = 9;
+    break;
+    case LJM_dtT7:
+        *min = 0;
+        *max = 7;
+    break;
+    default:
+        *min = -1;
+        *max = -1;
+    }
+}
+
+void diochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
+    switch(dconf[devnum].device_act){
+    case LJM_dtT4:
+        *min = 4;
+        *max = 19;
+    break;
+    case LJM_dtT7:
+        *min = 0;
+        *max = 22;
+    break;
+    default:
+        *min = -1;
+        *max = -1;
+    }
 }
 
 
@@ -446,7 +550,7 @@ int load_config(DEVCONF* dconf, const unsigned int devmax, const char* filename)
         // If we find EOF while looking for a value, raise an error
         if(value[0] == '\0'){
             fprintf(stderr,"LOAD: Unexpected end of file while reading parameter: %s\n", param);
-            goto lconf_loadfail;
+            loadfail();
         }
         
 
@@ -459,20 +563,20 @@ int load_config(DEVCONF* dconf, const unsigned int devmax, const char* filename)
             devnum++;
             if(devnum>=devmax){
                 fprintf(stderr,"LOAD: Too many devices specified. Maximum allowed is %d.\n", devmax);
-                goto lconf_loadfail;
+                loadfail();
             }
 
             // look for usb, eth, or any
-            if(strncmp(value,"usb",LCONF_MAX_STR)==0){
+            if(streq(value,"usb")){
                 dconf[devnum].connection=LJM_ctUSB;
-            }else if(strncmp(value,"eth",LCONF_MAX_STR)==0){
+            }else if(streq(value,"eth")){
                 dconf[devnum].connection=LJM_ctETHERNET;
-            }else if(strncmp(value,"any",LCONF_MAX_STR)==0){
+            }else if(streq(value,"any")){
                 dconf[devnum].connection=LJM_ctANY;
             }else{
                 fprintf(stderr,"LOAD: Unrecognized connection type: %s\n",value);
                 fprintf(stderr,"%s\n","Expected \"usb\", \"eth\", or \"any\".");
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // What if CONNECTION isn't first?
@@ -481,6 +585,23 @@ int load_config(DEVCONF* dconf, const unsigned int devmax, const char* filename)
             fprintf(stderr,"LOAD: The first configuration parameter must be \"connection\".\n\
 Found \"%s\"\n", param);
             return LCONF_ERROR;
+        }else if(streq(param,"device")){
+            if(streq(value, "any"))
+                dconf[devnum].device = LJM_dtANY;
+            else if(streq(value, "t7"))
+                dconf[devnum].device = LJM_dtT7;
+            else if(streq(value, "t4"))
+                dconf[devnum].device = LJM_dtT4;
+            else{
+                fprintf(stderr, "LOAD: Unrecognized device type: %s\n", value);
+                fprintf(stderr, "Expected \"any\" \"t7\" or \"t4\"\n");
+                loadfail();
+            }
+        //
+        // The NAME parameter
+        //
+        }else if(streq(param,"name")){
+            strncpy(dconf[devnum].name,value,LCONF_MAX_NAME);
         //
         // The IP parameter
         //
@@ -507,7 +628,7 @@ Found \"%s\"\n", param);
         }else if(streq(param,"samplehz")){
             if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Illegal SAMPLEHZ value \"%s\". Expected float.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].samplehz = ftemp;
         //
@@ -516,7 +637,7 @@ Found \"%s\"\n", param);
         }else if(streq(param,"settleus")){
             if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Illegal SETTLEUS value \"%s\". Expected float.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].settleus = ftemp;
         //
@@ -525,7 +646,7 @@ Found \"%s\"\n", param);
         }else if(streq(param,"nsample")){
             if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: Illegal NSAMPLE value \"%s\".  Expected integer.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(itemp <= 0)
                 fprintf(stderr,"LOAD: **WARNING** NSAMPLE value was less than or equal to zero.\n"
                        "      Fix this before initiating a stream!\n");
@@ -538,16 +659,16 @@ Found \"%s\"\n", param);
             // Check for an array overrun
             if(ainum>=LCONF_MAX_NAICH){
                 fprintf(stderr,"LOAD: Too many AIchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NAICH);
-                goto lconf_loadfail;
+                loadfail();
             // Make sure the channel number is a valid integer
             }else if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AIchannel number \"%s\". Expected integer.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             // Make sure the channel number is in range for the T7.
             if(itemp<0 || itemp>LCONF_MAX_AICH){
                 fprintf(stderr,"LOAD: AIchannel number %d is out of range [0-%d].\n", itemp, LCONF_MAX_AICH);
-                goto lconf_loadfail;
+                loadfail();
             }
             // increment the number of active channels
             dconf[devnum].naich++;
@@ -564,11 +685,11 @@ Found \"%s\"\n", param);
             // Test that there is a configured channel already
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AIrange number \"%s\". Expected a float.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aich[ainum].range = ftemp;
         //
@@ -579,7 +700,7 @@ Found \"%s\"\n", param);
             // Test that there is a configured channel already
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             // if value is a string specifying ground
             if(strncmp(value,"ground",LCONF_MAX_STR)==0){
@@ -590,21 +711,21 @@ Found \"%s\"\n", param);
                 itemp = dconf[devnum].aich[ainum].channel+1;
             }else if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AIneg index \"%s\". Expected an integer, \"differential\", or \"ground\".\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(itemp == LJM_GND){
                 // bypass further error checking if the index referrs to ground.
             }else if(itemp < 0 || itemp > LCONF_MAX_AICH){
                 fprintf(stderr,"LOAD: AIN negative channel number %d is out of range [0-%d].\n", itemp, LCONF_MAX_AICH);
-                goto lconf_loadfail;
+                loadfail();
             }else if(itemp%2-1){
                 fprintf(stderr,"LOAD: Even channels cannot serve as negative channels\n\
 and negative channels cannot opperate in differential mode.\n");
-                goto lconf_loadfail;
+                loadfail();
             }else if(itemp-dconf[devnum].aich[ainum].channel!=1){
                 fprintf(stderr,"LOAD: Illegal choice of negative channel %d for positive channel %d.\n\
 Negative channels must be the odd channel neighboring the\n\
 even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].channel);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aich[ainum].nchannel = itemp;
         //
@@ -614,15 +735,15 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             ainum = dconf[devnum].naich-1;
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
 
             if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AIres index \"%s\". Expected an integer.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(itemp < 0 || itemp > LCONF_MAX_AIRES){
                 fprintf(stderr,"LOAD: AIres index %d is out of range [0-%d].\n", itemp, LCONF_MAX_AIRES);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aich[ainum].resolution = itemp;
         //
@@ -632,11 +753,11 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             ainum = dconf[devnum].naich-1;
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             // Make sure the coefficient is a valid float
             }else if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AIcalslope number \"%s\". Expected float.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aich[ainum].calslope = ftemp;
         //
@@ -646,11 +767,11 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             ainum = dconf[devnum].naich-1;
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             // Make sure the offset is a valid float
             }else if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AIcaloffset number \"%s\". Expected float.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aich[ainum].calzero = ftemp;
         //
@@ -660,7 +781,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             ainum = dconf[devnum].naich-1;
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             strncpy(dconf[devnum].aich[ainum].calunits, value, LCONF_MAX_STR);
         //
@@ -670,9 +791,24 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             ainum = dconf[devnum].naich-1;
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             strncpy(dconf[devnum].aich[ainum].label, value, LCONF_MAX_STR);
+        //
+        // The DISTREAM parameter
+        //
+        }else if(streq(param,"distream")){
+            if(sscanf(value, "%d", &itemp)!=1){
+                fprintf(stderr,
+                        "LOAD: Expected integer DISTREAM, but found \"%s\"\n", 
+                        value);
+                loadfail();
+            }else if(itemp < 0 || itemp > 0xFFFF){
+                fprintf(stderr,
+                        "LOAD: DISTREAM must be a positive 16-bit mask. Found %d\n",
+                        itemp);
+            }
+            dconf[devnum].distream = itemp;
         //
         // The AOCHANNEL parameter
         //
@@ -681,16 +817,16 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             // Check for an array overrun
             if(aonum>=LCONF_MAX_NAOCH){
                 fprintf(stderr,"LOAD: Too many AOchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NAOCH);
-                goto lconf_loadfail;
+                loadfail();
             // Make sure the channel number is a valid integer
             }else if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: Illegal AOchannel number \"%s\". Expected integer.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             // Make sure the channel number is in range for the T7.
             if(itemp<0 || itemp>LCONF_MAX_AOCH){
                 fprintf(stderr,"LOAD: AOchannel number %d is out of range [0-%d].\n", itemp, LCONF_MAX_AOCH);
-                goto lconf_loadfail;
+                loadfail();
             }
             // increment the number of active channels
             dconf[devnum].naoch++;
@@ -707,7 +843,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             // Case out valid AOsignal values
             if(strncmp(value,"constant",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_CONSTANT;
@@ -717,7 +853,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             else if(strncmp(value,"noise",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_NOISE;
             else{
                 fprintf(stderr,"LOAD: Illegal AOsignal type: %s\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // AOFREQUENCY
@@ -726,14 +862,14 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             // Convert the string into a float
             }else if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: AOfrequency expected float, but found: %s\n", value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(ftemp<=0){
                 fprintf(stderr,"LOAD: AOfrequency must be positive.  Found: %f\n", ftemp);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aoch[aonum].frequency = ftemp;
         //
@@ -743,11 +879,11 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             // Convert the string into a float
             }else if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: AOamplitude expected float, but found: %s\n", value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aoch[aonum].amplitude = ftemp;
         //
@@ -757,14 +893,14 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             // Convert the string into a float
             }else if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: AOoffset expected float, but found: %s\n", value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(ftemp<0. || ftemp>5.){
                 fprintf(stderr,"LOAD: AOoffset must be between 0 and 5 volts.  Found %f.", ftemp);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aoch[aonum].offset = ftemp;
         //
@@ -774,14 +910,14 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             // Convert the string into a float
             }else if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: AOduty expected float but found: %s\n", value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(ftemp<0. || ftemp>1.){
                 fprintf(stderr,"LOAD: AOduty must be between 0. and 1.  Found %f.\n", ftemp);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].aoch[aonum].duty = ftemp;
         //
@@ -791,7 +927,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             strncpy(dconf[devnum].aoch[aonum].label, value, LCONF_MAX_STR);
         //
@@ -803,10 +939,10 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             }else if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: TRIGchannel expected an integer channel number but found: %s\n", 
                     value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(itemp<0){
                 fprintf(stderr,"LOAD: TRIGchannel must be non-negative.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].trigchannel = itemp;
         //
@@ -816,7 +952,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: TRIGlevel expected a floating point voltage but found: %s\n", 
                     value);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].triglevel = ftemp;
         //
@@ -831,7 +967,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].trigedge = TRIG_ALL;
             else{
                 fprintf(stderr,"LOAD: Unrecognized TRIGedge parameter: %s\n", value);
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // TRIGPRE parameter
@@ -840,11 +976,11 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: TRIGpre expected an integer pretrigger sample count but found: %s\n", 
                     value);
-                goto lconf_loadfail;
+                loadfail();
             }
             if(itemp < 0){
                 fprintf(stderr,"LOAD: TRIGpre must be non-negative.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].trigpre = itemp;
         //
@@ -853,10 +989,10 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         }else if(streq(param,"fiofrequency")){
             if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Got illegal FIOfrequency: %s\n",value);
-                goto lconf_loadfail; 
+                loadfail(); 
             }else if(ftemp <= 0.){
                 fprintf(stderr,"LOAD: FIOfrequency must be positive!\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].fiofrequency = ftemp;
         //
@@ -867,16 +1003,16 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             // Check for an array overrun
             if(fionum>=LCONF_MAX_FIOCH){
                 fprintf(stderr,"LOAD: Too many FIOchannel definitions.  Only %d are allowed.\n",LCONF_MAX_FIOCH);
-                goto lconf_loadfail;
+                loadfail();
             // Make sure the channel number is a valid integer
             }else if(sscanf(value,"%d",&itemp)!=1){
                 fprintf(stderr,"LOAD: Illegal FIOchannel number \"%s\". Expected integer.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
             // Make sure the channel number is in range for the T7.
             if(itemp<0 || itemp>LCONF_MAX_FIOCH){
                 fprintf(stderr,"LOAD: FIOchannel number %d is out of range [0-%d].\n", itemp, LCONF_MAX_FIOCH);
-                goto lconf_loadfail;
+                loadfail();
             }
             // increment the number of active channels
             dconf[devnum].nfioch++;
@@ -906,7 +1042,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].fioch[fionum].signal = FIO_QUADRATURE;
             }else{
                 fprintf(stderr,"LOAD: Illegal FIO signal: %s\n",value);
-                goto lconf_loadfail; 
+                loadfail(); 
             }
         //
         // FIOEDGE
@@ -920,7 +1056,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].fioch[fionum].edge = FIO_ALL;
             }else{
                 fprintf(stderr,"LOAD: Illegal FIO edge: %s\n",value);
-                goto lconf_loadfail; 
+                loadfail(); 
             }
         //
         // FIODEBOUNCE
@@ -936,7 +1072,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].fioch[fionum].debounce = FIO_DEBOUNCE_MINIMUM;
             }else{
                 fprintf(stderr,"LOAD: Illegal FIO debounce mode: %s\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // FIODIRECTION
@@ -948,7 +1084,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].fioch[fionum].direction = FIO_OUTPUT;
             }else{
                 fprintf(stderr,"LOAD: Illegal FIO direction: %s\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // FIOusec
@@ -958,7 +1094,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].fioch[fionum].time = ftemp;
             }else{
                 fprintf(stderr,"LOAD: Illegal FIO time parameter. Found: %s\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // FIOdegrees
@@ -968,7 +1104,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 dconf[devnum].fioch[fionum].phase = ftemp;
             }else{
                 fprintf(stderr,"LOAD: Illegal FIO phase parameter. Found: %s\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
         //
         // FIODUTY
@@ -976,10 +1112,10 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         }else if(streq(param,"fioduty")){
             if(sscanf(value,"%f",&ftemp)!=1){
                 fprintf(stderr,"LOAD: Illegal FIO duty cycle. Found: %s\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }else if(ftemp<0. || ftemp>1.){
                 fprintf(stderr,"LOAD: Illegal FIO duty cycles must be between 0 and 1. Found %f\n",ftemp);
-                goto lconf_loadfail;
+                loadfail();
             }
             dconf[devnum].fioch[fionum].duty = ftemp;
         //
@@ -989,7 +1125,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             fionum = dconf[devnum].nfioch-1;
             if(fionum<0){
                 fprintf(stderr,"LOAD: Cannot set flexible input-output parameters before the first FIOchannel parameter.\n");
-                goto lconf_loadfail;
+                loadfail();
             }
             strncpy(dconf[devnum].fioch[fionum].label, value, LCONF_MAX_STR);
         //
@@ -1008,7 +1144,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 metatype = 'n';
             else{
                 fprintf(stderr,"LOAD: Illegal meta type: %s.\n",value);
-                goto lconf_loadfail;
+                loadfail();
             }
         // META integer configuration
         }else if(strncmp(param,"int:",4)==0){
@@ -1039,18 +1175,12 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // Deal with unhandled parameters
         }else{
             fprintf(stderr,"LOAD: Unrecognized parameter name: \"%s\"\n", param);
-            goto lconf_loadfail;
+            loadfail();
         }
     }
 
     fclose(ff);
     return LCONF_NOERR;
-
-    lconf_loadfail:
-    fprintf(stderr,"LCONFIG: Error while parsing device %d in file \"%s\"",\
-                    devnum,filename);
-    fclose(ff);
-    return LCONF_ERROR;
 }
 
 
@@ -1069,6 +1199,14 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     else
         fprintf(ff,"connection eth\n");
 
+    if(dconf[devnum].device==LJM_dtANY)
+        fprintf(ff, "device any\n");
+    else if(dconf[devnum].device==LJM_dtT4)
+        fprintf(ff, "device t4\n");
+    else if(dconf[devnum].device==LJM_dtT7)
+        fprintf(ff, "device t7\n");
+
+    write_str(name,name);
     write_str(serial,serial);
     write_str(ip,ip);
     write_str(gateway,gateway);
@@ -1092,6 +1230,9 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
         write_aistr(aicalunits,calunits);
         fprintf(ff,"\n");
     }
+    
+    // Digital Input streaming
+    write_int(distream,distream);
 
     // Analog outputs
     if(dconf[devnum].naoch)
@@ -1242,36 +1383,114 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
     int err,done=LCONF_NOERR;
     char *id;
     const static char any[4] = "ANY";
+    char stemp[LCONF_MAX_STR];
+    int serial, ip, dummy;
 
+    // Device identification method precedence depends on the conneciton
+    // type:
+    //  USB/ANY: Serial, Name
+    //  Ethernet: IP, Serial, Name
+    // IP specified with USB causes IP parameters to be written
+    // IP specified with ANY raises a warning and is ignored
+    if(dconf[devnum].connection == LJM_ctETHERNET && dconf[devnum].ip[0]!='\0')
+        id = dconf[devnum].ip;
+    else if(dconf[devnum].serial[0]!='\0')
+        id = dconf[devnum].serial;
+    else if(dconf[devnum].name[0]!='\0')
+        id = dconf[devnum].name;
+    else
+        id = (char*) any;
+    //
+    // WARNINGS
+    //
+    // If no device id was specified
+    if(id==any)
+        fprintf(stderr,"OPEN::WARNING:: Device %d was requested without a device identifier.\n"\
+"Results may be inconsistent; IP, SERIAL, or NAME should be set.\n",devnum);
 
-    // If the connection is USB, use the serial number and ignore the IP
-    if(dconf[devnum].connection==LJM_ctUSB){
-        if(dconf[devnum].serial[0]!='\0')
-            id=dconf[devnum].serial;
-        else
-            id= (char*) any;
-    }else if(dconf[devnum].connection==LJM_ctETHERNET){
-        if(dconf[devnum].ip[0]!='\0')
-            id=dconf[devnum].ip;
-        else if(dconf[devnum].serial[0]!='\0')
-            id=dconf[devnum].serial;
-        else
-            id= (char*) any;
+    // If an IP address was specified with ANY connection, raise a warning
+    // and clear the IP address
+    if(dconf[devnum].connection == LJM_ctANY && dconf[devnum].ip[0]!='\0'){
+        fprintf(stderr, "OPEN::WARNING:: Specifying an ip address with ANY connection is ambiguous.  Ignoring.\n");
+        dconf[devnum].ip[0] = '\0';
+    }
+
+    //
+    // OPEN
+    //
+    err = LJM_Open(dconf[devnum].device, dconf[devnum].connection, \
+            id, &dconf[devnum].handle);
+    if(err){
+        fprintf(stderr, "OPEN: Failed to open the device: %s.\n", id);
+        openfail();
     }
     
-    if(id==any)
-        fprintf(stderr,"OPEN: Device %d was requested without a \
-device identifier.\nResults may be inconsistent.\n",devnum);
-
-    err = LJM_Open(LJM_dtT7, dconf[devnum].connection, id, &dconf[devnum].handle);
-
+    //
+    // DEV INFO
+    //
+    err = LJM_GetHandleInfo(dconf[devnum].handle, 
+                            &dconf[devnum].device_act,
+                            &dconf[devnum].connection_act,
+                            &serial,
+                            &ip,
+                            &dummy,
+                            &dummy);
     if(err){
-        fprintf(stderr,"LCONFIG: Error opening device %d with identifier \"%s\"\n",devnum,id);
-        LJM_ErrorToString(err, err_str);
-        fprintf(stderr,"%s\n",err_str);
-        done=LCONF_ERROR;
+        fprintf(stderr, "OPEN: Failed to obtain device information.\n");
+        openfail();
     }
-    return done;
+    
+    //
+    // SERIAL
+    //
+    sprintf(stemp, "%d", serial);
+    if(dconf[devnum].serial[0] == '\0'){
+        strncpy(dconf[devnum].serial, stemp, LCONF_MAX_STR);
+    }else if(!streq(dconf[devnum].serial, stemp)){
+        fprintf(stderr, 
+                "OPEN: Requested serial: %s, connected to serial: %s\n"\
+                "  Conflicting device identifiers!\n",\
+                dconf[devnum].serial, stemp);
+        openfail();
+    }
+
+    //
+    // IP
+    //
+    if(dconf[devnum].connection != LJM_ctUSB){
+        LJM_NumberToIP(ip, stemp);
+        if(dconf[devnum].ip[0] == '\0'){
+            strncpy(dconf[devnum].serial, stemp, LCONF_MAX_STR);
+        }else if(!streq(dconf[devnum].ip, stemp)){
+            fprintf(stderr, 
+                    "OPEN: Requested ip: %s, connected to ip: %s\n"\
+                    "  Conflicting device identifiers!\n",\
+                    dconf[devnum].ip, stemp);
+            openfail();
+        }
+    }
+    
+    //
+    // NAME
+    //
+    err = LJM_eReadNameString(dconf[devnum].handle, \
+            "DEVICE_NAME_DEFAULT", stemp);
+    if(err){
+        fprintf(stderr, "OPEN: Failed to read the device name.\n");
+        openfail();
+    }
+    
+    if(dconf[devnum].name[0] == '\0'){
+        strncpy(dconf[devnum].name, stemp, LCONF_MAX_NAME);
+    }else if(!streq(dconf[devnum].name, stemp)){
+        fprintf(stderr, 
+                "OPEN: Requested device name: \"%s\", connected to device name: \"%s\"\n"\
+                "  Conflicting device identifiers!\n",
+                dconf[devnum].name, stemp);
+        openfail();
+    }
+    
+    return LCONF_NOERR;
 }
 
 
@@ -1279,12 +1498,16 @@ device identifier.\nResults may be inconsistent.\n",devnum);
 
 int close_config(DEVCONF* dconf, const unsigned int devnum){
     int err;
-    err = LJM_Close(dconf[devnum].handle);
-    if(err){
-        fprintf(stderr,"LCONFIG: Error closing device %d.\n",devnum);
-        LJM_ErrorToString(err, err_str);
-        fprintf(stderr,"%s\n",err_str);
+    if(dconf[devnum].handle>=0){
+        err = LJM_Close(dconf[devnum].handle);
+        if(err){
+            fprintf(stderr,"LCONFIG: Error closing device %d.\n",devnum);
+            LJM_ErrorToString(err, err_str);
+            fprintf(stderr,"%s\n",err_str);
+        }
     }
+    dconf[devnum].handle = -1;
+    dconf[devnum].connection_act = -1;
     // Clean up the buffer
     clean_buffer(&dconf[devnum].RB);
     return err;
@@ -1296,13 +1519,16 @@ int close_config(DEVCONF* dconf, const unsigned int devnum){
 
 int upload_config(DEVCONF* dconf, const unsigned int devnum){
     int err,handle;             // integers for interacting with the device
-    int reg_temp, type_temp;    // register and type holding variables
+    // Registers for holding register addresses and memory type
+    int reg_temp, type_temp;
     // Regsisters for analog input
     int ainum, naich;
     // Registers for analog output
     int aonum,naoch;
     // Registers for fio configuration
     int fionum,nfioch;
+    // Channel range registers
+    int minch, maxch;
     unsigned int fio_clk_roll, fio_clk_div;
     unsigned int samples;
     double ei,er,gi,gr;     // exponent and generator (real and imaginary)
@@ -1318,34 +1544,38 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     naoch = dconf[devnum].naoch;
     handle = dconf[devnum].handle;
 
-    // Global parameters...
-
-    // Test the connection and retrieve connection type
-    err = LJM_GetHandleInfo(handle, 
-                            &dummy,
-                            &reg_temp,
-                            &dummy,
-                            &dummy,
-                            &dummy,
-                            &dummy);
-    if(err){
-        fprintf(stderr,"UPLOAD: No answer from device handle %d.\n", handle);
-        goto lconf_uploadfail;
+    // Verify that the device is open
+    if(dconf[devnum].handle < 0){
+        fprintf(stderr, "UPLOAD: The device connection is not open.\n");
+        return LCONF_ERROR;
     }
 
-    // If the conneciton is USB, assert the IP parameters
-    if(reg_temp == LJM_ctUSB){
+
+    // Global parameters...
+
+    // If the requested conneciton was USB, assert the IP parameters
+    if(dconf[devnum].connection == LJM_ctUSB){
         flag=0;
-        if(!LJM_IPToNumber(dconf[devnum].ip, &itemp)){
-            err = LJM_eWriteName(handle, "ETHERNET_IP_DEFAULT", (double) itemp);
+        err = 0;
+        if(dconf[devnum].ip[0] != '\0'){
+            printf("IP: %s\n", dconf[devnum].ip);
+            err = LJM_IPToNumber(dconf[devnum].ip, &itemp);
+            err = err ? err : \
+                    LJM_eWriteName(handle, "ETHERNET_IP_DEFAULT", (double) itemp);
             flag=1;
         }
-        if(!err && !LJM_IPToNumber(dconf[devnum].gateway, &itemp)){
-            err = LJM_eWriteName(handle, "ETHERNET_GATEWAY_DEFAULT", (double) itemp);
+        if(!err && dconf[devnum].gateway[0] != '\0'){
+            printf("IP: %s\n", dconf[devnum].gateway);
+            err = LJM_IPToNumber(dconf[devnum].ip, &itemp);
+            err = err ? err : \
+                    LJM_eWriteName(handle, "ETHERNET_GATEWAY_DEFAULT", (double) itemp);
             flag=1;
         }
-        if(!err && !LJM_IPToNumber(dconf[devnum].subnet, &itemp)){
-            err = LJM_eWriteName(handle, "ETHERNET_SUBNET_DEFAULT", (double) itemp);
+        if(!err && dconf[devnum].subnet[0] != '\0'){
+            printf("IP: %s\n", dconf[devnum].subnet);
+            LJM_IPToNumber(dconf[devnum].ip, &itemp);
+            err = err ? err : \
+                    LJM_eWriteName(handle, "ETHERNET_SUBNET_DEFAULT", (double) itemp);
             flag=1;
         }
         // if any of the IP parameters were asserted
@@ -1357,18 +1587,21 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         }
         if(err){
             fprintf(stderr,"UPLOAD: Failed to assert ethernet parameters on device with handle %d.\n",handle);
-            goto lconf_uploadfail;
+            uploadfail();
         }
     }
 
+    // Get the max/min ai channel numbers for later
+    aichan_config(dconf, devnum, &minch, &maxch);
+    
     // Loop through the analog input channels.
     for(ainum=0;ainum<naich;ainum++){
         channel = dconf[devnum].aich[ainum].channel;
         // Perform a sanity check on the channel number
-        if(channel>=LCONF_MAX_AICH){
-            fprintf(stderr,"UPLOAD: Analog input %d points to channel %d, which is out of range [0-%d]\n",
-                    ainum, channel, LCONF_MAX_AICH);
-            goto lconf_uploadfail;
+        if(channel>maxch || channel<minch){
+            fprintf(stderr,"UPLOAD: Analog input %d points to channel %d, which is out of range [%d-%d]\n",
+                    ainum, channel, minch, maxch);
+            uploadfail();
         }
         /* Determine AI register addresses - depreciated - the new code relies on the LJM naming system
         airegisters(channel,&reg_negative,&reg_range,&reg_resolution);
@@ -1388,7 +1621,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to update analog input %d, AI%d negative input to %d\n", 
                     ainum, channel, dconf[devnum].aich[ainum].nchannel);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // Write the range
         stemp[0] = '\0';
@@ -1404,7 +1637,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to update analog input %d, AI%d range input to %f\n", 
                     ainum, channel, dconf[devnum].aich[ainum].range);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // Write the resolution
         stemp[0] = '\0';
@@ -1420,9 +1653,25 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to update analog input %d, AI%d resolution index to %d\n", 
                     ainum, channel, dconf[devnum].aich[ainum].resolution);
-            goto lconf_uploadfail;
+            uploadfail();
         }
 
+    }
+
+    // Set the digital direction based on the DISTREAM register
+    if(dconf[devnum].distream){
+        err = LJM_eWriteName(dconf[devnum].handle,
+                "DIO_INHIBIT", 0xFFFF0000);
+        err = err ? err : LJM_eWriteName(dconf[devnum].handle,
+                "DIO_DIRECTION", ~dconf[devnum].distream);
+        err = err ? err : LJM_eWriteName(dconf[devnum].handle,
+                "DIO_INHIBIT", 0x00000000);
+        if(err){
+            fprintf(stderr, 
+                    "UPLOAD: Failed to set DIO direction from DISTREAM: %d\n",
+                    dconf[devnum].distream);
+            uploadfail();
+        }
     }
 
     // Set up all analog outputs
@@ -1449,7 +1698,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to disable analog output buffer STREAM_OUT%d_ENABLE\n", 
                     aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // Configure the stream target to point to the DAC channel
         stemp[0] = '\0';
@@ -1459,7 +1708,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to write target AO%d (%d), to STREAM_OUT%d_TARGET\n", 
                     channel, target, aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // Configure the buffer size
         stemp[0] = '\0';
@@ -1469,7 +1718,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to write AO%d buffer size, %d, to STREAM_OUT%d_BUFFER_SIZE\n", 
                     channel, LCONF_MAX_AOBUFFER, aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
 
         // Enable the output buffer
@@ -1480,20 +1729,20 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to enable analog output buffer STREAM_OUT%d_ENABLE\n", 
                     aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
 
         // Construct the buffer data
         // Restrict the signal period to an integer multiple of sample periods
         if(dconf[devnum].aoch[aonum].frequency<=0.){
             fprintf(stderr,"UPLOAD: Analog output %d has zero or negative frequency.\n",aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         samples = (unsigned int)(dconf[devnum].samplehz / dconf[devnum].aoch[aonum].frequency);
         // samples * 2 will be the buffer size
         if(samples*2 > LCONF_MAX_AOBUFFER){
             fprintf(stderr,"UPLOAD: Analog output %d signal will require too many samples at this frequency.\n",aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // Get the buffer address
         stemp[0] = '\0';
@@ -1581,7 +1830,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to write data to the OStream STREAM_OUT%d_BUFFER_F32\n", 
                     aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
 
         // Set the loop size
@@ -1592,7 +1841,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to write loop size %d to STREAM_OUT%d_LOOP_SIZE\n", 
                     samples, aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // Update loop settings
         stemp[0] = '\0';
@@ -1602,7 +1851,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         if(err){
             fprintf(stderr,"UPLOAD: Failed to write 1 to STREAM_OUT%d_SET_LOOP\n", 
                     aonum);
-            goto lconf_uploadfail;
+            uploadfail();
         }
     }
 
@@ -1613,21 +1862,21 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         err = err ? err : LJM_eWriteName( handle, "DIO18_EF_ENABLE", 1);
         if(err){
             fprintf(stderr,"UPLOAD: Failed to configure high speed counter 2 for the HSC trigger.\n");
-            goto lconf_uploadfail;
+            uploadfail();
         }
     }
 
     //
     // Upload the FIO parameters
     // First, deactivate all of the extended features
-    // For some reason, upper DIO#_EF_ENABLE raises an error
-    for(fionum=0; fionum<8; fionum++){
+    efchan_config(dconf, devnum, &minch, &maxch);
+    for(fionum=minch; fionum<=maxch; fionum++){
         sprintf(stemp, "DIO%d_EF_ENABLE", fionum);
         err = err ? err : LJM_eWriteName(handle, stemp, 0);
     }
     if(err){
         fprintf(stderr,"UPLOAD: Failed to disable DIO extended features\n");
-        goto lconf_uploadfail;
+        uploadfail();
     }
     // Determine the clock 0 rollover and clock divisor from the FIOFREQUENCY parameter
     if(dconf[devnum].fiofrequency>0)
@@ -1644,11 +1893,11 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     if(ftemp > 0xFFFFFFFF){
         fprintf(stderr,"UPLOAD: FIO frequency was too low (%f Hz). Minimum is %f uHz.\n", 
             dconf[devnum].fiofrequency, 1e12 * LCONF_CLOCK_MHZ / 0xFFFFFFFF / 256);
-        goto lconf_uploadfail;
+        uploadfail();
     }else if(ftemp < 0x8){
         fprintf(stderr,"UPLOAD: FIO frequency was too high (%f Hz).  Maximum is %f MHz.\n",
             dconf[devnum].fiofrequency, LCONF_CLOCK_MHZ / 0x8);
-        goto lconf_uploadfail;
+        uploadfail();
     }
     // Convert the rollover value to unsigned int
     fio_clk_roll = (unsigned int) ftemp;
@@ -1664,7 +1913,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         err = err ? err : LJM_eWriteName(handle, "DIO_EF_CLOCK0_ENABLE", 1);
         if(err){
             fprintf(stderr,"UPLOAD: Failed to configure FIO Clock 0\n");
-            goto lconf_uploadfail;
+            uploadfail();
         }
         // If the clock setup was successful, then back-calculate the actual frequency
         // and store it in the fiofrequency parameter.
@@ -1683,7 +1932,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                     if(channel > 1){
                         fprintf(stderr,"UPLOAD: Pulse width input only permitted on channels 0 and 1. Found ch %d.\n",
                             dconf[devnum].fioch[fionum].channel);
-                        goto lconf_uploadfail;
+                        uploadfail();
                     }
                     // Measurement index 5
                     sprintf(stemp, "DIO%d_EF_INDEX", channel);
@@ -1702,7 +1951,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                     if(channel > 5 || channel == 1){
                         fprintf(stderr,"UPLOAD: Pulse width output only permitted on channels 0, 2, 3, 4, and 5. Found ch %d.\n",
                             dconf[devnum].fioch[fionum].channel);
-                        goto lconf_uploadfail;
+                        uploadfail();
                     }
                     // Calculate the start index
                     // Unwrap the phase first (lazy method)
@@ -1746,7 +1995,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                     if(channel > 7 || channel == 4 || channel ==5){
                         fprintf(stderr, "UPLOAD: FIO Counter input on channel %d is not supported.\n Use FIO channel 0,1,2,3,6,or 7.",
                             channel);
-                        goto lconf_uploadfail;
+                        uploadfail();
                     }
                     switch(dconf[devnum].fioch[fionum].debounce){
                         case FIO_DEBOUNCE_NONE:
@@ -1764,7 +2013,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                                 err = err ? err : LJM_eWriteName(handle, stemp, 4);
                             else{
                                 fprintf(stderr,"UPLOAD: Fixed interval debounce is not supported on  'all' edges\n");
-                                goto lconf_uploadfail;
+                                uploadfail();
                             }
                             // Write the timeout interval
                             sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
@@ -1796,7 +2045,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                                 err = err ? err : LJM_eWriteName(handle, stemp, 6);
                             else{
                                 fprintf(stderr,"UPLOAD: Minimum duration debounce is not supported on  'all' edges\n");
-                                goto lconf_uploadfail;
+                                uploadfail();
                             }
                             // Write the timeout interval
                             sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
@@ -1809,7 +2058,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                     err = err ? err : LJM_eWriteName(handle, stemp, 1);
                 }else{
                     fprintf(stderr, "UPLOAD: Count output is not currently supported.\n");
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }
             break;
             case FIO_FREQUENCY:
@@ -1817,10 +2066,10 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                 if(channel > 1){
                     fprintf(stderr, "UPLOAD: FIO Frequency on channel %d is not supported. 0 and 1 are allowed.\n",
                         channel);
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }else if(dconf[devnum].fioch[fionum].direction == FIO_OUTPUT){
                     fprintf(stderr, "UPLOAD: FIO Frequency output is not supported. Use PWM.\n");
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }
                 if(dconf[devnum].fioch[fionum].edge == FIO_FALLING){
                     sprintf(stemp, "DIO%d_EF_INDEX", channel);
@@ -1840,11 +2089,11 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                 channel = (channel / 2) * 2;
                 if(channel != 0){
                     fprintf(stderr, "UPLOAD: Digital phase input is only supported on channels 0 and 1.\n");
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }
                 if(dconf[devnum].fioch[fionum].direction == FIO_OUTPUT){
                     fprintf(stderr, "UPLOAD: Phase output is not supported\n");
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }
                 // Measurement index 6
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
@@ -1863,7 +2112,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                     err = err ? err : LJM_eWriteName( handle, stemp, 0);
                 }else{
                     fprintf(stderr, "UPLOAD: Phase measurements on ALL edges are not supported.\n");
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }
                 // Enable the EF channels
                 sprintf(stemp, "DIO%d_EF_ENABLE", channel);
@@ -1877,10 +2126,10 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                 if(channel > 6 || channel == 4){
                     fprintf(stderr, "UPLOAD: FIO Quadrature channels %d/%d not supported. 0/1, 2/3, 6/7 are allowed.\n",
                         channel, channel+1);
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }else if(dconf[devnum].fioch[fionum].direction == FIO_OUTPUT){
                     fprintf(stderr, "UPLOAD: FIO Quadrature output is not allowed.\n");
-                    goto lconf_uploadfail;
+                    uploadfail();
                 }
                 // Measurement index 10
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
@@ -1901,17 +2150,11 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         }
         if(err){
             fprintf(stderr, "UPLOAD: Failed to configure FIO channel %d\n.", channel);
-            goto lconf_uploadfail;
+            uploadfail();
         }
     }
 
     return LCONF_NOERR;
-
-    lconf_uploadfail:
-    fprintf(stderr,"LCONFIG: Error uploading to device %d\n", devnum);
-    LJM_ErrorToString(err, err_str);
-    fprintf(stderr,"%s\n",err_str);
-    return LCONF_ERROR;
 }
 
 
@@ -2690,21 +2933,24 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     if(samples_per_read <= 0)
         samples_per_read = LCONF_SAMPLES_PER_READ;
 
-    if(dconf[devnum].naich<1 && dconf[devnum].naoch<1){
-        fprintf(stderr,"STREAM_START: Cannot start a data stream with no channels on device %d.\n", devnum);
-        return LCONF_ERROR;
+    if(dconf[devnum].naich<1 && dconf[devnum].naoch<1 && dconf[devnum].distream==0){
+        fprintf(stderr,"START_DATA_STREAM: No channels are configured\n");
+        startfail();
     }
 
     // Initialize the resolution index
     resindex = dconf[devnum].aich[0].resolution;
     flag = 1;   // use the flag to remember if we have already issued a warning.
+    index = 0;  // Index is a parallel count for the location in stlist.
     // Assemble the list of channels and check the resolution settings
     for(ainum=0; ainum<dconf[devnum].naich; ainum++){
         // Populate the channel list
-        stlist[ainum] = dconf[devnum].aich[ainum].channel * 2;
+        stlist[index++] = dconf[devnum].aich[ainum].channel * 2;
         // Do we have a conflict in resindex values?
         if(flag && resindex != dconf[devnum].aich[ainum].resolution){
-            fprintf(stderr,"STREAM_START: AI channel resolution indices disagree; defaulting to the lowest.\n");
+            fprintf(stderr,
+                    "STREAM_START::WARNING:: AICH%d has different resolution %d.\n",
+                    ainum, resindex);
             flag=0;
         }
         // If this channel's resolution index is less than those previous
@@ -2715,29 +2961,33 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     if(!flag)
         fprintf(stderr,"STREAM_START: Used resolution index %d for all streaming channels.\n",resindex);
 
-
     // Write the configuration parameters unique to streaming.
-    err=LJM_eWriteName(dconf[devnum].handle, "STREAM_RESOLUTION_INDEX", resindex);
+    err=LJM_eWriteName(dconf[devnum].handle, 
+            "STREAM_RESOLUTION_INDEX", resindex);
+    // Write the settling time
+    err= err ? err : LJM_eWriteName(dconf[devnum].handle, 
+            "STREAM_SETTLING_US", dconf[devnum].settleus);
+    if(err){
+        fprintf(stderr,"STREAM_START: Failed to set setting and resolution settings.\n");
+        startfail();
+    }
+
+    // Add digital input streaming?
+    if(dconf[devnum].distream)
+        LJM_NameToAddress("FIO_EIO_STATE", &stlist[index++], &dummy);
 
     // Add any analog output streams to the stream scanlist
     // This approach collects analog input BEFORE updating the outputs.
     // This allows one scan cycle for system settling before the new 
     // measurements are taken.  On the other hand, it also imposes a 
     // scan cycle's worth of phase between output and input.
-    index = dconf[devnum].naich;
+    
     // Get the STREAM_OUT0 address
     LJM_NameToAddress("STREAM_OUT0",&reg_temp,&dummy);
     for(aonum=0;aonum<dconf[devnum].naoch;aonum++){
-        stlist[index] = reg_temp;
+        stlist[index++] = reg_temp;
         // increment the index and the register
         reg_temp += 1;
-        index+=1;
-    }
-    // Write the settling time
-    err=LJM_eWriteName(dconf[devnum].handle, "STREAM_SETTLING_US", dconf[devnum].settleus);
-    if(err){
-        fprintf(stderr,"STREAM_START: Failed to set STREAM_SETTLING_US register.\n");
-        goto lconf_startfail;
     }
 
     // Determine the number of R/W blocks in the buffer
@@ -2749,7 +2999,7 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     // The number of buffer R/W blocks is calculated from the pretrigger
     // buffer size plus 1.
     if(init_buffer(&dconf[devnum].RB, 
-                dconf[devnum].naich,
+                nistream_config(dconf, devnum),
                 samples_per_read,
                 blocks)){
         fprintf(stderr,"STREAM_START: Failed to initialize the buffer.\n");
@@ -2764,21 +3014,15 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     // Start the stream.
     err=LJM_eStreamStart(dconf[devnum].handle, 
             samples_per_read,
-            dconf[devnum].naich+dconf[devnum].naoch,
+            index,
             stlist,
             &dconf[devnum].samplehz);
 
     if(err){
         fprintf(stderr,"STREAM_START: Failed to start the stream.\n");
-        goto lconf_startfail;
+        startfail();
     }
     return LCONF_NOERR;
-
-    lconf_startfail:
-    fprintf(stderr,"LCONFIG: Encountered an error starting a data stream on device %d.\n",devnum);
-    LJM_ErrorToString(err, err_str);
-    fprintf(stderr,"%s\n",err_str);
-    return LCONF_ERROR;
 }
 
 

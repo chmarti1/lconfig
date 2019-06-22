@@ -122,21 +122,29 @@ with init_data_file() and write_data_file() utilities.
 ** 3.05
 3/2019
 - Added mandatory quotes when writing string parameters to config and
-	data files
+    data files
+
+** 3.06
+6/2019
+- Added support for the T4
+    - NOTE: advanced FIO features have NOT been tested with the T4
+- Added support for digital input streaming
+- Changed error handling codes
 */
 
 #define TWOPI 6.283185307179586
 
 #define LCONF_MAX_STR 80    // longest supported string
+#define LCONF_MAX_NAME 49   // longest device name allowed
 #define LCONF_MAX_META 32   // how many meta parameters should we allow?
-#define LCONF_MAX_STCH 15   // maximum number of streaming channels allowed (LCONF_MAX_NAICH + LCONF_MAX_NAOCH)
+#define LCONF_MAX_STCH  LCONF_MAX_AICH + LCONF_MAX_AOCH + 1 // Maximum streaming channels
 #define LCONF_MAX_AOCH 1    // maximum analog output channel number allowed
 #define LCONF_MAX_NAOCH 2   // maximum analog output channels to allow
-#define LCONF_MAX_AICH 13   // highest analog input channel number allowed
-#define LCONF_MAX_NAICH 14  // maximum analog input channels to allow
+#define LCONF_MAX_AICH 14   // highest analog input channel number allowed
+#define LCONF_MAX_NAICH 15  // maximum analog input channels to allow
 #define LCONF_MAX_AIRES 8   // maximum resolution index
 #define LCONF_MAX_NDEV 32   // catch runaway cases if the user passes junk to devmax
-#define LCONF_MAX_FIOCH 7   // Highest flexible IO channel
+#define LCONF_MAX_FIOCH 22  // Highest flexible IO channel
 #define LCONF_MAX_NFIOCH 8  // maximum flexible IO channels to allow
 #define LCONF_MAX_AOBUFFER  512     // Maximum number of buffered analog outputs
 #define LCONF_BACKLOG_THRESHOLD 1024 // raise a warning if the backlog exceeds this number.
@@ -278,11 +286,15 @@ typedef struct ringbuffer {
 
 typedef struct devconf {
     // Global configuration
-    int connection;                 // connection type index
+    int connection;                 // requested connection type index
+    int connection_act;             // actual connection type index
+    int device;                     // The requested device type index
+    int device_act;                 // The actual device type
     char ip[LCONF_MAX_STR];         // ip address string
     char gateway[LCONF_MAX_STR];    // gateway address string
     char subnet[LCONF_MAX_STR];     // subnet mask string
     char serial[LCONF_MAX_STR];     // serial number string
+    char name[LCONF_MAX_NAME];      // device name string
     int handle;                     // device handle
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
@@ -290,6 +302,8 @@ typedef struct devconf {
     // Analog input
     AICONF aich[LCONF_MAX_NAICH];    // analog input configuration array
     unsigned int naich;             // number of configured analog input channels
+    // Digital input streaming
+    unsigned int distream;          // input stream mask
     // Analog output
     AOCONF aoch[LCONF_MAX_NAOCH];   // analog output configuration array
     unsigned int naoch;             // number of configured analog output channels
@@ -330,7 +344,8 @@ int ndev_config(DEVCONF* dconf, // Array of device configuration structs
 
 /* NISTREAM_CONFIG
 Returns the number of input stream channels configured. These will be the number 
-of columns of data discovered in the data when streaming.
+of columns of data discovered in the data when streaming.  This is the number of
+analog input channels plus the digital input stream (if configured).
 */
 int nistream_config(DEVCONF* dconf, const unsigned int devnum);
 
@@ -339,6 +354,35 @@ Returns the number of output stream channels configured. These will be the numbe
 of columns of data discovered in the data when streaming.
 */
 int nostream_config(DEVCONF* dconf, const unsigned int devnum);
+
+/* AICHAN_CONFIG
+Determine the range of valid analog input channels for the current device 
+configuration.  MIN is the lowest valid channel number.  MAX is the highest 
+valid channel number.  Valid channel numbers are presumed to be sequential.
+*/
+void aichan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+
+/* AOCHAN_CONFIG
+Determine the range of valid analog output channels for the current device
+configuration.  MIN is the lowest valid channel number.  MAX is the highest 
+valid channel number.  Valid channel numbers are presumed to be sequential.
+*/
+void aochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+
+/* EFCHAN_CONFIG
+Determine the range of valid extended feature IO channels for the current device
+configuration.  MIN is the lowest valid channel number.  MAX is the highest 
+valid channel number.  Valid channel numbers are presumed to be sequential.
+*/
+void efchan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+
+/* DIOCHAN_CONFIG
+Determine the range of valid digital IO channels for the current device
+configuration.  MIN is the lowest valid channel number.  MAX is the highest 
+valid channel number.  Valid channel numbers are presumed to be sequential.
+*/
+void diochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+
 
 /* LOAD_CONFIG
 Load a file by its file name.
@@ -374,14 +418,32 @@ The following parameters are recognized:
 .   configure.  Every parameter-value pair that follows will be applied to the
 .   preceeding connection.  As a result, the connection parameter must come 
 .   before any other parameters.
+-DEVICE
+.   Determines the type of device to connect to.  Currently supported values
+.   are "t7" or "t4".
 -SERIAL
-.   Identifies the device by its serial number. 
+.   Identifies the device by its serial number.  Devices can be identified by
+.   their serial number, NAME, or IP address.  When multiples of these are
+.   defined simultaneously, the device is queried to be certain they are all
+.   consistent.  Contradictions will result in an error from open_config().
+.
+.   The precedence rules change slightly based on the conneciton type:
+.   ANY:    SERIAL, NAME
+.   USB:    SERIAL, NAME
+.   ETH:    IP, SERIAL, NAME
+-NAME
+.   Identifies the device by its name or alias.  See SERIAL for more about 
+.   how LConfig finds devices.  Names must be 49 or fewer characters with no
+.   periods (".").  To use spaces and upper-case characters, put the value in
+.   quotes.
 -IP
 .   The static IP address to use for an ethernet connection.  If the connection
-.   is ETH, then the ip address will be given precedence over the serial
-.   number if both are specified.  If the connection is USB, and a valid
-.   IP address is still specified, the value will written.  The same is true
-.   for the GATEWAY and SUBNET parameters.
+.   is ETH, then the ip address will be used to to identify the device.  If the
+.   connection is set to USB, then the IP address will be treated like any 
+.   other parameter, and will be written to the T7 with the upload_config()
+.   function.  If the connection is ANY, a non-empty IP value causes a warning
+.   and will be ignored.  See SERIAL for more about how LConfig identifies
+.   devices.
 -GATEWAY, SUBNET
 .   These parameters are only used if the device connection is USB.  If the
 .   conneciton is through ethernet, lconfig can not make changes to any of
@@ -453,6 +515,17 @@ The following parameters are recognized:
 -AICALUNITS
 .   This optional string can be used to specify the units for the 
 .   calibrated measurement specified by AICALZERO and AICALSLOPE.
+-DISTREAM
+.   When enabled, the lowest 16 DIO bits (FIO and EIO registers) are streamed
+.   as an additional input stream as if the integer value were an extra analog 
+.   input.  To enable DIstreaming, the DISTREAM parameter should be a non-zero
+.   integer mask for which of the channels should be treated as inputs.  For 
+.   example, to set DIO0 and DIO4 as streaming inputs, DISTREAM should be set
+.   to 2^0 + 2^4 = 17.
+.
+.   When FIO settings contradict DISTREAM settings, the FIO settings are given
+.   precedence.  Be careful, because LCONFIG does not currently check for this
+.   type of contradiction.
 -AOCHANNEL
 .   This parameter indicates the channel number to be configured for cyclic 
 .   dynamic output (function generator).  This will be used to generate a 
