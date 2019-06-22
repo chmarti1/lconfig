@@ -1232,7 +1232,8 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     }
     
     // Digital Input streaming
-    write_int(distream,distream);
+    if(dconf[devnum].distream)
+        write_int(distream,distream);
 
     // Analog outputs
     if(dconf[devnum].naoch)
@@ -3156,7 +3157,7 @@ int stop_data_stream(DEVCONF* dconf, const unsigned int devnum){
     int err;
     err = LJM_eStreamStop(dconf[devnum].handle);
     
-    clean_buffer(&dconf[devnum].RB);
+    //clean_buffer(&dconf[devnum].RB);
     
     if(err){
         fprintf(stderr,"LCONFIG: Error stopping a data stream on device %d.\n",devnum);

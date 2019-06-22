@@ -365,9 +365,6 @@ int main(int argc, char *argv[]){
     // Write the samples
     while(!isempty_data_stream(dconf,0)){
         write_data_file(dconf,0,dfile);
-        //printf(".");
-        //fflush(stdout);
-        status_data_stream(dconf,0,&samples_streamed, &samples_read, &samples_waiting);
         printf(".");
         fflush(stdout);
     }
