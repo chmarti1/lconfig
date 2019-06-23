@@ -187,40 +187,9 @@ airesolution 0
 4.019948e-01 -6.766737e-05
 ...
 ```
-
-## <a name="constants"></a> Table of LCONFIG constants
-
-These are the compiler constants provided by `lconfig.h`.
-
-| Constant | Value | Description
-|--------|:-----:|-------------|
-| TWOPI  | 6.283185307179586 | 2*pi comes in handy for signal calculations
-| LCONF_VERSION | 3.00 | The floating point version
-| LCONF_MAX_STR | 128  | The longest character string permitted when reading or writing values and parameters
-| LCONF_MAX_STCH | 18     | Maximum number of stream channels (both input and output  permitted in the DEVCONF struct
-| LCONF_MAX_AOCH | 1      | Highest analog output channel number allowed
-| LCONF_MAX_NAOCH | 2     | Maximum number of analog output channels allowed
-| LCONF_MAX_AICH | 14     | Highest analog input channel number allowed
-| LCONF_MAX_NAICH | 15    | Maximum number of analog input channels allowed
-| LCONF_MAX_AIRES | 8     | Maximum resolution index allowed
-| LCONF_MAX_AOBUFFER | 512 | Maximum analog output buffer for repeating functions
-| LCONF_BACKLOG_THRESHOLD | 1024 | Raise a warning if LJM reports a stream backlog greater than this value
-| LCONF_CLOCK_MHZ | 80.0 | The device clock frequency in MHz
-| LCONF_TRIG_HSC | 3000 | The trigger channel number that specifies using the high speed counter as a trigger
-| LCONF_SAMPLES_PER_READ | 64 | The default samples_per_read value in streaming operations
-| LCONF_DEF_NSAMPLE | 64 | Default value for the `nsample` parameter; used when it is unspecified
-| LCONF_DEF_AI_NCH | 199 | Default value for the `ainegative` parameter
-| LCONF_DEF_AI_RANGE | 10. | Default value for the `airange` parameter
-| LCONF_DEF_AI_RES | 0. | Default value for the `airesolution` parameter
-| LCONF_DEF_AO_AMP | 1. | Default value for the `aoamplitude` parameter
-| LCONF_DEF_AO_OFF | 2.5 | Default value for the `aooffset` parameter
-| LCONF_DEF_AO_DUTY | 0.5 | Default value for the `aoduty` parameter
-| LCONF_NOERR | 0 | Value returned on successful exit
-| LCONF_ERROR | 1 | Value returned on unsuccessful exit
-
 ## Future Improvements
 
-Analog input software triggering is on its way.  This is a technique for streaming continuously until a trigger event is observed in software.  Well implemented software triggers allow for generous pre-trigger buffering, so data before and after the trigger can be recorded.
+Some of the parameters have not been thoroughly tested; especailly the extended features.  I have done some basic testing, but I would not be surprised to learn that there are bugs that need attention there.  Contact me if you find any.
 
 ## Known Bugs
 
