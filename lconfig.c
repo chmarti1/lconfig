@@ -1509,6 +1509,7 @@ int close_config(DEVCONF* dconf, const unsigned int devnum){
     }
     dconf[devnum].handle = -1;
     dconf[devnum].connection_act = -1;
+    dconf[devnum].device_act = -1;
     // Clean up the buffer
     clean_buffer(&dconf[devnum].RB);
     return err;

@@ -37,7 +37,7 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LCONF_VERSION 3.05   // Track modifications in the header
+#define LCONF_VERSION 3.06   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LCONF_VERSION
@@ -129,7 +129,8 @@ with init_data_file() and write_data_file() utilities.
 - Added support for the T4
     - NOTE: advanced FIO features have NOT been tested with the T4
 - Added support for digital input streaming
-- Changed error handling codes
+- Changed error handling algorithms
+- Removed a clear_buffer() in stop_data_stream() that caused dburst to fail
 */
 
 #define TWOPI 6.283185307179586
