@@ -14,7 +14,7 @@ $ sudo -H pip install --upgrade matplotlib
 
 If you are not using pip, or if you have difficulty getting pip to work correctly, there are a number of options.  The simplest is to try your system's native package manager.
 ```bash
-$ sudo apt install numpy matplotlib
+$ sudo apt install python-numpy python-matplotlib
 ```
 
 
