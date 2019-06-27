@@ -1,5 +1,9 @@
 [back](documentation.md)
 
+Version 3.06<br>
+June 2019<br>
+Chris Martin<br>
+
 ## Post processing
 
 The LConfig package includes a post-processing suite written in Python in the `py` directory.  This is a package with tools for loading LConfig data files, plotting, calibrating, and manipulating the data.  For full functionality, the NumPy and Matplotlib packages must be installed.  If you are using the Python package index (pip), 

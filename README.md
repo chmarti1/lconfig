@@ -14,8 +14,8 @@ Version 3.06
 This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder and is linked here:
 
 - [Documentation](docs/documentation.md)
-	- [The LConfig API](docs/api.md)
-	- [Reference](docs/reference.md)
+- [The LConfig API](docs/api.md)
+- [Reference](docs/reference.md)
 
 ---
 

@@ -1,5 +1,9 @@
 [back](../readme.md)
 
+Version 3.06<br>
+June 2019<br>
+Chris Martin<br>
+
 ## Data files
 
 LConfig includes two functions for creating data files: `init_file_stream()` and `write_file_stream()` described in the [api](api.md).  They are used in both the `dburst` and `drun` [binaries](bin.md) to produce a standardized human-readable data file that embeds the configuration in a header.

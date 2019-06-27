@@ -1,5 +1,9 @@
 [back](../readme.md)
 
+Version 3.06<br>
+June 2019<br>
+Chris Martin<br>
+
 ## <a name="ref:top"></a> Reference
 - [Table of configuration parameters](#params)
 - [LConfig data types](#types)

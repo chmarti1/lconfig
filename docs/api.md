@@ -1,12 +1,16 @@
 [back](../readme.md)
 
-##  <a name='fun:top'></a> The LConfig API
+Version 3.06<br>
+June 2019<br>
+Chris Martin<br>
+
+##  <a name='top'></a> The LConfig API
 If you want to use the LConfig system, but you don't just want to use the canned drun or dburst codes, you'll need to know the LConfig API.  The lconfig.h header exposes functions for 
-- [Interacting with configuration files](#fun:config)
-- [Interacting with devices](#fun:dev)
-- [Performing diagnostics](#fun:diag)
-- [Data collection](#fun:data)
-- [Meta configuration](#fun:meta)
+- [Interacting with configuration files](#config)
+- [Interacting with devices](#dev)
+- [Performing diagnostics](#diag)
+- [Data collection](#data)
+- [Meta configuration](#meta)
 
 It is important to remember that LConfig is just a layer built on top of LabJack's interface to automate the device configuration, to handle software triggering, and to handle data buffering.
 
@@ -20,7 +24,7 @@ The typical steps for writing an applicaiton that uses LConfig are: <br>
 ** (7) Stop the stream ** with `stop_data_stream()`.  This halts the data collection process, but does NOT free the data buffer.  Some applications (like `dburst`) may want to quickly stream data to memory and read it later when the acquisition process is done.  This allows steps 7 and 6 to be reversed without consequence.
 ** (8) Close the device connection ** with `close_config()`.  Closing a connection automatically calls `clear_buffer()`, which frees the ring buffer memory and dumps any data not read.
 
-### <a name='fun:config'></a> Interacting with configuration files
+### <a name='config'></a> Interacting with configuration files
 
 ```C
 int load_config(          DEVCONF* dconf, 
@@ -38,9 +42,9 @@ void write_config(        DEVCONF* dconf,
 
 Rather than accept file names, `write_config` accepts an open file pointer so it is convenient for creating headers for data files (which don't need to be closed after the configuration is written).  It also means that the write operation doesn't need to return an error status.
 
-[top](#fun:top)
+[top](#top)
 
-### <a name='fun:dev'></a> Interacting with devices
+### <a name='dev'></a> Interacting with devices
 
 ```C
 int open_config(          DEVCONF* dconf, 
@@ -69,9 +73,9 @@ int download_config(      DEVCONF* dconf,
 
 It is important to note that some of the DEVCONF members configure parameters that are not used until a data operation is executed (like `nsample` or `samplehz`).  These parameters can never be downloaded because they do not reside persistently on the device.
 
-[top](#fun:top)
+[top](#top)
 
-### <a name='fun:diag'></a> Performing diagnostics
+### <a name='diag'></a> Performing diagnostics
 
 ```C
 int ndev_config(          DEVCONF* dconf, 
@@ -91,9 +95,9 @@ void show_config(         DEVCONF* dconf,
 ```
 The `show_config` function calls `download_config` and prints a detailed color-coded comparison of live parameters against the configuration parameters in the `devnum` element of the `dconf` array.  Parameters that do not match are printed in red while parameters that agree with the configuration parameters are printed in green.
 
-[top](#fun:top)
+[top](#top)
 
-### <a name='fun:data'></a> Data collection
+### <a name='data'></a> Data collection
 
 ```C
 int start_data_stream(    DEVCONF* dconf, 
@@ -178,9 +182,9 @@ int update_fio(dconf, devnum);
 frequency = 1e6 / dconf[devnum].fioch[0].time;
 ```
 
-[top](#fun:top)
+[top](#top)
 
-### <a name='fun:meta'></a> Meta configuration
+### <a name='meta'></a> Meta configuration
 
 Experiments are about more than just data rates and analog input ranges.  What were the parameters that mattered most to you?  What did you change in today's experiment?  Was there anything you wanted to note in the data file?  Are there standard searchable fields you want associated with your data?  Meta parameters are custom configuraiton parameters that are embedded in the data file just like device parameters, but they are ignored when configuring the T4/T7.  They are only there to help you keep track of your data.
 
@@ -223,4 +227,4 @@ int put_meta_str(          DEVCONF* dconf,
 ```
 The `put_meta_XXX` functions retrieve meta parameters from the `devnum` element of the `dconf` array by their name, `param`.  The values are written to target of the `value` pointer, and the function returns the `LCONF_ERROR` or `LCONF_NOERR` error status based on whether the parameter was found.
 
-[top](#fun:top)
+[top](#top)

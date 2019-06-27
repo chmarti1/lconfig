@@ -1,8 +1,8 @@
 ## <a name="top"></a> Documentation
 
-Version 3.06
-June 2019
-Chris Martin
+Version 3.06<br>
+June 2019<br>
+Chris Martin<br>
 
 
 ## <a name="intro"></a> Introduction

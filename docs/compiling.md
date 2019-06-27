@@ -1,5 +1,9 @@
 [back](documentation.md)
 
+Version 3.06<br>
+June 2019<br>
+Chris Martin<br>
+
 ## <a name="compiling"></a> Compiling
 
 The LConfig system is written in C using LabJack's LabJackM interface, and is written for a POSIX environment (Linux/Unix).  To obtain the latest version of LConfig
