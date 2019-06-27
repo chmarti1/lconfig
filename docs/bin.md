@@ -1,8 +1,10 @@
-## Binaries
+[back](documentation.md)
 
 Version 3.06<br>
 June 2019<br>
 Chris Martin<br>
+
+## Binaries
 
 There are two binaries included with LConfig: `drun` and `dburst`.  These are inteded to be sufficiently generic to do most data acquisition tasks.  `drun` is intended for long slow sample-rate tests where the test duration may not be known in advance.  `dburst` is intended for short high-speed tests.
 
