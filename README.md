@@ -1,7 +1,6 @@
 # LCONFIG
 
-Headers and utilities for laboratory measurements and machine control with the 
-[LabJack T4 and T7](https://labjack.com/products)
+Headers and utilities for laboratory measurements and machine control with the [LabJack T4 and T7](https://labjack.com/products)
 
 By Christopher R. Martin<br>
 Assistant Professor of Mechanical Engineering<br>
@@ -10,32 +9,31 @@ Penn State University<br>
 
 Version 3.06
 
+### Foreword
+
+This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder and is linked here:
+
+- [Documentation](docs/documentation.md)
+	- [The LConfig API](docs/api.md)
+	- [Reference](docs/reference.md)
+
+---
+
 - [About](#about)
 - [License](#license)
 - [Getting started](#start)
 - [Anatomy of an LCONFIG configuration file](#config)
 - [Anatomy of a data file](#data)
-- [The LConfig API](docs/api.md)
-	- [Interacting with configuration files](docs/api.md#fun:config)
-	- [Interacting with devices](docs/api.md#fun:dev)
-	- [Performing diagnostics](docs/api.md#fun:diag)
-	- [Data collection](docs/api.md#fun:data)
-	- [Meta configuration](docs/api.md#fun:meta)
-- [Reference](docs/reference.md)
-	- [Table of configuration parameters](docs/reference.md#param)
-	- [The LCONFIG data types](docs/reference.md#types)
-	- [The LCONFIG functions](docs/reference.md#functions)
-	- [The LCONFIG header constants](docs/reference.md#constants)
 
 ## <a name="about"></a> About
 
 In the summer of 2016, I realized I needed to be able to adjust my data acquisition parameters day-by-day as I was tweaking and optimizing an experiment.  I love my LabJacks, and the folks at LabJack do a great job of documenting their intuitive interface.  HOWEVER, the effort involved in tweaking DAQ properties on the fly AND documenting them with each experiment can be cumbersome.
 
-This little **L**aboratory **CONFIG**uration system is designed to work with text-based configuration files using an intuitive human readable format.  The philosophy is that most (admittedly not all) laboratory jobs that require data acquisition are quite similar and can be configured using simple text without Labview or other expensive (computationally or monitarily) software.  
+This little **L**aboratory **CONFIG**uration system is designed to work with text-based configuration files using an intuitive human readable format.  The philosophy is that most (admittedly not all) laboratory jobs that require data acquisition are quite similar and can be configured using simple text without Labview or other expensive (computationally or monitarily) software.
 
 All of the acquisition tools are written in C, and only the top-level binaries are specifically written for Linux.  Some minor tweaks should make the base system suitable for Windows.  Still, unless you are ready to dive into the source, I don't recommend it.
 
-There are two binaries, `drun` and `dburst`, that do most of the jobs I need in the lab.  `dburst` collects high speed data in short bursts, and `drun` streams data directly to a data file until I tell it to stop.  It will run as long as you have hard drive space, so tests that last for days, months, or years become possible.  If these binaries don't work for you, the back-end configuration is contained in `lconfig.c` and `lconfig.h`.  I occasionally build specialized codes on them, but for the most part, the `d*` binaries are good enough.
+I have included two binaries, `drun` and `dburst`, built on the LConfig system that do most of the jobs I need in the lab that also serve as examples for how to use LConfig.  `dburst` collects high speed data in short bursts, and `drun` streams data directly to a data file until I tell it to stop.  It will run as long as you have hard drive space, so tests that last for days, months, or years become possible.  If these binaries don't work for you, the back-end configuration is contained in `lconfig.c` and `lconfig.h`.  I occasionally build specialized codes on them, but for the most part, the `d*` binaries are good enough.
 
 While I do my best to keep this README up to date, the authoritative documentation for the behavior of LCONFIG is contained in `lconfig.h`.  Each function has comments that defines its behavior, and there are even some examples that indicate how the functions should be used.  There is also a changelog commented at the top of the header.
 
@@ -88,12 +86,12 @@ This software is released under the [GNU General Public License version 3.0](htt
 
 To get the repository,
 
-```
-    $ git clone http://github.com/chmarti1/lconfig
-    $ cd lconfig
-    $ sudo make install	# Installs binaries to /usr/local/bin
-    $ drun -h   # Prints help
-    $ dburst -h
+```bash
+$ git clone http://github.com/chmarti1/lconfig
+$ cd lconfig
+$ sudo make install	# Installs binaries to /usr/local/bin
+$ drun -h   # Prints help
+$ dburst -h
 ```
 `drun` and `dburst` are binaries built on the LCONFIG system.  `drun` continuously streams data to a file, but the read/write times for most hard drives prevents realizing the full speed of the T7.  `dburst` collects a high speed burst of data and then writes it to a file.  Both executables use the LCONFIG library to load a configuration file, open the appropriate device connections, initiate the data transfer, and write data files automatically.
 
@@ -104,7 +102,7 @@ Once you produce your data, there's a good chance that you'll want to analyze it
 ## <a name="config"></a> Anatomy of an LCONFIG configuration file
 
 A configuration file has MANY optional contents, but all configuration files will have a few things in common.  ALL configuration directives have the same format; a parameter followed by a value separated by whitespace.
-```
+```bash
 # Configuration files can contain comments
 # The first directive always has to be a conneciton type. The connection
 # directive tells LCONFIG what interface to use to reach the T7.  It 
@@ -189,7 +187,7 @@ airesolution 0
 ```
 ## Future Improvements
 
-Some of the parameters have not been thoroughly tested; especailly the extended features.  I have done some basic testing, but I would not be surprised to learn that there are bugs that need attention there.  Contact me if you find any.
+Some of the parameters have not been thoroughly tested; especailly the extended features.  I have done some basic testing, but I would not be surprised to learn that there are bugs that need attention there.  Please contact me if you find any!
 
 ## Known Bugs
 

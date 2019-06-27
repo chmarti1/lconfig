@@ -25,23 +25,23 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | aichannel   | integer [0-13]                          | Analog Input | The physical analog input channel number
 | ainegative  | [0-13], 199, ground, differential       | Analog Input | The physical channel to use as the negative side of the measurement.  199 and ground both indicate a single-ended measurement.  The T7 requires that negative channels be the odd channel one greater than the even positive counterpart (e.g. 0+ 1- or 8+ 9-).  Specify differential to make that selection automatic.
 | ailabel       | string                                              | Analog Input | This is a text label that can be used to identify the channel.
-| aicalslope | float                                                                 | Analog Input | Used with AICALOFFSET to form a linear calibration.
+| aicalslope | float                                                                 | Analog Input | Used with `aicalzero` to form a linear calibration.
 | aicalzero | float | Analog Input | calibrated value = (AICALSLOPE)*(voltage - AICALZERO)
 | aicalunits | string | Analog Input | Used to name the calibrated nunits ("V" by default)
 | airange     | float [.01, .1, 1., 10.]                | Analog Input  | The bipolar (+/-) voltage range for the measurement.  The T7 can accept four values.
 | airesolution| integer 					| Analog Input | The resolution index to be used for the channel.  (See [Resolution Indexes](https://labjack.com/support/datasheets/t-series/ain#resolution))
-| diostream | integer					| Digital Input | A 16-bit mask of DIO channels (FIO/EIO only) to include in a data stream. (1=include, 0=exclude).  If `diostream` is 0, then no digital streaming is included.
+| diostream | integer					| Global | A 16-bit mask of DIO channels (FIO/EIO only) to include in a data stream. (1=include, 0=exclude).  If `diostream` is 0, then no digital streaming is included.
 | aochannel   | integer [0,1]                           | Analog Output | The physical analog output (DAC) channel to use for pseudo function generator output.
 | aolabel | string | Analog Output | A string used to name the analog output channel.
 | aosignal    | constant, sine, square, triangle, noise | Analog Output | The type of cyclic signal to generate
 | aoamplitude | floating point                          | Analog Output | Voltage amplitude of the AC component of the signal (ignored for constant signal).
 | aooffset    | floating point                          | Analog Output | Offset (DC) voltage to add to the oscillating (AC) signal.
 | aoduty      | floating point [0-1]                    | Analog Output | The duty cycle of triangle and square waves. This skews the signal to spend more time on one part of the wave than the other.
+| aofrequency | floating point                          | Analog Output | Specifies the rate the wave will repeat in Hz.
 | trigchannel | integer [0-13]                          | Global        | The analog input to use for a software trigger.  This is NOT the physical channel, but the index of the ordered list of configured inputs.
 | triglevel   | floating point [-10. - 10.]             | Global        | Software trigger threshold voltage.
 | trigedge    | rising, falling, all                    | Global        | Software trigger edge type.
 | trigpre     | non-negative integer [>=0]              | Global        | The "pretrigger" is the minimum number of samples per channel PRIOR to the triger event that will be included in the streamed data.
-| aofrequency | floating point                          | Analog Output | Specifies the rate the wave will repeat in Hz.
 | fiofrequency | floating point                         | Global        | Specifies the CLOCK0 rollover frequency.
 | fiochannel  | integer [0-7]                           | Flexible IO   | The physical FIO channel to use for a digital IO operation.
 | fiolabel | string | Flexible IO | A string used to name the FIO channel.

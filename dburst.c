@@ -116,8 +116,7 @@ int main(int argc, char *argv[]){
     int     nsample,        // number of samples to collect
             nich;           // number of channels in the operation
     // Temporary variables
-    int     count,          // a counter for loops
-            col;            // column counter for data loop
+    int     count;          // a counter for loops
     double  ftemp;          // Temporary float
     int     itemp;          // Temporary integer
     char    stemp[MAXSTR],  // Temporary string
@@ -128,10 +127,7 @@ int main(int argc, char *argv[]){
             data_file[MAXSTR] = DEF_DATAFILE;
     int     samples = 0, 
             duration = 0;
-    // Status registers
-    unsigned int    samples_streamed, 
-                    samples_read, 
-                    samples_waiting;
+
     // Finally, the essentials; a data file and the device configuration
     FILE *dfile;
     DEVCONF dconf[1];
