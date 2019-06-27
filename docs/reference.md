@@ -11,7 +11,7 @@ Chris Martin<br>
 - [LConfig compiler constants](#constants)
 
 
-## <a name="params"></a> Table of configurationarameters
+## <a name="params"></a> Table of configuration parameters
 
 These are the parameters recognized by LCONFIG.  The valid values list the values or classes of values that each parameter can legally be assigned.  The scope indicates where those values are applied.  Global scope parameters are always overwritten if they are repeated, but AI and AO parameters are written to which ever channel is active, and there may be many.
 
