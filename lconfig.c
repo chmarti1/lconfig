@@ -1196,6 +1196,19 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
         fprintf(ff,"connection usb\n");
     else
         fprintf(ff,"connection eth\n");
+        
+    // Actual connection comment
+    switch(dconf[devnum].connection_act){
+    case LJM_ctUSB:
+        fprintf(ff, "#connection (actual) usb\n");
+        break;
+    case LJM_ctETHERNET:
+        fprintf(ff, "#connection (actual) eth\n");
+        break;
+    default:
+        fprintf(ff, "#connection (actual) unknown: %d\n", dconf[devnum].device_act);
+    }
+    
     // Device
     switch(dconf[devnum].device){
     case LJM_dtT4:
@@ -1211,18 +1224,17 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     // Actual device comment
     switch(dconf[devnum].device_act){
     case LJM_dtT4:
-        fprintf(ff, "#device_act t4\n");
+        fprintf(ff, "#device (actual) t4\n");
         break;
     case LJM_dtT7:
-        fprintf(ff, "#device_act t7\n");
+        fprintf(ff, "#device (actual) t7\n");
         break;
     case LJM_dtANY:
     default:
-        fprintf(ff, "#device_act none\n");
+        fprintf(ff, "#device (actual) unknown: (%d)\n", dconf[devnum].device_act);
     }
 
     write_str(name,name);
-    write_str(name_act,#name_act);
     write_str(serial,serial);
     write_str(ip,ip);
     write_str(gateway,gateway);
