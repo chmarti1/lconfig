@@ -9,6 +9,10 @@ LINK=-lLabJackM -lm
 lconfig.o: lconfig.c lconfig.h
 	gcc -c lconfig.c -o lconfig.o
 
+# The LCTOOLS object file
+lctools.o: lctools.c lctools.h lconfig.o
+	gcc -c lctools.c -o lctools.o
+
 # The Binaries...
 #
 drun.bin: lconfig.o drun.c

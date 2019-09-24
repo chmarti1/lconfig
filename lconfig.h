@@ -147,6 +147,9 @@ with init_data_file() and write_data_file() utilities.
 #define LCONF_MAX_NDEV 32   // catch runaway cases if the user passes junk to devmax
 #define LCONF_MAX_FIOCH 22  // Highest flexible IO channel
 #define LCONF_MAX_NFIOCH 8  // maximum flexible IO channels to allow
+#define LCONF_MAX_COMCH 22  // Highest digital communications channel
+#define LCONF_MAX_UART_BAUD 38400   // Highest COMRATE setting when in UART mode
+#define LCONF_MAX_NCOMCH 4  // maximum com channels to allow
 #define LCONF_MAX_AOBUFFER  512     // Maximum number of buffered analog outputs
 #define LCONF_BACKLOG_THRESHOLD 1024 // raise a warning if the backlog exceeds this number.
 #define LCONF_CLOCK_MHZ 80.0    // Clock frequency in MHz
@@ -193,7 +196,7 @@ with init_data_file() and write_data_file() utilities.
 
 // Analog input configuration
 // This includes everyting the DAQ needs to configure and AI channel
-typedef struct aiconf {
+typedef struct {
     unsigned int    channel;     // channel number (0-13)
     unsigned int    nchannel;    // negative channel number (0-13 or 199)
     double          range;       // bipolar input range (0.01, 0.1, 1.0, or 10.)
@@ -210,7 +213,7 @@ enum AOSIGNAL {AO_CONSTANT, AO_SINE, AO_SQUARE, AO_TRIANGLE, AO_NOISE};
 
 // Analog output configuration
 // This includes everything we need to know to construct a signal for output
-typedef struct aoconf {
+typedef struct {
     unsigned int    channel;      // Channel number (0 or 1)
     enum AOSIGNAL   signal;       // What function type is being generated?
     double          amplitude;    // How big?
@@ -223,7 +226,7 @@ typedef struct aoconf {
 
 // Flexible Input/Output configuration struct
 // This includes everything needed to configure an extended feature FIO channel
-typedef struct fioconf {
+typedef struct {
     // Flexible IO mode enumerated type
     enum {  FIO_NONE,   // No extended features
             FIO_PWM,    // Pulse width modulation (input/output)
@@ -253,12 +256,30 @@ typedef struct fioconf {
     char label[LCONF_MAX_STR];
 } FIOCONF;
 
+// Digital Communications Configuration Structure
+//
+typedef struct {
+    enum {COM_NONE, COM_UART, COM_1WIRE, COM_SPI, COM_I2C, COM_SBUS} type;
+    char label[LCONF_MAX_STR];
+    double rate;
+    int pin_in;
+    int pin_out;
+    int pin_clock;
+    union {
+        struct {
+            unsigned int bits;
+            enum {PARITY_NONE=0, PARITY_ODD=1, PARITY_EVEN=2} parity;
+            unsigned int stop;
+        } uart;
+    } options;
+} COMCONF;
+
 // The METACONF is a struct for user-defined flexible parameters.
 // These are not used to configure the DAQ, but simply data of record
 // relevant to the measurement.  They may be needed by the parent program
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
-typedef struct metaconf {
+typedef struct {
     char param[LCONF_MAX_STR];      // parameter name
     union {
         char svalue[LCONF_MAX_STR];
@@ -268,11 +289,10 @@ typedef struct metaconf {
     char type;                      // reminder of what type we have
 } METACONF;
 
-
 // Ring Buffer structure
 // The LCONF ring buffer supports reading and writing in R/W blocks that mimic
 // the T7 stream read block.  
-typedef struct ringbuffer {
+typedef struct {
     unsigned int size_samples;      // length of the buffer array (NOT per channel)
     unsigned int blocksize_samples; // size of each read/write block
     unsigned int samples_per_read;  // samples per channel in each block
@@ -312,6 +332,9 @@ typedef struct devconf {
     double fiofrequency;            // flexible input/output frequency
     FIOCONF fioch[LCONF_MAX_NFIOCH]; // flexible digital input/output
     unsigned int nfioch;            // how many of the FIO are configured?
+    // Communication
+    COMCONF comch[LCONF_MAX_COMCH]; // Communication channels
+    unsigned int ncomch;            // how many of the com channels are configured?
     // Trigger
     int trigchannel;                // Which channel should be used for the trigger?
     unsigned int trigpre;           // How many pre-trigger samples?
@@ -659,11 +682,11 @@ The following parameters are recognized:
 .   parentheses after each description.  Valid values are:
 .       none - all qualifying edges are counted (rising, falling, all)
 .       fixed - ignore all edges a certain interval after an edge 
-                (rising, falling)
+.               (rising, falling)
 .       reset - like fixed, but the interval resets if an edge occurrs during
 .               the timeout period. (rising, falling, all)
 .       minimum - count only edges that persist for a minimum interval
-                (rising, falling)
+.               (rising, falling)
 .   The intervals specified in these debounce modes are set by the FIOUSEC
 .   parameter.
 -FIODIRECTION
@@ -678,6 +701,43 @@ The following parameters are recognized:
 .   Accepts a floating value from zero to one indicating a PWM duty cycle.
 -FIOCOUNT
 .   An unsigned integer counter value.
+-COMCHANNEL
+.   Like the AICHANNEL, AOCHANNEL, and FIOCHANNEL parameter, the COMCHANNEL 
+.   signals the creation of a new communications channel, but unlike the other
+.   scopes, COMCHANNELS do not specify a channel number, but a channel type.
+.   Valid values are:
+. * UART - Universal Asynchronous Receive-Transmit
+. * 1WIRE - 1 Wire communication (NOT YET SUPPORTED)
+. * SPI - Serial-periferal interface (NOT YET SUPPORTED)
+. * I2C - Inter Integrated Circuit (pronounced "eye-squared-see") (NOT YET SUPPORTED)
+. * SBUS - Sensiron Bus I2C derivative (NOT YET SUPPORTED)
+.   
+.   The interpretation of the COM parameters depends on which protocol is being
+.   used.  For example, 1-wire and I2C do not require separate RX and TX lines
+.   and the UART does not require a clock.
+-COMRATE
+.   The requested data rate in bits per second.  The available bit rates vary 
+.   with the different COM interfaces.
+.   * UART: 9600 is default, but LJ recommends < 38,400
+-COMLABEL
+.   This is a string label to apply to the COM channel.
+-COMOUT
+.   The data output line expects an integer DIO pin number.
+.   * UART: This will be the TX pin.
+-COMIN
+.   The data input line expects an integer DIO pin number.
+.   * UART: This will be the RX pin.
+-COMCLOCK
+.   The data clock line expects an integer DIO pin number.
+.   * UART: This parameter is unusued.
+-COMOPTIONS
+.   The communication options is a coded string that defines the mode of the 
+.   selected protocol.
+.   * UART: "8N1" BITS PARITY STOP
+.       The UART options string must be three characters long
+.       BITS:   8 or fewer.  (no 9-bit codes)
+.       PARITY: (N)one, (P)ositive, (O)dd, others are not supported.
+.       STOP:   Number of stop bits 0, 1, or 2.
 -META
 .   The META keyword begins or ends a stanza in which meta parameters can be 
 .   defined without a type prefix (see below).  Meta parameters are free entry
@@ -784,6 +844,9 @@ found in the corresponding registers of the live device.  Some parameters are
 not available for download (like naich and the ai channel numbers).  Instead,
 those are used verbatim to identify how many and which channels to investigate
 on the live device.
+
+DOwNLOAD_CONFIG is marked for depreciation.  It will no longer be updated in 
+future releases, and it will eventually be removed from the package altogether.
 */
 int download_config(DEVCONF* dconf, const unsigned int devnum, DEVCONF* out);
 
@@ -831,6 +894,24 @@ upload_config() should be re-called.  This will halt acquisition and re-start
 it.
 */
 int update_fio(DEVCONF* dconf, const unsigned int devnum);
+
+/*COMMUNICATE
+Executes a read/write operation on a digital communication channel.  The 
+COMCHANNEL is the integer index of the configured COMCHANNEL.  The TXBUFFER is
+an array to transmit over the channel of length TXLENGTH.  The RXBUFFER is an
+array of data to listen for with length RXLENGTH.
+
+If positive, the TIMEOUT_MS is the time in milliseconds to wait for a reply 
+before rasing an error.  If RXLENGTH is zero, the reply is ignored, and if 
+TIMEOUT_MS is negative, then COMMUNICATE will wait indefinitely.
+
+Returns -1 if there is an error.
+*/
+int communicate(DEVCONF* dconf, const unsigned int devnum, 
+        const unsigned int comchannel,
+        const char *txbuffer, const unsigned int txlength, 
+        char *rxbuffer, const unsigned int rxlength,
+        const int timeout_ms);
 
 /*STATUS_DATA_STREAM
 Report on a data stream's status
