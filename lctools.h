@@ -29,6 +29,7 @@ sequences for the Linux console environment.
 
 
 // Add some headers
+#include "lconfig.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -197,9 +198,9 @@ int lct_keypress_prompt(int look_for, const char* prompt, char* input, unsigned 
 .   label that matches LABEL.  If no matching channel is found, the functions
 .   return -1.
 */
-int lct_ai_bylabel(devconf *dconf, unsigned int devnum, char label[]);
-int lct_ao_bylabel(devconf *dconf, unsigned int devnum, char label[]);
-int lct_fio_bylabel(devconf *dconf, unsigned int devnum, char label[]);
+int lct_ai_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]);
+int lct_ao_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]);
+int lct_fio_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]);
 
 
 /************************************
@@ -224,7 +225,7 @@ int lct_fio_bylabel(devconf *dconf, unsigned int devnum, char label[]);
 double data[DATA_SIZE];
 double *this;
 lct_diter_t diter;
-devconf dconf[1];
+DEVCONF dconf[1];
 
 // ...Code to read in data goes here...
 
@@ -235,7 +236,6 @@ while(this = lct_diter_next(&diter)){
 */
 
 typedef struct {
-    devconf *dconf;
     double *next;
     double *last;
     unsigned int increment;
@@ -249,7 +249,7 @@ typedef struct {
 .
 .Returns 0 normally.  Returns -1 if the channel is out of range.
 */
-int lct_diter_init(devconf *dconf, unsigned int devnum, lct_diter_t *diter,
+int lct_diter_init(DEVCONF *dconf, unsigned int devnum, lct_diter_t *diter,
                     double* data, unsigned int data_size, unsigned int channel);
                     
 
@@ -274,7 +274,7 @@ double* lct_diter_next(lct_diter_t *diter);
 .
 .   When CHANNEL or SAMPLE are out of range, LTC_DATA returns a NULL pointer.
 */
-double * lct_data(devconf *dconf, unsigned int devnum, 
+double * lct_data(DEVCONF *dconf, unsigned int devnum, 
                 double data[], unsigned int data_size,
                 unsigned int channel, unsigned int sample);
 
@@ -285,7 +285,7 @@ double * lct_data(devconf *dconf, unsigned int devnum,
 .   calibration parameters, DATA is the array on which to operate, and DATA_SIZE
 .   is its length.  
 */
-void lct_cal_inplace(devconf *dconf, unsigned int devnum, 
+void lct_cal_inplace(DEVCONF *dconf, unsigned int devnum, 
                 double data[], unsigned int data_size);
 
 

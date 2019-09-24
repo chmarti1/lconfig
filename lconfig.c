@@ -20,10 +20,12 @@
 
 #include <stdio.h>      // 
 #include <stdlib.h>     // for rand, malloc, and free
+#include <unistd.h>     // for sleep
 #include <string.h>     // for strncmp and strncpy
 #include <math.h>       // for sin and cos
 #include <limits.h>     // for MIN/MAX values of integers
-#include <time.h>       // for file stream time stamps and COM timeout
+#include <time.h>       // For time stamp formatting
+#include <sys/time.h>   // For high-resolution time in COM timeout
 #include <LabJackM.h>   // duh
 #include <stdint.h>     // being careful about bit widths
 #include <sys/sysinfo.h>    // for ram overload checking
@@ -92,6 +94,12 @@ char err_str[LJM_MAX_NAME_SIZE];
 .
 .............................*/
 
+
+// Helper funciton to calculate elapsed time in milliseconds from two timeval 
+// structs.  
+double difftime_ms(struct timeval *a, struct timeval *b){
+    return ((double)((a->tv_sec - b->tv_sec)*1000)) - ((double)(a->tv_usec - b->tv_usec))/1000;
+}
 
 void strlower(char* target){
     char *a;
@@ -226,7 +234,7 @@ void read_param(FILE *source, char *param){
 
 
 void init_config(DEVCONF* dconf){
-    int ainum, aonum, metanum, fionum;
+    int ainum, aonum, metanum, fionum, comnum;
     // Global configuration
     dconf->connection = -1;
     dconf->connection_act = -1;
@@ -412,6 +420,7 @@ void clean_buffer(RINGBUFFER* RB){
     RB->read = 0;
     RB->write = 0;
 }
+
 
 /*....................................
 .
@@ -1144,7 +1153,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             comnum = dconf[devnum].ncomch;
             // Check for an overrun
             if(comnum>=LCONF_MAX_NCOMCH){
-                fprintf(stderr,"LOAD: Too many COMchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NCOM);
+                fprintf(stderr,"LOAD: Too many COMchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NCOMCH);
                 loadfail();
             }
             // Case out the legal modes
@@ -1179,7 +1188,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 fprintf(stderr,"LOAD: Cannot set digital communication parameters before the first COMchannel parameter.\n");
                 loadfail();
             }else if(sscanf(value, "%f", &ftemp)!=1){
-                frpintf(stderr,"LOAD: The COMRATE parameter expects a numerical data rate in bits per second.\n    Received : %s\n", value);
+                fprintf(stderr,"LOAD: The COMRATE parameter expects a numerical data rate in bits per second.\n    Received : %s\n", value);
                 loadfail();
             }
             dconf[devnum].comch[comnum].rate = ftemp;
@@ -1191,7 +1200,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 fprintf(stderr,"LOAD: Cannot set digital communication parameters before the first COMchannel parameter.\n");
                 loadfail();
             }else if(sscanf(value, "%d", &itemp)!=1){
-                frpintf(stderr,"LOAD: The COMIN parameter expects an integer channel number.\n    Received : %s\n", value);
+                fprintf(stderr,"LOAD: The COMIN parameter expects an integer channel number.\n    Received : %s\n", value);
                 loadfail();
             }else if(itemp < 0 || itemp > LCONF_MAX_COMCH){
                 fprintf(stderr,"LOAD: The COMIN channel must be between 0 and %d, but was set to %d.\n", LCONF_MAX_COMCH, itemp);
@@ -1206,7 +1215,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 fprintf(stderr,"LOAD: Cannot set digital communication parameters before the first COMout parameter.\n");
                 loadfail();
             }else if(sscanf(value, "%d", &itemp)!=1){
-                frpintf(stderr,"LOAD: The COMOUT parameter expects an integer channel number.\n    Received : %s\n", value);
+                fprintf(stderr,"LOAD: The COMOUT parameter expects an integer channel number.\n    Received : %s\n", value);
                 loadfail();
             }else if(itemp < 0 || itemp > LCONF_MAX_COMCH){
                 fprintf(stderr,"LOAD: The COMOUT channel must be between 0 and %d, but was set to %d.\n", LCONF_MAX_COMCH, itemp);
@@ -1224,7 +1233,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             switch(dconf[devnum].comch[comnum].type){
             // == UART OPTIONS == //
             case COM_UART:
-                if(strlen(value)!=3 || sscanf(value, "%1d%c%1d", itemp, ctemp, itemp2) != 3){
+                if(strlen(value)!=3 || sscanf(value, "%1d%c%1d", &itemp, &ctemp, &itemp2) != 3){
                     fprintf(stderr, "LOAD: UART COMOPTIONS parameters must be in 8N1 (BIT PARITY STOP) notation.\n    Received: %s\n", value);
                     loadfail();
                 }else if(itemp < 0 || itemp > 8){
@@ -2977,14 +2986,15 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
     int err, err2;
     struct timeval start, now;
     double ftemp;
+    unsigned int txbytes, rxbytes;
     
     // Verify that the channel number is legal
     if(comchannel > LCONF_MAX_NCOMCH){
-        fprintf(stderr, "COMMUNICATE: Com channel, %d, is larger than the maximum, $d\n", comchannel, LCONF_MAX_COMCH);
+        fprintf(stderr, "COMMUNICATE: Com channel, %d, is larger than the maximum, %d\n", comchannel, LCONF_MAX_COMCH);
         return -1;
     }
     // Point to the selected com struct
-    com = &dconf[devnum].com[comchannel];
+    com = &dconf[devnum].comch[comchannel];
     // Case out the different channel types, and start configuring!
     switch(com->type){
     //
@@ -2996,15 +3006,20 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
             fprintf(stderr, "COMMUNICATE: A UART channel requires that COMIN, COMOUT, and COMRATE be configured\n");
             return -1;
         }
+        // The UART interface encodes data in 16-bit wide words, so the buffer 
+        // length is twice the number of bytes that need to be transmitted
+        rxbytes = (rxlength >> 1);
+        txbytes = (txlength >> 1);
+        
         // Start configuring
         err = LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_TX_DIONUM", (double) com->pin_out);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_RX_DIONUM", (double) com->pin_in);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_BAUD", (double) com->rate);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_RX_BUFFER_SIZE_BYTES", (double) rxlength);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_DATA_BITS", (double) com->options.uart.bits);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_STOP_BITS", (double) com->options.uart.stop);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_PARITY", (double) com->options.uart.parity);
+        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_RX_BUFFER_SIZE_BYTES", (double) rxlength);
         err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 1);
         if(err){
             LJM_ErrorToString(err, err_str);
@@ -3013,9 +3028,10 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
         }
         // If configured to transmit, now's the time.
         if(txlength){
-            err = LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_BYTES_TX", (double) txlength);
+            err = LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_BYTES_TX", (double) txbytes);
             err = err ? err : LJM_eWriteNameByteArray(dconf[devnum].handle, 
                     "ASYNCH_DATA_TX", txlength, txbuffer, &err2);
+            err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_TX_GO", 1);
             if(err){
                 LJM_ErrorToString(err, err_str);
                 fprintf(stderr, "COMMUNICATE: Failed while trying to transmit data over UART\n%s\n", err_str);
@@ -3035,14 +3051,14 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
                 LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
                 return -1;
             }
-            if(ftemp >= rxlength){
-                err = LJM_eWriteNameByteArray(dconf[devnun].handle, 
+            if(ftemp >= rxbytes){
+                err = LJM_eReadNameByteArray(dconf[devnum].handle, 
                         "ASYNCH_DATA_RX", rxlength, rxbuffer, &err2);
                 break;
             }
             // Check for a timeout
             gettimeofday(&now,NULL); 
-            if(timeout_ms > 0 && difftime(now,start)*1000 > timeout_ms){
+            if(timeout_ms > 0 && difftime_ms(&now,&start) > timeout_ms){
                 fprintf(stderr, "COMMUNICATE: RX operation timed out (over %dms)\n", timeout_ms);
                 LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
                 return -1;

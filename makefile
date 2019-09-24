@@ -7,11 +7,11 @@ LINK=-lLabJackM -lm
 
 # The LCONFIG object file
 lconfig.o: lconfig.c lconfig.h
-	gcc -c lconfig.c -o lconfig.o
+	gcc -Wall -c lconfig.c -o lconfig.o
 
 # The LCTOOLS object file
 lctools.o: lctools.c lctools.h lconfig.o
-	gcc -c lctools.c -o lctools.o
+	gcc -Wall -c lctools.c -o lctools.o
 
 # The Binaries...
 #
@@ -22,6 +22,11 @@ drun.bin: lconfig.o drun.c
 dburst.bin: lconfig.o dburst.c
 	gcc lconfig.o dburst.c $(LINK) -o dburst.bin
 	chmod +x dburst.bin
+
+test: lconfig.o test.c
+	gcc lconfig.o test.c $(LINK) -o test
+	chmod +x test
+
 clean:
 	rm -f *.o
 	rm -f *.bin

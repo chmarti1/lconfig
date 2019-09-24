@@ -1,4 +1,5 @@
-#include <lctools.h>
+#include "lctools.h"
+#include "lconfig.h"
 
 
 /*
@@ -190,12 +191,12 @@ void lct_finish_keypress(void){
 
 //******************************************************************************
 int lct_keypress_prompt(int look_for, const char* prompt, char* input, const unsigned int length){
-    if(     keypress() && \
+    if(     lct_is_keypress() && \
             (getchar()==(char)look_for || look_for<0)){
-        finish_keypress();
+        lct_finish_keypress();
         fputs(prompt,stdout);
         fgets(input,length,stdin);
-        setup_keypress();
+        lct_setup_keypress();
         return 1;
     }
     return 0;
@@ -216,7 +217,7 @@ int lct_keypress_prompt(int look_for, const char* prompt, char* input, const uns
 .   label that matches LABEL.  If no matching channel is found, the functions
 .   return -1.
 */
-int lct_ai_bylabel(devconf *dconf, unsigned int devnum, char label[]){
+int lct_ai_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
     int ii;
     for(ii=0; ii<dconf[devnum].naich; ii++){
         if(strcmp(label, dconf[devnum].aich[ii].label)==0)
@@ -225,7 +226,7 @@ int lct_ai_bylabel(devconf *dconf, unsigned int devnum, char label[]){
     return -1;
 }
 
-int lct_ao_bylabel(devconf *dconf, unsigned int devnum, char label[]){
+int lct_ao_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
     int ii;
     for(ii=0; ii<dconf[devnum].naoch; ii++){
         if(strcmp(label, dconf[devnum].aoch[ii].label)==0)
@@ -234,7 +235,7 @@ int lct_ao_bylabel(devconf *dconf, unsigned int devnum, char label[]){
     return -1;
 }
 
-int lct_fio_bylabel(devconf *dconf, unsigned int devnum, char label[]){
+int lct_fio_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
     int ii;
     for(ii=0; ii<dconf[devnum].nfioch; ii++){
         if(strcmp(label, dconf[devnum].fioch[ii].label)==0)
@@ -249,14 +250,9 @@ int lct_fio_bylabel(devconf *dconf, unsigned int devnum, char label[]){
  *                                  *
  ************************************/
 
-typedef struct {
-    double *next;
-    double *last;
-    unsigned int increment;
-} lct_diter_t;
 
 
-int lct_diter_init(devconf *dconf, unsigned int devnum, lct_diter_t *diter,
+int lct_diter_init(DEVCONF *dconf, unsigned int devnum, lct_diter_t *diter,
                     double* data, unsigned int data_size, unsigned int channel){
     unsigned int ii;
     ii = nistream_config(dconf,devnum);
@@ -297,7 +293,7 @@ double* lct_diter_next(lct_diter_t *diter){
 .
 .   When CHANNEL or SAMPLE are out of range, LTC_DATA returns a NULL pointer.
 */
-double * lct_data(devconf *dconf, unsigned int devnum, 
+double * lct_data(DEVCONF *dconf, unsigned int devnum, 
                 double data[], unsigned int data_size,
                 unsigned int channel, unsigned int sample){
     unsigned int ii;
@@ -318,7 +314,7 @@ double * lct_data(devconf *dconf, unsigned int devnum,
 .   calibration parameters, DATA is the array on which to operate, and DATA_SIZE
 .   is its length.  
 */
-void lct_cal_inplace(devconf *dconf, unsigned int devnum, 
+void lct_cal_inplace(DEVCONF *dconf, unsigned int devnum, 
                 double data[], unsigned int data_size){
     lct_diter_t diter;
     double *this;

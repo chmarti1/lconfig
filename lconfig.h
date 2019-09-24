@@ -348,7 +348,6 @@ typedef struct devconf {
 } DEVCONF;
 
 
-
 /*
 .
 .   Prototypes
@@ -904,6 +903,10 @@ array of data to listen for with length RXLENGTH.
 If positive, the TIMEOUT_MS is the time in milliseconds to wait for a reply 
 before rasing an error.  If RXLENGTH is zero, the reply is ignored, and if 
 TIMEOUT_MS is negative, then COMMUNICATE will wait indefinitely.
+
+In UART mode, the applicaiton should only read and write to odd-indexed values
+of the buffers.  The LJM interface encodes UART data in 16-bit registers padded
+with zeros, so the even-indices are neither transmitted nor received.
 
 Returns -1 if there is an error.
 */
