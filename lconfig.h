@@ -56,7 +56,7 @@ First implementation in The Lab
 Defined LCONF_VERSION constant and added this log.
 Improved commenting in the header file.  
 Added support for analog output.
-Removed calibration information from the AICONF struct
+Removed calibration information from the lc_aiconf_t struct
 Added meta configuration
 
 **1.2
@@ -88,7 +88,7 @@ file.
 7/2017
 - Transitioned to name-based addressing instead of explicit addressing for
 adaptation to future modbus upgrades.
-- Added FIO extended feature support.
+- Added EF extended feature support.
 
 **3.00
 7/2017
@@ -104,7 +104,7 @@ with init_data_file() and write_data_file() utilities.
 
 **3.02
 9/2017
-- Added labels to aichannels, aochannels, and fiochannels
+- Added labels to aichannels, aochannels, and efchannels
 - Updated lconfig.py to work properly with 3.02
 - Added the .bylabel dictionary to the dfile python objects
 
@@ -127,10 +127,20 @@ with init_data_file() and write_data_file() utilities.
 ** 3.06
 6/2019
 - Added support for the T4
-    - NOTE: advanced FIO features have NOT been tested with the T4
+    - NOTE: advanced EF features have NOT been tested with the T4
 - Added support for digital input streaming
 - Changed error handling algorithms
 - Removed a clear_buffer() in stop_data_stream() that caused dburst to fail
+
+** 4.00
+9/2019
+- BREAKS REVERSE COMPATIBILITY!!!
+- Implemented a new funciton naming scheme
+- Implemented digital communications interface
+- Replaced configuration array/index pairs with a single configuration pointer
+- Removed DOWNLOAD_CONFIG
+- Changed "FIO" to "EF" to conform to LJ's extended features naming.
+
 */
 
 #define TWOPI 6.283185307179586
@@ -145,8 +155,8 @@ with init_data_file() and write_data_file() utilities.
 #define LCONF_MAX_NAICH 15  // maximum analog input channels to allow
 #define LCONF_MAX_AIRES 8   // maximum resolution index
 #define LCONF_MAX_NDEV 32   // catch runaway cases if the user passes junk to devmax
-#define LCONF_MAX_FIOCH 22  // Highest flexible IO channel
-#define LCONF_MAX_NFIOCH 8  // maximum flexible IO channels to allow
+#define LCONF_MAX_EFCH 22  // Highest flexible IO channel
+#define LCONF_MAX_NEFCH 8  // maximum flexible IO channels to allow
 #define LCONF_MAX_COMCH 22  // Highest digital communications channel
 #define LCONF_MAX_UART_BAUD 38400   // Highest COMRATE setting when in UART mode
 #define LCONF_MAX_NCOMCH 4  // maximum com channels to allow
@@ -173,7 +183,7 @@ with init_data_file() and write_data_file() utilities.
 #define LCONF_DEF_AO_AMP 1.
 #define LCONF_DEF_AO_OFF 2.5
 #define LCONF_DEF_AO_DUTY 0.5
-#define LCONF_DEF_FIO_TIMEOUT 1000
+#define LCONF_DEF_EF_TIMEOUT 1000
 
 #define LCONF_NOERR 0
 #define LCONF_ERROR 1
@@ -205,56 +215,54 @@ typedef struct {
     double          calzero;    // calibration offset
     char            calunits[LCONF_MAX_STR];   // calibration units
     char            label[LCONF_MAX_STR];   // channel label
-} AICONF;
+} lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
-
-// Define the types of analog outputs supported
-enum AOSIGNAL {AO_CONSTANT, AO_SINE, AO_SQUARE, AO_TRIANGLE, AO_NOISE};
 
 // Analog output configuration
 // This includes everything we need to know to construct a signal for output
 typedef struct {
     unsigned int    channel;      // Channel number (0 or 1)
-    enum AOSIGNAL   signal;       // What function type is being generated?
+    // What function type is being generated?
+    enum {AO_CONSTANT, AO_SINE, AO_SQUARE, AO_TRIANGLE, AO_NOISE} signal;
     double          amplitude;    // How big?
     double          frequency;    // Signal frequency in Hz
     double          offset;       // What is the mean value?
     double          duty;         // Duty cycle for a square wave or triangle wave
                                   // duty=1 results in all-high square and an all-rising triangle (sawtooth)
     char            label[LCONF_MAX_STR];   // Output channel label
-} AOCONF;
+} lc_aoconf_t;
 
 // Flexible Input/Output configuration struct
-// This includes everything needed to configure an extended feature FIO channel
+// This includes everything needed to configure an extended feature EF channel
 typedef struct {
     // Flexible IO mode enumerated type
-    enum {  FIO_NONE,   // No extended features
-            FIO_PWM,    // Pulse width modulation (input/output)
-            FIO_COUNT,  // Counter (input/output)
-            FIO_FREQUENCY,  // Frequency (input)
-            FIO_PHASE,  // Line-to-line phase (input)
-            FIO_QUADRATURE  // Encoder quadrature (input)
+    enum {  EF_NONE,   // No extended features
+            EF_PWM,    // Pulse width modulation (input/output)
+            EF_COUNT,  // Counter (input/output)
+            EF_FREQUENCY,  // Frequency (input)
+            EF_PHASE,  // Line-to-line phase (input)
+            EF_QUADRATURE  // Encoder quadrature (input)
         } signal;
 
-    enum {  FIO_RISING,     // Rising edge
-            FIO_FALLING,    // Falling edge
-            FIO_ALL         // Rising and falling edges
+    enum {  EF_RISING,     // Rising edge
+            EF_FALLING,    // Falling edge
+            EF_ALL         // Rising and falling edges
         } edge;
 
-    enum {  FIO_DEBOUNCE_NONE,      // No debounce
-            FIO_DEBOUNCE_FIXED,     // Fixed debounce timer (rising, falling)
-            FIO_DEBOUNCE_RESTART,   // Self restarting timer (rising, falling, all)
-            FIO_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
+    enum {  EF_DEBOUNCE_NONE,      // No debounce
+            EF_DEBOUNCE_FIXED,     // Fixed debounce timer (rising, falling)
+            EF_DEBOUNCE_RESTART,   // Self restarting timer (rising, falling, all)
+            EF_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
         } debounce;
 
-    enum {  FIO_INPUT, FIO_OUTPUT } direction;
+    enum {  EF_INPUT, EF_OUTPUT } direction;
     int channel;
     double time;        // Time parameter (us)
     double duty;        // PWM duty cycle (0-1)
     double phase;       // Phase parameters (degrees)
     unsigned int counts; // Pulse count
     char label[LCONF_MAX_STR];
-} FIOCONF;
+} lc_efconf_t;
 
 // Digital Communications Configuration Structure
 //
@@ -272,9 +280,9 @@ typedef struct {
             unsigned int stop;
         } uart;
     } options;
-} COMCONF;
+} lc_comconf_t;
 
-// The METACONF is a struct for user-defined flexible parameters.
+// The lc_meta_t is a struct for user-defined flexible parameters.
 // These are not used to configure the DAQ, but simply data of record
 // relevant to the measurement.  They may be needed by the parent program
 // they could hold calibration information, or they may simply be a way
@@ -287,7 +295,7 @@ typedef struct {
         double fvalue;
     } value;                        // union for flexible data types
     char type;                      // reminder of what type we have
-} METACONF;
+} lc_meta_t;
 
 // Ring Buffer structure
 // The LCONF ring buffer supports reading and writing in R/W blocks that mimic
@@ -302,7 +310,7 @@ typedef struct {
     unsigned int read;              // beginning index of the next read block
     unsigned int write;             // beginning index of the next write block
     double* buffer;                 // the buffer array
-} RINGBUFFER;
+} lc_ringbuf_t;
 
 
 typedef struct devconf {
@@ -321,19 +329,19 @@ typedef struct devconf {
     double settleus;                // *settling time in us
     unsigned int nsample;           // *number of samples per read
     // Analog input
-    AICONF aich[LCONF_MAX_NAICH];    // analog input configuration array
+    lc_aiconf_t aich[LCONF_MAX_NAICH];    // analog input configuration array
     unsigned int naich;             // number of configured analog input channels
     // Digital input streaming
     unsigned int distream;          // input stream mask
     // Analog output
-    AOCONF aoch[LCONF_MAX_NAOCH];   // analog output configuration array
+    lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
     unsigned int naoch;             // number of configured analog output channels
     // Flexible Input/output
-    double fiofrequency;            // flexible input/output frequency
-    FIOCONF fioch[LCONF_MAX_NFIOCH]; // flexible digital input/output
-    unsigned int nfioch;            // how many of the FIO are configured?
+    double effrequency;            // flexible input/output frequency
+    lc_efconf_t efch[LCONF_MAX_NEFCH]; // flexible digital input/output
+    unsigned int nefch;            // how many of the EF are configured?
     // Communication
-    COMCONF comch[LCONF_MAX_COMCH]; // Communication channels
+    lc_comconf_t comch[LCONF_MAX_COMCH]; // Communication channels
     unsigned int ncomch;            // how many of the com channels are configured?
     // Trigger
     int trigchannel;                // Which channel should be used for the trigger?
@@ -343,9 +351,9 @@ typedef struct devconf {
     enum {TRIG_RISING, TRIG_FALLING, TRIG_ALL} trigedge; // Trigger edge
     enum {TRIG_IDLE, TRIG_PRE, TRIG_ARMED, TRIG_ACTIVE} trigstate; // Trigger state
     // Meta & filestream
-    METACONF meta[LCONF_MAX_META];  // *meta parameters
-    RINGBUFFER RB;                  // ring buffer
-} DEVCONF;
+    lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
+    lc_ringbuf_t RB;                  // ring buffer
+} lc_devconf_t;
 
 
 /*
@@ -355,59 +363,59 @@ typedef struct devconf {
 */
 
 
-/* NDEV_CONFIG
-Return the number of configured device connections in a DEVCONF array.
+/* LC_NDEV
+Return the number of configured device connections in a lc_devconf_t array.
 Counts until it finds a device with a connection index less than 0 (indicating
 that it was never configured) or until the devmax limit is reached.  That means
-that NDEV_CONFIG will be fooled if DEVCONF elements are not configured 
+that LC_NDEV will be fooled if lc_devconf_t elements are not configured 
 sequentially.  Fortunately, load_config always works sequentially.
 */
-int ndev_config(DEVCONF* dconf, // Array of device configuration structs
+int lc_ndev(lc_devconf_t* dconf, // Array of device configuration structs
                 const unsigned int devmax); // maximum number of devices allowed
 
-/* NISTREAM_CONFIG
+/* LC_NISTREAM
 Returns the number of input stream channels configured. These will be the number 
 of columns of data discovered in the data when streaming.  This is the number of
 analog input channels plus the digital input stream (if configured).
 */
-int nistream_config(DEVCONF* dconf, const unsigned int devnum);
+int lc_nistream(lc_devconf_t* dconf);
 
-/* NOSTREAM_CONFIG
+/* LC_NOSTREAM
 Returns the number of output stream channels configured. These will be the number 
 of columns of data discovered in the data when streaming.
 */
-int nostream_config(DEVCONF* dconf, const unsigned int devnum);
+int lc_nostream(lc_devconf_t* dconf);
 
-/* AICHAN_CONFIG
+/* LC_AICHANNELS
 Determine the range of valid analog input channels for the current device 
 configuration.  MIN is the lowest valid channel number.  MAX is the highest 
 valid channel number.  Valid channel numbers are presumed to be sequential.
 */
-void aichan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+void lc_aichannels(const lc_devconf_t* dconf, int *min, int *max);
 
-/* AOCHAN_CONFIG
+/* LC_AOCHANNELS
 Determine the range of valid analog output channels for the current device
 configuration.  MIN is the lowest valid channel number.  MAX is the highest 
 valid channel number.  Valid channel numbers are presumed to be sequential.
 */
-void aochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+void lc_aochannels(const lc_devconf_t* dconf, int *min, int *max);
 
-/* EFCHAN_CONFIG
+/* LC_EFCHANNELS
 Determine the range of valid extended feature IO channels for the current device
 configuration.  MIN is the lowest valid channel number.  MAX is the highest 
 valid channel number.  Valid channel numbers are presumed to be sequential.
 */
-void efchan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+void lc_efchannels(const lc_devconf_t* dconf, int *min, int *max);
 
 /* DIOCHAN_CONFIG
 Determine the range of valid digital IO channels for the current device
 configuration.  MIN is the lowest valid channel number.  MAX is the highest 
 valid channel number.  Valid channel numbers are presumed to be sequential.
 */
-void diochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max);
+void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max);
 
 
-/* LOAD_CONFIG
+/* LC_LOAD_CONFIG
 Load a file by its file name.
 The file should be constructed with parameter-value sets separated by 
 whitespace.  For example
@@ -539,14 +547,14 @@ The following parameters are recognized:
 .   This optional string can be used to specify the units for the 
 .   calibrated measurement specified by AICALZERO and AICALSLOPE.
 -DISTREAM
-.   When enabled, the lowest 16 DIO bits (FIO and EIO registers) are streamed
+.   When enabled, the lowest 16 DIO bits (EF and EIO registers) are streamed
 .   as an additional input stream as if the integer value were an extra analog 
 .   input.  To enable DIstreaming, the DISTREAM parameter should be a non-zero
 .   integer mask for which of the channels should be treated as inputs.  For 
 .   example, to set DIO0 and DIO4 as streaming inputs, DISTREAM should be set
 .   to 2^0 + 2^4 = 17.
 .
-.   When FIO settings contradict DISTREAM settings, the FIO settings are given
+.   When EF settings contradict DISTREAM settings, the EF settings are given
 .   precedence.  Be careful, because LCONFIG does not currently check for this
 .   type of contradiction.
 -AOCHANNEL
@@ -599,7 +607,7 @@ The following parameters are recognized:
 .
 .   The read_data_stream() function is responsible for monitoring the number of
 .   samples and looking for a trigger.  There are four trigger states indicated
-.   by the TRIGSTATE member of the DEVCONF structure.
+.   by the TRIGSTATE member of the lc_devconf_t structure.
 .       TRIG_IDLE - the trigger is inactive and data will be collected as 
 .                   normal.
 .       TRIG_PRE - data collection has begun recently, and TRIGPRE samples have 
@@ -619,62 +627,62 @@ The following parameters are recognized:
 -TRIGPRE
 .   Pretrigger sample count.  This non-negative integer indicates how many 
 .   samples should be collected on each channel before a trigger is allowed.
--FIOFREQUENCY
-.   Sets the frequency scale for all FIO extended features.  This parameter
-.   determines how often the FIO clock updates.  Pulse and PWM outputs will
-.   exhibit this frequency.  Unlike all other FIO parameters, the frequency
-.   is set globally, so there is only one FIOFREQUENCY parameter, rather than
+-EFFREQUENCY
+.   Sets the frequency scale for all EF extended features.  This parameter
+.   determines how often the EF clock updates.  Pulse and PWM outputs will
+.   exhibit this frequency.  Unlike all other EF parameters, the frequency
+.   is set globally, so there is only one EFFREQUENCY parameter, rather than
 .   one for each channel.
--FIOCHANNEL
-.   Like the AOCHANNEL and AICHANNEL, this determines which of the FIO channels
+-EFCHANNEL
+.   Like the AOCHANNEL and AICHANNEL, this determines which of the EF channels
 .   is being set.  Valid values are 0-7, but some features are not implemented
-.   on all FIO channels.  Check the T7 manual Digital IO section for details.
--FIOLABEL
-.   This optional string can be used to label the FIO channel like AILABEL
+.   on all EF channels.  Check the T7 manual Digital IO section for details.
+-EFLABEL
+.   This optional string can be used to label the EF channel like AILABEL
 .   or the other labels.
--FIOSIGNAL
+-EFSIGNAL
 .   Sets the signal type used for this channel.  The following is a list of the
 .   supported signal types and how their settings are handled.  Measurements
-.   are collected by executing the update_fio() function and checking the 
-.   member fioch[] member variables, duty, counts, or time.  Their
+.   are collected by executing the update_ef() function and checking the 
+.   member efch[] member variables, duty, counts, or time.  Their
 .   meaning is listed below each signal type.
 . * PWM - pulse width
 .       Input: valid channels 0,1
-.           FIOEDGE - "rising" indicates duty cycle high, "falling" inverts.
+.           EFEDGE - "rising" indicates duty cycle high, "falling" inverts.
 .           duty - Holds the measured duty cycle
 .           counts - Holds the signal period in counts
 .           time - Holds the signal period in usec
 .       Output: valid channels 0,2,3,4,5
-.           FIOFREQUENCY - Determines the waveform frequency
-.           FIOEDGE - "rising" indicates duty cycle high, "falling" invergs.
-.           FIODUTY - Number 0-1 indicating % time high (low in "falling" mode).
-.           FIODEGREES - Phase of the PWM waveform in degrees.
+.           EFFREQUENCY - Determines the waveform frequency
+.           EFEDGE - "rising" indicates duty cycle high, "falling" invergs.
+.           EFDUTY - Number 0-1 indicating % time high (low in "falling" mode).
+.           EFDEGREES - Phase of the PWM waveform in degrees.
 . * COUNT - edge counter
 .       Input: valid channels 0,1,2,3,6,7
-.           FIOEDGE - Count rising, falling, or ALL edges.
-.           FIODEBOUNCE - What debounce filter to use?
-.           FIOUSEC - What debounce interval to use?
+.           EFEDGE - Count rising, falling, or ALL edges.
+.           EFDEBOUNCE - What debounce filter to use?
+.           EFUSEC - What debounce interval to use?
 .           counts - Holds the measured count.
 .       Output: Not supported
 . * FREQUENCY - period or frequency tracker
 .       Input: valid channels 0,1
-.           FIOUSEC - Holds the measured period.
+.           EFUSEC - Holds the measured period.
 .       Output: Not supported
 . * PHASE - Delay between edges on two channels
 .       Input: valid channels are in pairs 0/1 (only one needs to be specified)
-.           FIOEDGE - rising/falling
-.           FIOUSEC - Holds the measured delay between edges
+.           EFEDGE - rising/falling
+.           EFUSEC - Holds the measured delay between edges
 .       Output: Not supported
 . * QUADRATURE - Two-channel encoder quadrature
 .       Input: valid channels are in pairs 0/1, 2/3, 6/7
 .       (only one needs to be specified)
-.           FIOCOUNT - Holds the measured encoder count
+.           EFCOUNT - Holds the measured encoder count
 .       Output: Not supported
--FIOEDGE
+-EFEDGE
 .   Used by the frequency and phase signals, this parameter determines whether
 .   rising, falling, or both edges should be counted.  Valid values are "all",
 .   "rising", or "falling".
--FIODEBOUNCE
+-EFDEBOUNCE
 .   Used by a COUNT input signal, this parameter indicates what type of filter
 .   (if any) to emply to clean noisy (bouncy) edges.  The T7 does not implement
 .   all of these filters on all edge types.  Valid edge types are listed in 
@@ -686,22 +694,22 @@ The following parameters are recognized:
 .               the timeout period. (rising, falling, all)
 .       minimum - count only edges that persist for a minimum interval
 .               (rising, falling)
-.   The intervals specified in these debounce modes are set by the FIOUSEC
+.   The intervals specified in these debounce modes are set by the EFUSEC
 .   parameter.
--FIODIRECTION
+-EFDIRECTION
 .   Valid parameters "input" or "output" determine whether the signal should
-.   be generated or measured.  FIO outputs cannot be streamed, but are set
+.   be generated or measured.  EF outputs cannot be streamed, but are set
 .   statically.
--FIOUSEC
+-EFUSEC
 .   Specifies a time in microseconds.
--FIODEGREES
+-EFDEGREES
 .   Specifies a phase angle in degrees.
--FIODUTY
+-EFDUTY
 .   Accepts a floating value from zero to one indicating a PWM duty cycle.
--FIOCOUNT
+-EFCOUNT
 .   An unsigned integer counter value.
 -COMCHANNEL
-.   Like the AICHANNEL, AOCHANNEL, and FIOCHANNEL parameter, the COMCHANNEL 
+.   Like the AICHANNEL, AOCHANNEL, and EFCHANNEL parameter, the COMCHANNEL 
 .   signals the creation of a new communications channel, but unlike the other
 .   scopes, COMCHANNELS do not specify a channel number, but a channel type.
 .   Valid values are:
@@ -794,38 +802,36 @@ The following parameters are recognized:
 .   Once established, it can be accessed using the get_meta_int or put_meta_int
 .   functions.
         int year;
-.       get_meta_int(dconf,devnum,"year",&year);
+.       get_meta_int(dconf,"year",&year);
 */
-int load_config(DEVCONF* dconf,         // array of device configuration structs
+int lc_load_config(lc_devconf_t* dconf,         // array of device configuration structs
                 const unsigned int devmax, // maximum number of devices to load
                 const char* filename);  // name of the file to read
 
 
 /* WRITE_CONFIG
-Write the configuration parameters from device devnum of the dconf array to a 
+Write the configuration parameters set in DCONF to a configuration
 file identified by filename.  The append flag indicates whether the file should
 be overwritten or appended with the parameters.  In order to save multiple
 device configurations to the same file, the append flag should be set.
 */
-void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff);
+void lc_write_config(lc_devconf_t* dconf, FILE* ff);
 
 
 
 /* OPEN_CONFIG
-When dconf is an array of device configurations loaded by load_config(), this
-function will open a connection to the device at index "devnum", and the 
-handle will be written to that device's "handle" field.
+When dconf is an array of device configurations loaded by load_config().  DCONF
+is a pointer to the device configuration struct corresponding to the device 
+connection to open.
 */
-int open_config(DEVCONF* dconf,     // device configuration 
-                const unsigned int devnum); // devices index to open
+int lc_open(lc_devconf_t* dconf);
 
 
 
 /* CLOSE_CONFIG
-Closes the connection to device devnum in the dconf array.
+Closes the connection to device DCONF.
 */
-int close_config(DEVCONF* dconf,     // device configuration array
-                const unsigned int devnum); // device to close
+int lc_close(lc_devconf_t* dconf);
 
 
 /*UPLOAD_CONFIG
@@ -833,29 +839,13 @@ Presuming that the connection has already been opened by open_config(), this
 function uploads the appropriate parameters to the respective registers of 
 device devnum in the dconf array.
 */
-int upload_config(DEVCONF* dconf, const unsigned int devnum);
-
-
-/*DOWNLOAD_CONFIG
-This function builds a dummy configuration struct corresponding to device
-devnum in the dconf array.  The values in that struct are based on the values
-found in the corresponding registers of the live device.  Some parameters are
-not available for download (like naich and the ai channel numbers).  Instead,
-those are used verbatim to identify how many and which channels to investigate
-on the live device.
-
-DOwNLOAD_CONFIG is marked for depreciation.  It will no longer be updated in 
-future releases, and it will eventually be removed from the package altogether.
-*/
-int download_config(DEVCONF* dconf, const unsigned int devnum, DEVCONF* out);
+int lc_upload_config(lc_devconf_t* dconf);
 
 
 /*SHOW_CONFIG
-This function calls download_config() and displays a color-coded comparison
-between the configuration in dconf and the live device configuration for the
-device identified by devnum.
+Prints a display of the parameters configured in DCONF.
 */
-void show_config(DEVCONF* dconf, const unsigned int devnum);
+void lc_show_config(lc_devconf_t* dconf);
 
 
 /*GET_META_XXX
@@ -869,30 +859,30 @@ can be referenced by
     int year;
     get_meta_int(dconf,devnum,"year",&year);
 */
-int get_meta_int(DEVCONF* dconf, const unsigned int devnum, const char* param, int* value);
-int get_meta_flt(DEVCONF* dconf, const unsigned int devnum, const char* param, double* value);
-int get_meta_str(DEVCONF* dconf, const unsigned int devnum, const char* param, char* value);
+int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value);
+int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value);
+int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value);
 
 /*PUT_META_XXX
 Write to the meta array.  If the parameter already exists, the old data will be overwritten.
 If the parameter does not exist, a new meta entry will be created.  If the meta array is
 full, put_meta_XXX will return an error.
 */
-int put_meta_int(DEVCONF* dconf, const unsigned int devnum, const char* param, int value);
-int put_meta_flt(DEVCONF* dconf, const unsigned int devnum, const char* param, double value);
-int put_meta_str(DEVCONF* dconf, const unsigned int devnum, const char* param, char* value);
+int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value);
+int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value);
+int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value);
 
 
-/*UPDATE_FIO
-Refresh Flexible Input/Output parameters.  All DEVCONF FIO parameters will be 
+/*UPDATE_EF
+Refresh the extended features registers.  All lc_devconf_t EF parameters will be 
 rewritten to their respective registers and measurements will be downloaded into
-the appropriate FIO channel member variables.
+the appropriate EF channel member variables.
 
-The clock frequency will NOT be updated.  To change the FIOfrequency parameter,
+The clock frequency will NOT be updated.  To change the EFfrequency parameter,
 upload_config() should be re-called.  This will halt acquisition and re-start 
 it.
 */
-int update_fio(DEVCONF* dconf, const unsigned int devnum);
+int lc_update_ef(lc_devconf_t* dconf);
 
 /*COMMUNICATE
 Executes a read/write operation on a digital communication channel.  The 
@@ -910,13 +900,12 @@ with zeros, so the even-indices are neither transmitted nor received.
 
 Returns -1 if there is an error.
 */
-int communicate(DEVCONF* dconf, const unsigned int devnum, 
-        const unsigned int comchannel,
+int lc_communicate(lc_devconf_t* dconf, const unsigned int comchannel,
         const char *txbuffer, const unsigned int txlength, 
         char *rxbuffer, const unsigned int rxlength,
         const int timeout_ms);
 
-/*STATUS_DATA_STREAM
+/*LC_STREAM_STATUS
 Report on a data stream's status
 CHANNELS - number of analog input channels streaming
 SAMPLES_PER_READ - number of samples per channel in each read/write block
@@ -928,44 +917,44 @@ SAMPLES_WAITING - the number of samples waiting in the buffer
 To determine the total number of samples in a read/write block, calculate
     CHANNELS * SAMPLES_PER_READ
 */
-void status_data_stream(DEVCONF* dconf, const unsigned int devnum,
+void lc_stream_status(lc_devconf_t* dconf, 
         unsigned int *samples_streamed, unsigned int *samples_read,
         unsigned int *samples_waiting);
 
-/*ISCOMPLETE_DATA_STREAM
+/* LC_STREAM_ISCOMPLETE
 Returns 1 to indicate that at least dconf[devnum].nsample samples per channel
 have been streamed from the T7.  Returns a 0 otherwise.
 */
-int iscomplete_data_stream(DEVCONF* dconf, const unsigned int devnum);
+int lc_stream_iscomplete(lc_devconf_t* dconf);
 
-/*ISEMPTY_DATA_STREAM
+/* LC_STREAM_ISEMPTY
 Returns 1 to indicate that all data in the buffer has been read.  Returns a 0
 otherwise.
 */
-int isempty_data_stream(DEVCONF* dconf, const unsigned int devnum);
+int lc_stream_isempty(lc_devconf_t* dconf);
 
-/*START_DATA_STREAM
+/* LC_STREAM_START
 Start a stream operation based on the device configuration for device devnum.
 samples_per_read can be used to override the NSAMPLE parameter in the device
 configuration.  If samples_per_read is <= 0, then the LCONF_SAMPLES_PER_READ
 value will be used instead.
 */
-int start_data_stream(DEVCONF* dconf, const unsigned int devnum,  // Device array and number
+int lc_stream_start(lc_devconf_t* dconf,   // Device array and number
             int samples_per_read);    // how many samples per call to read_data_stream
 
 
-/*SERVICE_DATA_STREAM
+/*LC_STREAM_SERVICE
 Read data from an active stream on the device devnum.  The SERVICE_DATA_STREAM
 function also services the software trigger state.
 
-Data are read directly from the T7 into a ring buffer in the DEVCONF struct.  
+Data are read directly from the T7 into a ring buffer in the lc_devconf_t struct.  
 Until data become available, READ_DATA_STREAM will return NULL data arrays,
 but once valid data are ready, READ_DATA_STREAM returns pointers into this
 ring buffer.
 */
-int service_data_stream(DEVCONF* dconf, const unsigned int devnum);
+int lc_stream_service(lc_devconf_t* dconf);
 
-/*READ_DATA_STREAM
+/*LC_STREAM_READ
 If data are available on the data stream on device number DEVNUM, then 
 READ_DATA_STREAM will return a DATA pointer into a buffer that contains data
 ready for use.  The amount of data available is indicated by the CHANNELS
@@ -983,7 +972,7 @@ data[4]     sample1, channel1
 data[5]     sample1, channel2
 ... 
 
-Once READ_DATA_STREAM has been called, the DEVCONF struct updates its internal
+Once READ_DATA_STREAM has been called, the lc_devconf_t struct updates its internal
 pointers, and the next call's DATA register will either point to the next 
 available block of data, or it will be NULL if the buffer is empty.
 
@@ -1006,13 +995,13 @@ if(data){
         my_buffer[index] = data[index];
 }
 */
-int read_data_stream(DEVCONF* dconf, const unsigned int devnum, 
-    double **data, unsigned int *channels, unsigned int *samples_per_read);
+int lc_stream_read(lc_devconf_t* dconf, double **data, 
+        unsigned int *channels, unsigned int *samples_per_read);
 
 /*STOP_STREAM
 Halt an active stream on device devnum.
 */
-int stop_data_stream(DEVCONF* dconf, const unsigned int devnum);
+int lc_stream_stop(lc_devconf_t* dconf);
 
 /*
 .
@@ -1020,59 +1009,21 @@ int stop_data_stream(DEVCONF* dconf, const unsigned int devnum);
 .
 */
 
-/*INIT_DATA_FILE
+/*LC_DATAFILE_INIT
 Writes the configuration header and timestamp to a data file.  This should
 be called prior to write_data_file()
 */
-int init_data_file(DEVCONF* dconf, const unsigned int devnum, FILE *FF);
+int lc_datafile_init(lc_devconf_t* dconf, FILE *FF);
 
 
-/*READ_FILE_STREAM
+/*LC_DATAFILE_WRITE
 Streams data from the dconf buffer to an open data file.  WRITE_DATA_FILE calls
 READ_DATA_STREAM to pull data from the device ring buffer.  The buffer will
 be empty unless there are also prior calls to SERVICE_DATA_STREAM.
 */
-int write_data_file(DEVCONF* dconf, const unsigned int devnum, FILE *FF);
+int lc_datafile_write(lc_devconf_t* dconf, FILE *FF);
 
 
-
-
-
-
-
-/*HELPER FUNCTIONS
-These are functions not designed for use outside the header
-*/
-
-// force a string to lower case
-void strlower(char* target);
-
-/* *DEPRECIATED* calculate transitioned away from address referencing
-//void airegisters(const unsigned int channel, int *reg_negative, int *reg_range, int *reg_resolution);
-
-// calculate analog output configuration register addresses
-void aoregisters(const unsigned int buffer,     // The output stream number (not the DAC number)
-                int *reg_target,                // STREAM_OUT#_TARGET (This should point to the DAC register) 
-                int *reg_buffersize,            // STREAM_OUT#_BUFFER_SIZE (The memory to allocate to the buffer)
-                int *reg_enable,                // STREAM_OUT#_ENABLE (Is the output stream enabled?)
-                int *reg_buffer,                // STREAM_OUT#_BUFFER_F32 (This is the destination for floating point data)
-                int *reg_loopsize,              // STREAM_OUT#_LOOP_SIZE (The number of samples in the loop)
-                int *reg_setloop);              // STREAM_OUT#_SET_LOOP (how to interact with the loop; should be 1)
-*/
-
-// print a formatted line with color flags for mismatching values
-// prints the following format: printf("%s: %s (%s)\n", head, value1, value2)
-void print_color(const char* head, char* value1, char* value2);
-
-// Read the next word from a configuration file while ignoring comments
-void read_param(FILE* source, char* param);
-
-
-
-/* INIT_CONFIG
-Initialize a configuration struct to safe default values
-*/
-void init_config(DEVCONF *dconf);
 
 
 #endif

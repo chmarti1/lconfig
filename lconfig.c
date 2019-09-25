@@ -34,18 +34,18 @@
 
 
 // macros for writing lines to configuration files in WRITE_CONFIG()
-#define write_str(param,child) dconf[devnum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].child) : (int) 0
-#define write_int(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].child)
-#define write_flt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].child)
-#define write_aistr(param,child) dconf[devnum].aich[ainum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].aich[ainum].child) : (int) 0
-#define write_aiint(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].aich[ainum].child)
-#define write_aiflt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].aich[ainum].child)
-#define write_aostr(param,child) dconf[devnum].aoch[aonum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].aoch[aonum].child) : (int) 0
-#define write_aoint(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].aoch[aonum].child)
-#define write_aoflt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].aoch[aonum].child)
-#define write_fiostr(param,child) dconf[devnum].fioch[fionum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf[devnum].fioch[fionum].child) : (int) 0
-#define write_fioint(param,child) fprintf(ff, "%s %d\n", #param, dconf[devnum].fioch[fionum].child)
-#define write_fioflt(param,child) fprintf(ff, "%s %f\n", #param, dconf[devnum].fioch[fionum].child)
+#define write_str(param,child) dconf->child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf->child) : (int) 0
+#define write_int(param,child) fprintf(ff, "%s %d\n", #param, dconf->child)
+#define write_flt(param,child) fprintf(ff, "%s %f\n", #param, dconf->child)
+#define write_aistr(param,child) dconf->aich[ainum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf->aich[ainum].child) : (int) 0
+#define write_aiint(param,child) fprintf(ff, "%s %d\n", #param, dconf->aich[ainum].child)
+#define write_aiflt(param,child) fprintf(ff, "%s %f\n", #param, dconf->aich[ainum].child)
+#define write_aostr(param,child) dconf->aoch[aonum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf->aoch[aonum].child) : (int) 0
+#define write_aoint(param,child) fprintf(ff, "%s %d\n", #param, dconf->aoch[aonum].child)
+#define write_aoflt(param,child) fprintf(ff, "%s %f\n", #param, dconf->aoch[aonum].child)
+#define write_efstr(param,child) dconf->efch[efnum].child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf->efch[efnum].child) : (int) 0
+#define write_efint(param,child) fprintf(ff, "%s %d\n", #param, dconf->efch[efnum].child)
+#define write_efflt(param,child) fprintf(ff, "%s %f\n", #param, dconf->efch[efnum].child)
 // macro for testing strings
 #define streq(a,b) strncmp(a,b,LCONF_MAX_STR)==0
 
@@ -58,25 +58,25 @@
 }
 
 #define openfail(){\
-    fprintf(stderr,"OPEN: Devnum: %d, IP: %s, Serial: %s, Name: \"%s\"\n",\
-            devnum, dconf[devnum].ip, dconf[devnum].serial, dconf[devnum].name);\
+    fprintf(stderr,"OPEN: IP: %s, Serial: %s, Name: \"%s\"\n",\
+            dconf->ip, dconf->serial, dconf->name);\
     LJM_ErrorToString(err, err_str);\
     fprintf(stderr,"LJM Error Code: %s\n",err_str);\
-    close_config(dconf, devnum);\
+    lc_close(dconf);\
     return LCONF_ERROR;\
 }
 
 #define uploadfail(){\
-    fprintf(stderr,"UPLOAD: Devnum: %d, IP: %s, Serial: %s, Name: \"%s\"\n",\
-            devnum, dconf[devnum].ip, dconf[devnum].serial, dconf[devnum].name);\
+    fprintf(stderr,"UPLOAD: IP: %s, Serial: %s, Name: \"%s\"\n",\
+            dconf->ip, dconf->serial, dconf->name);\
     LJM_ErrorToString(err, err_str);\
     fprintf(stderr,"LJM Error Code: %s\n",err_str);\
     return LCONF_ERROR;\
 }
 
 #define startfail(){\
-    fprintf(stderr,"START_DATA_STREAM: Devnum: %d, IP: %s, Serial: %s, Name: \"%s\"\n",\
-            devnum, dconf[devnum].ip, dconf[devnum].serial, dconf[devnum].name);\
+    fprintf(stderr,"START_DATA_STREAM: IP: %s, Serial: %s, Name: \"%s\"\n",\
+            dconf->ip, dconf->serial, dconf->name);\
     LJM_ErrorToString(err, err_str);\
     fprintf(stderr,"%s\n",err_str);\
     return LCONF_ERROR;\
@@ -233,8 +233,8 @@ void read_param(FILE *source, char *param){
 }
 
 
-void init_config(DEVCONF* dconf){
-    int ainum, aonum, metanum, fionum, comnum;
+void init_config(lc_devconf_t* dconf){
+    int ainum, aonum, metanum, efnum, comnum;
     // Global configuration
     dconf->connection = -1;
     dconf->connection_act = -1;
@@ -285,19 +285,19 @@ void init_config(DEVCONF* dconf){
         dconf->aoch[aonum].label[0] = '\0';
     }
     // Flexible IO
-    dconf->nfioch = 0;
-    dconf->fiofrequency = 0.;
-    for(fionum=0; fionum<LCONF_MAX_NFIOCH; fionum++){
-        dconf->fioch[fionum].channel = -1;
-        dconf->fioch[fionum].signal = FIO_NONE;
-        dconf->fioch[fionum].edge = FIO_RISING;
-        dconf->fioch[fionum].debounce = FIO_DEBOUNCE_NONE;
-        dconf->fioch[fionum].direction = FIO_INPUT;
-        dconf->fioch[fionum].time = 0.;
-        dconf->fioch[fionum].duty = .5;
-        dconf->fioch[fionum].phase = 0.;
-        dconf->fioch[fionum].counts = 0;
-        dconf->fioch[fionum].label[0] = '\0';
+    dconf->nefch = 0;
+    dconf->effrequency = 0.;
+    for(efnum=0; efnum<LCONF_MAX_NEFCH; efnum++){
+        dconf->efch[efnum].channel = -1;
+        dconf->efch[efnum].signal = EF_NONE;
+        dconf->efch[efnum].edge = EF_RISING;
+        dconf->efch[efnum].debounce = EF_DEBOUNCE_NONE;
+        dconf->efch[efnum].direction = EF_INPUT;
+        dconf->efch[efnum].time = 0.;
+        dconf->efch[efnum].duty = .5;
+        dconf->efch[efnum].phase = 0.;
+        dconf->efch[efnum].counts = 0;
+        dconf->efch[efnum].label[0] = '\0';
     }
     // Communications
     dconf->ncomch = 0;
@@ -314,7 +314,7 @@ void init_config(DEVCONF* dconf){
 
 // Initialization declares the buffer memory and initializes all
 // internal variables to describe the buffer's size and read/write oeprations
-int init_buffer(RINGBUFFER* RB,    // Ring buffer struct to initialize
+int init_buffer(lc_ringbuf_t* RB,    // Ring buffer struct to initialize
                 const unsigned int channels, // The number of channels in the stream
                 const unsigned int samples_per_read, // The samples (scans) per R/W block
                 const unsigned int blocks){ // The number of R/W blocks to buffer
@@ -323,7 +323,7 @@ int init_buffer(RINGBUFFER* RB,    // Ring buffer struct to initialize
     long unsigned int bytes;
 
     if(RB->buffer){
-        fprintf(stderr,"RINGBUFFER: Buffer not free!\n");
+        fprintf(stderr,"lc_ringbuf_t: Buffer not free!\n");
         return LCONF_ERROR;
     }
 
@@ -339,7 +339,7 @@ int init_buffer(RINGBUFFER* RB,    // Ring buffer struct to initialize
     sysinfo(&sinf);
     bytes = RB->size_samples * sizeof(double);
     if(sinf.freeram * 0.9 < bytes){
-        fprintf(stderr,"RINGBUFFER: Not enough available memory: aborting!\n");
+        fprintf(stderr,"INIT_BUFFER: Not enough available memory: aborting!\n");
         RB->buffer = NULL;
         return LCONF_ERROR;
     }
@@ -347,16 +347,16 @@ int init_buffer(RINGBUFFER* RB,    // Ring buffer struct to initialize
     return LCONF_NOERR;
 }
 
-int isempty_buffer(RINGBUFFER* RB){
+int isempty_buffer(lc_ringbuf_t* RB){
     return (RB->read == RB->write);
 }
 
-int isfull_buffer(RINGBUFFER* RB){
+int isfull_buffer(lc_ringbuf_t* RB){
     return (RB->read == RB->size_samples);
 }
 
 // Returns a pointer to the start of the next block to be written
-double* get_write_buffer(RINGBUFFER* RB){
+double* get_write_buffer(lc_ringbuf_t* RB){
     if(RB->buffer == NULL)
         return NULL;
     return &RB->buffer[RB->write];
@@ -364,7 +364,7 @@ double* get_write_buffer(RINGBUFFER* RB){
 
 // Writing to the buffer is done externally by the LJM module, but after the
 // data is written, the buffer variables need to be advanced appropriately.
-void service_write_buffer(RINGBUFFER* RB){
+void service_write_buffer(lc_ringbuf_t* RB){
     // advance the write index
     RB->write += RB->blocksize_samples;
     RB->samples_streamed += RB->samples_per_read;
@@ -378,7 +378,7 @@ void service_write_buffer(RINGBUFFER* RB){
 
 // Returns a pointer to the start of the next block to be read
 // returns NULL if the buffer is empty
-double* get_read_buffer(RINGBUFFER* RB){
+double* get_read_buffer(lc_ringbuf_t* RB){
     if(RB->buffer == NULL)
         return NULL;
     // if the buffer is full
@@ -393,7 +393,7 @@ double* get_read_buffer(RINGBUFFER* RB){
 }
 
 // Updates the buffer's read index once a read operation is complete.
-void service_read_buffer(RINGBUFFER *RB){
+void service_read_buffer(lc_ringbuf_t *RB){
     // if the buffer is full
     if(RB->read == RB->size_samples)
         RB->read = RB->write;
@@ -408,7 +408,7 @@ void service_read_buffer(RINGBUFFER *RB){
 }
 
 // Free the buffer's memory
-void clean_buffer(RINGBUFFER* RB){
+void clean_buffer(lc_ringbuf_t* RB){
     if(RB->buffer){
         free(RB->buffer);
         RB->buffer = NULL;
@@ -429,21 +429,21 @@ void clean_buffer(RINGBUFFER* RB){
 .
 ......................................*/
 
-int nistream_config(DEVCONF* dconf, const unsigned int devnum){
+int lc_nistream(lc_devconf_t* dconf){
     int out;
-    out = dconf[devnum].naich;
-    if(dconf[devnum].distream)
+    out = dconf->naich;
+    if(dconf->distream)
         out += 1;
     return out;
 }
 
-int nostream_config(DEVCONF* dconf, const unsigned int devnum){
+int lc_nostream(lc_devconf_t* dconf){
     int out;
-    out = dconf[devnum].naoch;
+    out = dconf->naoch;
     return out;
 }
 
-int ndev_config(DEVCONF* dconf, const unsigned int devmax){
+int lc_ndev(lc_devconf_t* dconf, const unsigned int devmax){
     int ii;
     for(ii=0; ii<devmax; ii++)
         if(dconf[ii].connection<0)
@@ -451,8 +451,8 @@ int ndev_config(DEVCONF* dconf, const unsigned int devmax){
     return devmax;
 }
 
-void aichan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
-    switch(dconf[devnum].device_act){
+void lc_aichannels(const lc_devconf_t* dconf, int *min, int *max){
+    switch(dconf->device_act){
     case LJM_dtT4:
         *min = 0;
         *max = 11;
@@ -467,8 +467,8 @@ void aichan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
     }
 }
 
-void aochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
-    switch(dconf[devnum].device_act){
+void lc_aochannels(const lc_devconf_t* dconf, int *min, int *max){
+    switch(dconf->device_act){
     case LJM_dtT4:
         *min = 0;
         *max = 1;
@@ -483,8 +483,8 @@ void aochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
     }
 }
 
-void efchan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
-    switch(dconf[devnum].device_act){
+void lc_efchannels(const lc_devconf_t* dconf, int *min, int *max){
+    switch(dconf->device_act){
     case LJM_dtT4:
         *min = 4;
         *max = 9;
@@ -499,8 +499,8 @@ void efchan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
     }
 }
 
-void diochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
-    switch(dconf[devnum].device_act){
+void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max){
+    switch(dconf->device_act){
     case LJM_dtT4:
         *min = 4;
         *max = 19;
@@ -524,8 +524,8 @@ void diochan_config(const DEVCONF* dconf, const int devnum, int *min, int *max){
 ......................................*/
 
 
-int load_config(DEVCONF* dconf, const unsigned int devmax, const char* filename){
-    int devnum=-1, ainum=-1, aonum=-1, fionum=-1, comnum=-1;
+int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* filename){
+    int devnum=-1, ainum=-1, aonum=-1, efnum=-1, comnum=-1;
     int itemp, itemp2;
     float ftemp;
     char param[LCONF_MAX_STR], value[LCONF_MAX_STR];
@@ -1003,149 +1003,149 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             }
             dconf[devnum].trigpre = itemp;
         //
-        // FIOFREQUENCY parameter
+        // EFFREQUENCY parameter
         //
-        }else if(streq(param,"fiofrequency")){
+        }else if(streq(param,"effrequency")){
             if(sscanf(value,"%f",&ftemp)!=1){
-                fprintf(stderr,"LOAD: Got illegal FIOfrequency: %s\n",value);
+                fprintf(stderr,"LOAD: Got illegal EFfrequency: %s\n",value);
                 loadfail(); 
             }else if(ftemp <= 0.){
-                fprintf(stderr,"LOAD: FIOfrequency must be positive!\n");
+                fprintf(stderr,"LOAD: EFfrequency must be positive!\n");
                 loadfail();
             }
-            dconf[devnum].fiofrequency = ftemp;
+            dconf[devnum].effrequency = ftemp;
         //
-        // FIOCHANNEL parameter
+        // EFCHANNEL parameter
         //
-        }else if(streq(param,"fiochannel")){
-            fionum = dconf[devnum].nfioch;
+        }else if(streq(param,"efchannel")){
+            efnum = dconf[devnum].nefch;
             // Check for an array overrun
-            if(fionum>=LCONF_MAX_FIOCH){
-                fprintf(stderr,"LOAD: Too many FIOchannel definitions.  Only %d are allowed.\n",LCONF_MAX_FIOCH);
+            if(efnum>=LCONF_MAX_EFCH){
+                fprintf(stderr,"LOAD: Too many EFchannel definitions.  Only %d are allowed.\n",LCONF_MAX_EFCH);
                 loadfail();
             // Make sure the channel number is a valid integer
             }else if(sscanf(value,"%d",&itemp)!=1){
-                fprintf(stderr,"LOAD: Illegal FIOchannel number \"%s\". Expected integer.\n",value);
+                fprintf(stderr,"LOAD: Illegal EFchannel number \"%s\". Expected integer.\n",value);
                 loadfail();
             }
             // Make sure the channel number is in range for the T7.
-            if(itemp<0 || itemp>LCONF_MAX_FIOCH){
-                fprintf(stderr,"LOAD: FIOchannel number %d is out of range [0-%d].\n", itemp, LCONF_MAX_FIOCH);
+            if(itemp<0 || itemp>LCONF_MAX_EFCH){
+                fprintf(stderr,"LOAD: EFchannel number %d is out of range [0-%d].\n", itemp, LCONF_MAX_EFCH);
                 loadfail();
             }
             // increment the number of active channels
-            dconf[devnum].nfioch++;
+            dconf[devnum].nefch++;
             // set the channel number
-            dconf[devnum].fioch[fionum].channel = itemp;
+            dconf[devnum].efch[efnum].channel = itemp;
             // initialize the other parameters
-            dconf[devnum].fioch[fionum].signal = FIO_NONE;
-            dconf[devnum].fioch[fionum].edge = FIO_RISING;
-            dconf[devnum].fioch[fionum].debounce = FIO_DEBOUNCE_NONE;
-            dconf[devnum].fioch[fionum].direction = FIO_INPUT;
-            dconf[devnum].fioch[fionum].time = LCONF_DEF_FIO_TIMEOUT;
-            dconf[devnum].fioch[fionum].phase = 0.;
-            dconf[devnum].fioch[fionum].duty = 0.5;
+            dconf[devnum].efch[efnum].signal = EF_NONE;
+            dconf[devnum].efch[efnum].edge = EF_RISING;
+            dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_NONE;
+            dconf[devnum].efch[efnum].direction = EF_INPUT;
+            dconf[devnum].efch[efnum].time = LCONF_DEF_EF_TIMEOUT;
+            dconf[devnum].efch[efnum].phase = 0.;
+            dconf[devnum].efch[efnum].duty = 0.5;
         //
-        // FIOSIGNAL parameter
+        // EFSIGNAL parameter
         //
-        }else if(streq(param,"fiosignal")){
+        }else if(streq(param,"efsignal")){
             if(streq(value,"pwm")){
-                dconf[devnum].fioch[fionum].signal = FIO_PWM;
+                dconf[devnum].efch[efnum].signal = EF_PWM;
             }else if(streq(value,"count")){
-                dconf[devnum].fioch[fionum].signal = FIO_COUNT;
+                dconf[devnum].efch[efnum].signal = EF_COUNT;
             }else if(streq(value,"frequency")){
-                dconf[devnum].fioch[fionum].signal = FIO_FREQUENCY;
+                dconf[devnum].efch[efnum].signal = EF_FREQUENCY;
             }else if(streq(value,"phase")){
-                dconf[devnum].fioch[fionum].signal = FIO_PHASE;
+                dconf[devnum].efch[efnum].signal = EF_PHASE;
             }else if(streq(value,"quadrature")){
-                dconf[devnum].fioch[fionum].signal = FIO_QUADRATURE;
+                dconf[devnum].efch[efnum].signal = EF_QUADRATURE;
             }else{
-                fprintf(stderr,"LOAD: Illegal FIO signal: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF signal: %s\n",value);
                 loadfail(); 
             }
         //
-        // FIOEDGE
+        // EFEDGE
         //
-        }else if(streq(param,"fioedge")){
+        }else if(streq(param,"efedge")){
             if(streq(value,"rising")){
-                dconf[devnum].fioch[fionum].edge = FIO_RISING;
+                dconf[devnum].efch[efnum].edge = EF_RISING;
             }else if(streq(value,"falling")){
-                dconf[devnum].fioch[fionum].edge = FIO_FALLING;
+                dconf[devnum].efch[efnum].edge = EF_FALLING;
             }else if(streq(value,"all")){
-                dconf[devnum].fioch[fionum].edge = FIO_ALL;
+                dconf[devnum].efch[efnum].edge = EF_ALL;
             }else{
-                fprintf(stderr,"LOAD: Illegal FIO edge: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF edge: %s\n",value);
                 loadfail(); 
             }
         //
-        // FIODEBOUNCE
+        // EFDEBOUNCE
         //
-        }else if(streq(param,"fiodebounce")){
+        }else if(streq(param,"efdebounce")){
             if(streq(value,"none")){
-                dconf[devnum].fioch[fionum].debounce = FIO_DEBOUNCE_NONE;
+                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_NONE;
             }else if(streq(value,"fixed")){
-                dconf[devnum].fioch[fionum].debounce = FIO_DEBOUNCE_FIXED;
+                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_FIXED;
             }else if(streq(value,"restart")){
-                dconf[devnum].fioch[fionum].debounce = FIO_DEBOUNCE_RESTART;
+                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_RESTART;
             }else if(streq(value,"minimum")){
-                dconf[devnum].fioch[fionum].debounce = FIO_DEBOUNCE_MINIMUM;
+                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_MINIMUM;
             }else{
-                fprintf(stderr,"LOAD: Illegal FIO debounce mode: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF debounce mode: %s\n",value);
                 loadfail();
             }
         //
-        // FIODIRECTION
+        // EFDIRECTION
         //
-        }else if(streq(param,"fiodirection")){
+        }else if(streq(param,"efdirection")){
             if(streq(value,"input")){
-                dconf[devnum].fioch[fionum].direction = FIO_INPUT;
+                dconf[devnum].efch[efnum].direction = EF_INPUT;
             }else if(streq(value,"output")){
-                dconf[devnum].fioch[fionum].direction = FIO_OUTPUT;
+                dconf[devnum].efch[efnum].direction = EF_OUTPUT;
             }else{
-                fprintf(stderr,"LOAD: Illegal FIO direction: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF direction: %s\n",value);
                 loadfail();
             }
         //
-        // FIOusec
+        // EFusec
         //
-        }else if(streq(param,"fiousec")){
+        }else if(streq(param,"efusec")){
             if(sscanf(value,"%f",&ftemp)==1){
-                dconf[devnum].fioch[fionum].time = ftemp;
+                dconf[devnum].efch[efnum].time = ftemp;
             }else{
-                fprintf(stderr,"LOAD: Illegal FIO time parameter. Found: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF time parameter. Found: %s\n",value);
                 loadfail();
             }
         //
-        // FIOdegrees
+        // EFdegrees
         //
-        }else if(streq(param,"fiodegrees")){
+        }else if(streq(param,"efdegrees")){
             if(sscanf(value,"%f",&ftemp)==1){
-                dconf[devnum].fioch[fionum].phase = ftemp;
+                dconf[devnum].efch[efnum].phase = ftemp;
             }else{
-                fprintf(stderr,"LOAD: Illegal FIO phase parameter. Found: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF phase parameter. Found: %s\n",value);
                 loadfail();
             }
         //
-        // FIODUTY
+        // EFDUTY
         //
-        }else if(streq(param,"fioduty")){
+        }else if(streq(param,"efduty")){
             if(sscanf(value,"%f",&ftemp)!=1){
-                fprintf(stderr,"LOAD: Illegal FIO duty cycle. Found: %s\n",value);
+                fprintf(stderr,"LOAD: Illegal EF duty cycle. Found: %s\n",value);
                 loadfail();
             }else if(ftemp<0. || ftemp>1.){
-                fprintf(stderr,"LOAD: Illegal FIO duty cycles must be between 0 and 1. Found %f\n",ftemp);
+                fprintf(stderr,"LOAD: Illegal EF duty cycles must be between 0 and 1. Found %f\n",ftemp);
                 loadfail();
             }
-            dconf[devnum].fioch[fionum].duty = ftemp;
+            dconf[devnum].efch[efnum].duty = ftemp;
         //
-        // FIOLABEL
+        // EFLABEL
         //
-        }else if(streq(param,"fiolabel")){
-            if(fionum<0){
-                fprintf(stderr,"LOAD: Cannot set flexible input-output parameters before the first FIOchannel parameter.\n");
+        }else if(streq(param,"eflabel")){
+            if(efnum<0){
+                fprintf(stderr,"LOAD: Cannot set flexible input-output parameters before the first EFchannel parameter.\n");
                 loadfail();
             }
-            strncpy(dconf[devnum].fioch[fionum].label, value, LCONF_MAX_STR);
+            strncpy(dconf[devnum].efch[efnum].label, value, LCONF_MAX_STR);
         //
         // COMCHANNEL
         //
@@ -1289,25 +1289,25 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // META integer configuration
         }else if(strncmp(param,"int:",4)==0){
             sscanf(value,"%d",&itemp);
-            put_meta_int(dconf, devnum, &param[4], itemp);
+            lc_put_meta_int(dconf, &param[4], itemp);
         // META float configuration
         }else if(strncmp(param,"flt:",4)==0){
             sscanf(value,"%f",&ftemp);
-            put_meta_flt(dconf, devnum, &param[4], ftemp);
+            lc_put_meta_flt(dconf, &param[4], ftemp);
         // META string configuration
         }else if(strncmp(param,"str:",4)==0){
-            put_meta_str(dconf, devnum, &param[4], value);
+            lc_put_meta_str(dconf, &param[4], value);
         //
         // META values defined in a stanza
         //
         }else if(metatype == 'i'){
             sscanf(value,"%d",&itemp);
-            put_meta_int(dconf, devnum, param, itemp);
+            lc_put_meta_int(dconf, param, itemp);
         }else if(metatype == 'f'){
             sscanf(value,"%f",&ftemp);
-            put_meta_flt(dconf, devnum, param, ftemp);
+            lc_put_meta_flt(dconf, param, ftemp);
         }else if(metatype == 's'){
-            put_meta_str(dconf, devnum, param, value);
+            lc_put_meta_str(dconf, param, value);
         // Deal gracefully with empty cases; usually EOF.
         }else if(   strncmp(param,"",LCONF_MAX_STR)==0 &&
                     strncmp(value,"",LCONF_MAX_STR)==0){
@@ -1326,19 +1326,19 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
 
 
 
-void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
-    int ainum,aonum, fionum, comnum, metanum;
+void lc_write_config(lc_devconf_t* dconf, FILE* ff){
+    int ainum,aonum, efnum, comnum, metanum;
     char mflt, mint, mstr;
 
     fprintf(ff,"# Configuration automatically generated by WRITE_CONFIG()\n");
 
-    if(dconf[devnum].connection==LJM_ctUSB)
+    if(dconf->connection==LJM_ctUSB)
         fprintf(ff,"connection usb\n");
     else
         fprintf(ff,"connection eth\n");
         
     // Actual connection comment
-    switch(dconf[devnum].connection_act){
+    switch(dconf->connection_act){
     case LJM_ctUSB:
         fprintf(ff, "#connection (actual) usb\n");
         break;
@@ -1346,11 +1346,11 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
         fprintf(ff, "#connection (actual) eth\n");
         break;
     default:
-        fprintf(ff, "#connection (actual) unknown: %d\n", dconf[devnum].device_act);
+        fprintf(ff, "#connection (actual) unknown: %d\n", dconf->device_act);
     }
     
     // Device
-    switch(dconf[devnum].device){
+    switch(dconf->device){
     case LJM_dtT4:
         fprintf(ff, "device t4\n");
         break;
@@ -1362,7 +1362,7 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
         fprintf(ff, "device any\n");
     }
     // Actual device comment
-    switch(dconf[devnum].device_act){
+    switch(dconf->device_act){
     case LJM_dtT4:
         fprintf(ff, "#device (actual) t4\n");
         break;
@@ -1371,7 +1371,7 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
         break;
     case LJM_dtANY:
     default:
-        fprintf(ff, "#device (actual) unknown: (%d)\n", dconf[devnum].device_act);
+        fprintf(ff, "#device (actual) unknown: (%d)\n", dconf->device_act);
     }
 
     write_str(name,name);
@@ -1384,9 +1384,9 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     write_int(nsample,nsample);
     
     // Analog inputs
-    if(dconf[devnum].naich)
+    if(dconf->naich)
         fprintf(ff,"\n# Analog Inputs\n");
-    for(ainum=0; ainum<dconf[devnum].naich; ainum++){
+    for(ainum=0; ainum<dconf->naich; ainum++){
 
         write_aiint(aichannel,channel);
         write_aistr(ailabel,label);
@@ -1400,20 +1400,20 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     }
     
     // Digital Input streaming
-    if(dconf[devnum].distream)
+    if(dconf->distream)
         write_int(distream,distream);
 
     // Analog outputs
-    if(dconf[devnum].naoch)
+    if(dconf->naoch)
         fprintf(ff,"# Analog Outputs\n");
-    for(aonum=0; aonum<dconf[devnum].naoch; aonum++){
+    for(aonum=0; aonum<dconf->naoch; aonum++){
         write_aoint(aochannel,channel);
         write_aostr(aolabel,label);
-        if(dconf[devnum].aoch[aonum].signal==AO_CONSTANT)  fprintf(ff,"aosignal constant\n");
-        else if(dconf[devnum].aoch[aonum].signal==AO_SINE)  fprintf(ff,"aosignal sine\n");
-        else if(dconf[devnum].aoch[aonum].signal==AO_SQUARE)  fprintf(ff,"aosignal square\n");
-        else if(dconf[devnum].aoch[aonum].signal==AO_TRIANGLE)  fprintf(ff,"aosignal triangle\n");
-        else if(dconf[devnum].aoch[aonum].signal==AO_NOISE)  fprintf(ff,"aosignal noise\n");
+        if(dconf->aoch[aonum].signal==AO_CONSTANT)  fprintf(ff,"aosignal constant\n");
+        else if(dconf->aoch[aonum].signal==AO_SINE)  fprintf(ff,"aosignal sine\n");
+        else if(dconf->aoch[aonum].signal==AO_SQUARE)  fprintf(ff,"aosignal square\n");
+        else if(dconf->aoch[aonum].signal==AO_TRIANGLE)  fprintf(ff,"aosignal triangle\n");
+        else if(dconf->aoch[aonum].signal==AO_NOISE)  fprintf(ff,"aosignal noise\n");
         else fprintf(ff,"signal ***\n");
         write_aoflt(aofrequency,frequency);
         write_aoflt(aoamplitude,amplitude);
@@ -1422,85 +1422,85 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
         fprintf(ff,"\n");
     }
     // Trigger settings
-    if(dconf[devnum].trigchannel >= 0){
+    if(dconf->trigchannel >= 0){
         fprintf(ff,"# Trigger Settings\n");
-        if(dconf[devnum].trigchannel == LCONF_TRIG_HSC)
+        if(dconf->trigchannel == LCONF_TRIG_HSC)
             fprintf(ff,"trigchannel hsc\n");
         else
             write_int(trigchannel,trigchannel);
         write_flt(triglevel,triglevel);
-        if(dconf[devnum].trigedge == TRIG_RISING)
+        if(dconf->trigedge == TRIG_RISING)
             fprintf(ff,"trigedge rising\n");
-        else if(dconf[devnum].trigedge == TRIG_FALLING)
+        else if(dconf->trigedge == TRIG_FALLING)
             fprintf(ff,"trigedge falling\n");
         else
             fprintf(ff,"trigedge all\n");
         write_int(trigpre,trigpre);
     }
 
-    // FIO CHANNELS
-    if(dconf[devnum].nfioch){
+    // EF CHANNELS
+    if(dconf->nefch){
         fprintf(ff,"# Flexible Input/Output\n");
         // Frequency
-        write_flt(fiofrequency,fiofrequency);
+        write_flt(effrequency,effrequency);
     }
-    for(fionum=0; fionum<dconf[devnum].nfioch; fionum++){
+    for(efnum=0; efnum<dconf->nefch; efnum++){
         // Channel Number
-        write_fioint(fiochannel,channel);
-        write_fiostr(fiolabel,label);
+        write_efint(efchannel,channel);
+        write_efstr(eflabel,label);
 
         // Input/output
-        if(dconf[devnum].fioch[fionum].direction==FIO_INPUT)
-            fprintf(ff, "fiodirection input\n");
+        if(dconf->efch[efnum].direction==EF_INPUT)
+            fprintf(ff, "efdirection input\n");
         else
-            fprintf(ff, "fiodirection output\n");
+            fprintf(ff, "efdirection output\n");
 
         // Signal type
-        if(dconf[devnum].fioch[fionum].signal==FIO_NONE){
-            fprintf(ff, "fiosignal none\n");
-        }else if(dconf[devnum].fioch[fionum].signal==FIO_PWM){
-            fprintf(ff, "fiosignal pwm\n");
+        if(dconf->efch[efnum].signal==EF_NONE){
+            fprintf(ff, "efsignal none\n");
+        }else if(dconf->efch[efnum].signal==EF_PWM){
+            fprintf(ff, "efsignal pwm\n");
             // Duty
-            write_fioflt(fioduty,duty);
+            write_efflt(efduty,duty);
             // Phase
-            write_fioflt(fiodegrees,phase);
-        }else if(dconf[devnum].fioch[fionum].signal==FIO_COUNT){
-            fprintf(ff, "fiosignal count\n");
-        }else if(dconf[devnum].fioch[fionum].signal==FIO_FREQUENCY){
-            fprintf(ff, "fiosignal frequency\n");
-        }else if(dconf[devnum].fioch[fionum].signal==FIO_PHASE){
-            fprintf(ff, "fiosignal phase\n");
-        }else if(dconf[devnum].fioch[fionum].signal==FIO_QUADRATURE){
-            fprintf(ff, "fiosignal quadrature\n");
+            write_efflt(efdegrees,phase);
+        }else if(dconf->efch[efnum].signal==EF_COUNT){
+            fprintf(ff, "efsignal count\n");
+        }else if(dconf->efch[efnum].signal==EF_FREQUENCY){
+            fprintf(ff, "efsignal frequency\n");
+        }else if(dconf->efch[efnum].signal==EF_PHASE){
+            fprintf(ff, "efsignal phase\n");
+        }else if(dconf->efch[efnum].signal==EF_QUADRATURE){
+            fprintf(ff, "efsignal quadrature\n");
         }
         // Debounce (None is the default - do nothing)
-        if(dconf[devnum].fioch[fionum].debounce==FIO_DEBOUNCE_FIXED)
-            fprintf(ff, "fiodebounce fixed\n");
-        else if(dconf[devnum].fioch[fionum].debounce==FIO_DEBOUNCE_RESTART)
-            fprintf(ff, "fiodebounce restart\n");
-        else if(dconf[devnum].fioch[fionum].debounce==FIO_DEBOUNCE_MINIMUM)
-            fprintf(ff, "fiodebounce minimum\n");
+        if(dconf->efch[efnum].debounce==EF_DEBOUNCE_FIXED)
+            fprintf(ff, "efdebounce fixed\n");
+        else if(dconf->efch[efnum].debounce==EF_DEBOUNCE_RESTART)
+            fprintf(ff, "efdebounce restart\n");
+        else if(dconf->efch[efnum].debounce==EF_DEBOUNCE_MINIMUM)
+            fprintf(ff, "efdebounce minimum\n");
         // Edge type (rising is the default - do nothing)
-        if(dconf[devnum].fioch[fionum].edge==FIO_FALLING)  
-            fprintf(ff, "fioedge falling\n");
-        else if(dconf[devnum].fioch[fionum].edge==FIO_ALL)  
-            fprintf(ff, "fioedge all\n");
+        if(dconf->efch[efnum].edge==EF_FALLING)  
+            fprintf(ff, "efedge falling\n");
+        else if(dconf->efch[efnum].edge==EF_ALL)  
+            fprintf(ff, "efedge all\n");
         // Timeout
-        if(dconf[devnum].fioch[fionum].time){
-            write_fioflt(fiousec,time);
+        if(dconf->efch[efnum].time){
+            write_efflt(efusec,time);
         }
     }
 
     // COM parameters
-    for(comnum=0; comnum<dconf[devnum].ncomch; comnum++){
-        switch(dconf[devnum].comch[comnum].type){
+    for(comnum=0; comnum<dconf->ncomch; comnum++){
+        switch(dconf->comch[comnum].type){
         case COM_UART:
             fprintf(ff, "comchannel uart\n");
-            fprintf(ff, "comin %d\n", dconf[devnum].comch[comnum].pin_in);
-            fprintf(ff, "comout %d\n", dconf[devnum].comch[comnum].pin_out);
-            fprintf(ff, "comrate %f\n", dconf[devnum].comch[comnum].rate);
-            fprintf(ff, "comoptions %d", dconf[devnum].comch[comnum].options.uart.bits);
-            switch(dconf[devnum].comch[comnum].options.uart.parity){
+            fprintf(ff, "comin %d\n", dconf->comch[comnum].pin_in);
+            fprintf(ff, "comout %d\n", dconf->comch[comnum].pin_out);
+            fprintf(ff, "comrate %f\n", dconf->comch[comnum].rate);
+            fprintf(ff, "comoptions %d", dconf->comch[comnum].options.uart.bits);
+            switch(dconf->comch[comnum].options.uart.parity){
             case PARITY_NONE:
                 fprintf(ff, "N");
                 break;
@@ -1511,7 +1511,7 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
                 fprintf(ff, "O");
                 break;
             }
-            fprintf(ff, "%d\n\n", dconf[devnum].comch[comnum].options.uart.stop);
+            fprintf(ff, "%d\n\n", dconf->comch[comnum].options.uart.stop);
             break;
         }
         
@@ -1521,12 +1521,12 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     // First, detect whether and which meta parameters there are
     mflt = 0; mint = 0; mstr = 0;
     for(metanum=0; metanum<LCONF_MAX_META && \
-            dconf[devnum].meta[metanum].param[0]!='\0'; metanum++){
-        if(dconf[devnum].meta[metanum].type=='i')
+            dconf->meta[metanum].param[0]!='\0'; metanum++){
+        if(dconf->meta[metanum].type=='i')
             mint = 1;
-        else if(dconf[devnum].meta[metanum].type=='f')
+        else if(dconf->meta[metanum].type=='f')
             mflt = 1;
-        else if(dconf[devnum].meta[metanum].type=='s')
+        else if(dconf->meta[metanum].type=='s')
             mstr = 1;
     }
 
@@ -1537,33 +1537,33 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
     if(mint){
         fprintf(ff,"\nmeta integer\n");
         for(metanum=0; metanum<LCONF_MAX_META && \
-                dconf[devnum].meta[metanum].param[0]!='\0'; metanum++)
-            if(dconf[devnum].meta[metanum].type=='i')
+                dconf->meta[metanum].param[0]!='\0'; metanum++)
+            if(dconf->meta[metanum].type=='i')
                 fprintf(ff,"%s %d\n",
-                    dconf[devnum].meta[metanum].param,
-                    dconf[devnum].meta[metanum].value.ivalue);
+                    dconf->meta[metanum].param,
+                    dconf->meta[metanum].value.ivalue);
     }
 
     // Write the floats
     if(mflt){
         fprintf(ff,"\nmeta float\n");
         for(metanum=0; metanum<LCONF_MAX_META && \
-                dconf[devnum].meta[metanum].param[0]!='\0'; metanum++)
-            if(dconf[devnum].meta[metanum].type=='f')
+                dconf->meta[metanum].param[0]!='\0'; metanum++)
+            if(dconf->meta[metanum].type=='f')
                 fprintf(ff,"%s %f\n",
-                    dconf[devnum].meta[metanum].param,
-                    dconf[devnum].meta[metanum].value.fvalue);
+                    dconf->meta[metanum].param,
+                    dconf->meta[metanum].value.fvalue);
     }
 
     // Write the strings
     if(mstr){
         fprintf(ff,"\nmeta string\n");
         for(metanum=0; metanum<LCONF_MAX_META && \
-                dconf[devnum].meta[metanum].param[0]!='\0'; metanum++)
-            if(dconf[devnum].meta[metanum].type=='s')
+                dconf->meta[metanum].param[0]!='\0'; metanum++)
+            if(dconf->meta[metanum].type=='s')
                 fprintf(ff,"%s %s\n",
-                    dconf[devnum].meta[metanum].param,
-                    dconf[devnum].meta[metanum].value.svalue);
+                    dconf->meta[metanum].param,
+                    dconf->meta[metanum].value.svalue);
     }
 
     // End the stanza
@@ -1574,7 +1574,7 @@ void write_config(DEVCONF* dconf, const unsigned int devnum, FILE* ff){
 
 
 
-int open_config(DEVCONF* dconf, const unsigned int devnum){
+int lc_open(lc_devconf_t* dconf){
     char *id;
     const static char any[4] = "ANY";
     char stemp[LCONF_MAX_STR];
@@ -1586,12 +1586,12 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
     //  Ethernet: IP, Serial, Name
     // IP specified with USB causes IP parameters to be written
     // IP specified with ANY raises a warning and is ignored
-    if(dconf[devnum].connection == LJM_ctETHERNET && dconf[devnum].ip[0]!='\0')
-        id = dconf[devnum].ip;
-    else if(dconf[devnum].serial[0]!='\0')
-        id = dconf[devnum].serial;
-    else if(dconf[devnum].name[0]!='\0')
-        id = dconf[devnum].name;
+    if(dconf->connection == LJM_ctETHERNET && dconf->ip[0]!='\0')
+        id = dconf->ip;
+    else if(dconf->serial[0]!='\0')
+        id = dconf->serial;
+    else if(dconf->name[0]!='\0')
+        id = dconf->name;
     else
         id = (char*) any;
     //
@@ -1599,21 +1599,21 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
     //
     // If no device id was specified
     if(id==any)
-        fprintf(stderr,"OPEN::WARNING:: Device %d was requested without a device identifier.\n"\
-"Results may be inconsistent; IP, SERIAL, or NAME should be set.\n",devnum);
+        fprintf(stderr,"OPEN::WARNING:: Device was requested without a device identifier.\n"\
+"Results may be inconsistent; IP, SERIAL, or NAME should be set.\n");
 
     // If an IP address was specified with ANY connection, raise a warning
     // and clear the IP address
-    if(dconf[devnum].connection == LJM_ctANY && dconf[devnum].ip[0]!='\0'){
+    if(dconf->connection == LJM_ctANY && dconf->ip[0]!='\0'){
         fprintf(stderr, "OPEN::WARNING:: Specifying an ip address with ANY connection is ambiguous.  Ignoring.\n");
-        dconf[devnum].ip[0] = '\0';
+        dconf->ip[0] = '\0';
     }
 
     //
     // OPEN
     //
-    err = LJM_Open(dconf[devnum].device, dconf[devnum].connection, \
-            id, &dconf[devnum].handle);
+    err = LJM_Open(dconf->device, dconf->connection, \
+            id, &dconf->handle);
     if(err){
         fprintf(stderr, "OPEN: Failed to open the device: %s.\n", id);
         openfail();
@@ -1622,9 +1622,9 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
     //
     // DEV INFO
     //
-    err = LJM_GetHandleInfo(dconf[devnum].handle, 
-                            &dconf[devnum].device_act,
-                            &dconf[devnum].connection_act,
+    err = LJM_GetHandleInfo(dconf->handle, 
+                            &dconf->device_act,
+                            &dconf->connection_act,
                             &serial,
                             &ip,
                             &dummy,
@@ -1638,28 +1638,28 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
     // SERIAL
     //
     sprintf(stemp, "%d", serial);
-    if(dconf[devnum].serial[0] == '\0'){
-        strncpy(dconf[devnum].serial, stemp, LCONF_MAX_STR);
-    }else if(!streq(dconf[devnum].serial, stemp)){
+    if(dconf->serial[0] == '\0'){
+        strncpy(dconf->serial, stemp, LCONF_MAX_STR);
+    }else if(!streq(dconf->serial, stemp)){
         fprintf(stderr, 
                 "OPEN: Requested serial: %s, connected to serial: %s\n"\
                 "  Conflicting device identifiers!\n",\
-                dconf[devnum].serial, stemp);
+                dconf->serial, stemp);
         openfail();
     }
 
     //
     // IP
     //
-    if(dconf[devnum].connection != LJM_ctUSB){
+    if(dconf->connection != LJM_ctUSB){
         LJM_NumberToIP(ip, stemp);
-        if(dconf[devnum].ip[0] == '\0'){
-            strncpy(dconf[devnum].serial, stemp, LCONF_MAX_STR);
-        }else if(!streq(dconf[devnum].ip, stemp)){
+        if(dconf->ip[0] == '\0'){
+            strncpy(dconf->serial, stemp, LCONF_MAX_STR);
+        }else if(!streq(dconf->ip, stemp)){
             fprintf(stderr, 
                     "OPEN: Requested ip: %s, connected to ip: %s\n"\
                     "  Conflicting device identifiers!\n",\
-                    dconf[devnum].ip, stemp);
+                    dconf->ip, stemp);
             openfail();
         }
     }
@@ -1667,20 +1667,20 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
     //
     // NAME
     //
-    err = LJM_eReadNameString(dconf[devnum].handle, \
+    err = LJM_eReadNameString(dconf->handle, \
             "DEVICE_NAME_DEFAULT", stemp);
     if(err){
         fprintf(stderr, "OPEN: Failed to read the device name.\n");
         openfail();
     }
     
-    if(dconf[devnum].name[0] == '\0'){
-        strncpy(dconf[devnum].name, stemp, LCONF_MAX_NAME);
-    }else if(!streq(dconf[devnum].name, stemp)){
+    if(dconf->name[0] == '\0'){
+        strncpy(dconf->name, stemp, LCONF_MAX_NAME);
+    }else if(!streq(dconf->name, stemp)){
         fprintf(stderr, 
                 "OPEN: Requested device name: \"%s\", connected to device name: \"%s\"\n"\
                 "  Conflicting device identifiers!\n",
-                dconf[devnum].name, stemp);
+                dconf->name, stemp);
         openfail();
     }
     
@@ -1690,21 +1690,21 @@ int open_config(DEVCONF* dconf, const unsigned int devnum){
 
 
 
-int close_config(DEVCONF* dconf, const unsigned int devnum){
+int lc_close(lc_devconf_t* dconf){
     int err;
-    if(dconf[devnum].handle>=0){
-        err = LJM_Close(dconf[devnum].handle);
+    if(dconf->handle>=0){
+        err = LJM_Close(dconf->handle);
         if(err){
-            fprintf(stderr,"LCONFIG: Error closing device %d.\n",devnum);
+            fprintf(stderr,"LCONFIG: Error closing device.\n");
             LJM_ErrorToString(err, err_str);
             fprintf(stderr,"%s\n",err_str);
         }
     }
-    dconf[devnum].handle = -1;
-    dconf[devnum].connection_act = -1;
-    dconf[devnum].device_act = -1;
+    dconf->handle = -1;
+    dconf->connection_act = -1;
+    dconf->device_act = -1;
     // Clean up the buffer
-    clean_buffer(&dconf[devnum].RB);
+    clean_buffer(&dconf->RB);
     return err;
 }
 
@@ -1712,7 +1712,7 @@ int close_config(DEVCONF* dconf, const unsigned int devnum){
 
 
 
-int upload_config(DEVCONF* dconf, const unsigned int devnum){
+int lc_upload_config(lc_devconf_t* dconf){
     // integers for interacting with the device
     int err,handle;
     // Registers for holding register addresses and memory type
@@ -1722,9 +1722,9 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     unsigned int channel;
     // Registers for analog output
     int aonum,naoch;
-    // Registers for fio configuration
-    int fionum,nfioch;
-    unsigned int fio_clk_roll, fio_clk_div;
+    // Registers for ef configuration
+    int efnum,nefch;
+    unsigned int ef_clk_roll, ef_clk_div;
     // Channel range registers
     int minch, maxch;
     // misc
@@ -1739,13 +1739,13 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     char stemp[LCONF_MAX_STR];   // temporary string
 
 
-    naich = dconf[devnum].naich;
-    naoch = dconf[devnum].naoch;
-    nfioch = dconf[devnum].nfioch;
-    handle = dconf[devnum].handle;
+    naich = dconf->naich;
+    naoch = dconf->naoch;
+    nefch = dconf->nefch;
+    handle = dconf->handle;
 
     // Verify that the device is open
-    if(dconf[devnum].handle < 0){
+    if(dconf->handle < 0){
         fprintf(stderr, "UPLOAD: The device connection is not open.\n");
         return LCONF_ERROR;
     }
@@ -1754,26 +1754,26 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     // Global parameters...
 
     // If the requested conneciton was USB, assert the IP parameters
-    if(dconf[devnum].connection == LJM_ctUSB){
+    if(dconf->connection == LJM_ctUSB){
         flag=0;
         err = 0;
-        if(dconf[devnum].ip[0] != '\0'){
-            printf("IP: %s\n", dconf[devnum].ip);
-            err = LJM_IPToNumber(dconf[devnum].ip, &itemp);
+        if(dconf->ip[0] != '\0'){
+            printf("IP: %s\n", dconf->ip);
+            err = LJM_IPToNumber(dconf->ip, &itemp);
             err = err ? err : \
                     LJM_eWriteName(handle, "ETHERNET_IP_DEFAULT", (double) itemp);
             flag=1;
         }
-        if(!err && dconf[devnum].gateway[0] != '\0'){
-            printf("IP: %s\n", dconf[devnum].gateway);
-            err = LJM_IPToNumber(dconf[devnum].ip, &itemp);
+        if(!err && dconf->gateway[0] != '\0'){
+            printf("IP: %s\n", dconf->gateway);
+            err = LJM_IPToNumber(dconf->ip, &itemp);
             err = err ? err : \
                     LJM_eWriteName(handle, "ETHERNET_GATEWAY_DEFAULT", (double) itemp);
             flag=1;
         }
-        if(!err && dconf[devnum].subnet[0] != '\0'){
-            printf("IP: %s\n", dconf[devnum].subnet);
-            LJM_IPToNumber(dconf[devnum].ip, &itemp);
+        if(!err && dconf->subnet[0] != '\0'){
+            printf("IP: %s\n", dconf->subnet);
+            LJM_IPToNumber(dconf->ip, &itemp);
             err = err ? err : \
                     LJM_eWriteName(handle, "ETHERNET_SUBNET_DEFAULT", (double) itemp);
             flag=1;
@@ -1792,11 +1792,11 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     }
 
     // Get the max/min ai channel numbers for later
-    aichan_config(dconf, devnum, &minch, &maxch);
+    lc_aichannels(dconf, &minch, &maxch);
     
     // Loop through the analog input channels.
     for(ainum=0;ainum<naich;ainum++){
-        channel = dconf[devnum].aich[ainum].channel;
+        channel = dconf->aich[ainum].channel;
         // Perform a sanity check on the channel number
         if(channel>maxch || channel<minch){
             fprintf(stderr,"UPLOAD: Analog input %d points to channel %d, which is out of range [%d-%d]\n",
@@ -1811,65 +1811,65 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         stemp[0] = '\0';
         sprintf(stemp, "AIN%d_NEGATIVE_CH", channel);
         err = LJM_eWriteName( handle, stemp, 
-                dconf[devnum].aich[ainum].nchannel);
+                dconf->aich[ainum].nchannel);
         /* Depreciated - used the address instead of the register name
         err = LJM_eWriteAddress(  handle,
                             reg_negative,
                             LJM_UINT16,
-                            dconf[devnum].aich[ainum].nchannel);
+                            dconf->aich[ainum].nchannel);
         */
         if(err){
             fprintf(stderr,"UPLOAD: Failed to update analog input %d, AI%d negative input to %d\n", 
-                    ainum, channel, dconf[devnum].aich[ainum].nchannel);
+                    ainum, channel, dconf->aich[ainum].nchannel);
             uploadfail();
         }
         // Write the range
         stemp[0] = '\0';
         sprintf(stemp, "AIN%d_RANGE", channel);
         err = LJM_eWriteName( handle, stemp, 
-                dconf[devnum].aich[ainum].range);
+                dconf->aich[ainum].range);
         /* Depreciated - used address instead of register name
         err = LJM_eWriteAddress(  handle,
                             reg_range,
                             LJM_FLOAT32,
-                            dconf[devnum].aich[ainum].range);
+                            dconf->aich[ainum].range);
         */
         if(err){
             fprintf(stderr,"UPLOAD: Failed to update analog input %d, AI%d range input to %f\n", 
-                    ainum, channel, dconf[devnum].aich[ainum].range);
+                    ainum, channel, dconf->aich[ainum].range);
             uploadfail();
         }
         // Write the resolution
         stemp[0] = '\0';
         sprintf(stemp, "AIN%d_RESOLUTION_INDEX", channel);
         err = LJM_eWriteName( handle, stemp, 
-                dconf[devnum].aich[ainum].resolution);
+                dconf->aich[ainum].resolution);
         /* Depreciated - used the address instead of the register name
         err = LJM_eWriteAddress(  handle,
                             reg_resolution,
                             LJM_UINT16,
-                            dconf[devnum].aich[ainum].resolution);
+                            dconf->aich[ainum].resolution);
         */
         if(err){
             fprintf(stderr,"UPLOAD: Failed to update analog input %d, AI%d resolution index to %d\n", 
-                    ainum, channel, dconf[devnum].aich[ainum].resolution);
+                    ainum, channel, dconf->aich[ainum].resolution);
             uploadfail();
         }
 
     }
 
     // Set the digital direction based on the DISTREAM register
-    if(dconf[devnum].distream){
-        err = LJM_eWriteName(dconf[devnum].handle,
+    if(dconf->distream){
+        err = LJM_eWriteName(dconf->handle,
                 "DIO_INHIBIT", 0xFFFF0000);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle,
-                "DIO_DIRECTION", ~dconf[devnum].distream);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle,
+        err = err ? err : LJM_eWriteName(dconf->handle,
+                "DIO_DIRECTION", ~dconf->distream);
+        err = err ? err : LJM_eWriteName(dconf->handle,
                 "DIO_INHIBIT", 0x00000000);
         if(err){
             fprintf(stderr, 
                     "UPLOAD: Failed to set DIO direction from DISTREAM: %d\n",
-                    dconf[devnum].distream);
+                    dconf->distream);
             uploadfail();
         }
     }
@@ -1880,9 +1880,9 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         // Find the address of the corresponding channel number
         // Start with DAC0 and increment by 2 for each channel number
         LJM_NameToAddress("DAC0",&reg_temp,&type_temp);
-        channel = reg_temp + 2*dconf[devnum].aoch[aonum].channel;
+        channel = reg_temp + 2*dconf->aoch[aonum].channel;
         */
-        channel = dconf[devnum].aoch[aonum].channel;
+        channel = dconf->aoch[aonum].channel;
         stemp[0] = '\0';
         sprintf(stemp, "DAC%d", channel);
         LJM_NameToAddress(stemp, &reg_temp, &type_temp);
@@ -1934,11 +1934,11 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
 
         // Construct the buffer data
         // Restrict the signal period to an integer multiple of sample periods
-        if(dconf[devnum].aoch[aonum].frequency<=0.){
+        if(dconf->aoch[aonum].frequency<=0.){
             fprintf(stderr,"UPLOAD: Analog output %d has zero or negative frequency.\n",aonum);
             uploadfail();
         }
-        samples = (unsigned int)(dconf[devnum].samplehz / dconf[devnum].aoch[aonum].frequency);
+        samples = (unsigned int)(dconf->samplehz / dconf->aoch[aonum].frequency);
         // samples * 2 will be the buffer size
         if(samples*2 > LCONF_MAX_AOBUFFER){
             fprintf(stderr,"UPLOAD: Analog output %d signal will require too many samples at this frequency.\n",aonum);
@@ -1951,13 +1951,13 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
 
         // Case out the different signal types
         // AO_CONSTANT
-        if(dconf[devnum].aoch[aonum].signal==AO_CONSTANT){
+        if(dconf->aoch[aonum].signal==AO_CONSTANT){
             for(index=0; index<samples; index++)
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp,\
-                    dconf[devnum].aoch[aonum].offset);
+                    dconf->aoch[aonum].offset);
         // AO_SINE
-        }else if(dconf[devnum].aoch[aonum].signal==AO_SINE){
+        }else if(dconf->aoch[aonum].signal==AO_SINE){
             // initialize generators
             gr = 1.; gi = 0;
             ftemp = TWOPI / samples;
@@ -1966,8 +1966,8 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
             for(index=0; index<samples; index++){
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp,\
-                    dconf[devnum].aoch[aonum].amplitude*gi + \
-                    dconf[devnum].aoch[aonum].offset);
+                    dconf->aoch[aonum].amplitude*gi + \
+                    dconf->aoch[aonum].offset);
                 // Update the complex arithmetic sine generator
                 // g *= e (only complex arithmetic)
                 // where e = exp(j*T*2pi*f) and g is initially 1+0i
@@ -1977,50 +1977,50 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                 gr = ftemp;
             }
         // AO_SQUARE
-        }else if(dconf[devnum].aoch[aonum].signal==AO_SQUARE){
-            itemp = samples*dconf[devnum].aoch[aonum].duty;
+        }else if(dconf->aoch[aonum].signal==AO_SQUARE){
+            itemp = samples*dconf->aoch[aonum].duty;
             if(itemp>samples) itemp = samples;
             // Calculate the high level
-            ftemp = dconf[devnum].aoch[aonum].offset + \
-                        dconf[devnum].aoch[aonum].amplitude;
+            ftemp = dconf->aoch[aonum].offset + \
+                        dconf->aoch[aonum].amplitude;
             for(index=0; index<itemp; index++)
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp, ftemp);
             // Calculate the low level
-            ftemp = dconf[devnum].aoch[aonum].offset - \
-                        dconf[devnum].aoch[aonum].amplitude;
+            ftemp = dconf->aoch[aonum].offset - \
+                        dconf->aoch[aonum].amplitude;
             for(;index<samples;index++)
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp, ftemp);
         // AO_TRIANGLE
-        }else if(dconf[devnum].aoch[aonum].signal==AO_TRIANGLE){
-            itemp = samples*dconf[devnum].aoch[aonum].duty;
+        }else if(dconf->aoch[aonum].signal==AO_TRIANGLE){
+            itemp = samples*dconf->aoch[aonum].duty;
             if(itemp>=samples) itemp = samples-1;
             else if(itemp<=0) itemp = 1;
             // Calculate the slope (use the generator constants)
-            er = 2.*dconf[devnum].aoch[aonum].amplitude/itemp;
+            er = 2.*dconf->aoch[aonum].amplitude/itemp;
             // Initialize the generator
-            gr = dconf[devnum].aoch[aonum].offset - \
-                    dconf[devnum].aoch[aonum].amplitude;
+            gr = dconf->aoch[aonum].offset - \
+                    dconf->aoch[aonum].amplitude;
             for(index=0; index<itemp; index++){
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp, gr);
                 gr += er;
             }
             // Calculate the new slope
-            er = 2.*dconf[devnum].aoch[aonum].amplitude/(samples-itemp);
+            er = 2.*dconf->aoch[aonum].amplitude/(samples-itemp);
             for(; index<samples; index++){
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp, gr);
                 gr -= er;
             }
         // AO_NOISE
-        }else if(dconf[devnum].aoch[aonum].signal==AO_NOISE){
+        }else if(dconf->aoch[aonum].signal==AO_NOISE){
             for(index=0; index<samples; index++){
                 // generate a random number between -1 and 1
                 ftemp = (2.*((double)rand())/RAND_MAX - 1.);
-                ftemp *= dconf[devnum].aoch[aonum].amplitude;
-                ftemp += dconf[devnum].aoch[aonum].offset;
+                ftemp *= dconf->aoch[aonum].amplitude;
+                ftemp += dconf->aoch[aonum].offset;
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp, ftemp);
             }
@@ -2056,7 +2056,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     }
 
     // Check for an HSC trigger setting
-    if(dconf[devnum].trigchannel == LCONF_TRIG_HSC){
+    if(dconf->trigchannel == LCONF_TRIG_HSC){
         err = LJM_eWriteName( handle, "DIO18_EF_ENABLE", 0);
         err = err ? err : LJM_eWriteName( handle, "DIO18_EF_INDEX", 7);
         err = err ? err : LJM_eWriteName( handle, "DIO18_EF_ENABLE", 1);
@@ -2067,71 +2067,71 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
     }
 
     //
-    // Upload the FIO parameters
+    // Upload the EF parameters
     // First, deactivate all of the extended features
-    efchan_config(dconf, devnum, &minch, &maxch);
-    for(fionum=minch; fionum<=maxch; fionum++){
-        sprintf(stemp, "DIO%d_EF_ENABLE", fionum);
+    lc_efchannels(dconf, &minch, &maxch);
+    for(efnum=minch; efnum<=maxch; efnum++){
+        sprintf(stemp, "DIO%d_EF_ENABLE", efnum);
         err = err ? err : LJM_eWriteName(handle, stemp, 0);
     }
     if(err){
         fprintf(stderr,"UPLOAD: Failed to disable DIO extended features\n");
         uploadfail();
     }
-    // Determine the clock 0 rollover and clock divisor from the FIOFREQUENCY parameter
-    if(dconf[devnum].fiofrequency>0)
-        ftemp = 1e6 * LCONF_CLOCK_MHZ / dconf[devnum].fiofrequency;
+    // Determine the clock 0 rollover and clock divisor from the EFFREQUENCY parameter
+    if(dconf->effrequency>0)
+        ftemp = 1e6 * LCONF_CLOCK_MHZ / dconf->effrequency;
     else
-        ftemp = 0xFFFFFFFF; // If FIOFREQUENCY is not configured, use a default
-    fio_clk_div = 1;
+        ftemp = 0xFFFFFFFF; // If EFFREQUENCY is not configured, use a default
+    ef_clk_div = 1;
     // The roll value is a 32-bit integer, and the maximum divisor is 256
-    while(ftemp > 0xFFFFFFFF && fio_clk_div < 256){
+    while(ftemp > 0xFFFFFFFF && ef_clk_div < 256){
         ftemp /= 2;
-        fio_clk_div *= 2;
+        ef_clk_div *= 2;
     }
     // Do some sanity checking
     if(ftemp > 0xFFFFFFFF){
-        fprintf(stderr,"UPLOAD: FIO frequency was too low (%f Hz). Minimum is %f uHz.\n", 
-            dconf[devnum].fiofrequency, 1e12 * LCONF_CLOCK_MHZ / 0xFFFFFFFF / 256);
+        fprintf(stderr,"UPLOAD: EF frequency was too low (%f Hz). Minimum is %f uHz.\n", 
+            dconf->effrequency, 1e12 * LCONF_CLOCK_MHZ / 0xFFFFFFFF / 256);
         uploadfail();
     }else if(ftemp < 0x8){
-        fprintf(stderr,"UPLOAD: FIO frequency was too high (%f Hz).  Maximum is %f MHz.\n",
-            dconf[devnum].fiofrequency, LCONF_CLOCK_MHZ / 0x8);
+        fprintf(stderr,"UPLOAD: EF frequency was too high (%f Hz).  Maximum is %f MHz.\n",
+            dconf->effrequency, LCONF_CLOCK_MHZ / 0x8);
         uploadfail();
     }
     // Convert the rollover value to unsigned int
-    fio_clk_roll = (unsigned int) ftemp;
+    ef_clk_roll = (unsigned int) ftemp;
     // Write the clock configuration
     // disable the clock
     err = LJM_eWriteName( handle, "DIO_EF_CLOCK0_ENABLE", 0);
-    // Only configure the clock if FIO channels have been configured.
-    if(dconf[devnum].nfioch>0){
-        err = err ? err : LJM_eWriteName( handle, "DIO_EF_CLOCK0_ROLL_VALUE", fio_clk_roll);
+    // Only configure the clock if EF channels have been configured.
+    if(dconf->nefch>0){
+        err = err ? err : LJM_eWriteName( handle, "DIO_EF_CLOCK0_ROLL_VALUE", ef_clk_roll);
         // set the clock divisor
-        err = err ? err : LJM_eWriteName(handle, "DIO_EF_CLOCK0_DIVISOR", fio_clk_div);
+        err = err ? err : LJM_eWriteName(handle, "DIO_EF_CLOCK0_DIVISOR", ef_clk_div);
         // re-enable the clock
         err = err ? err : LJM_eWriteName(handle, "DIO_EF_CLOCK0_ENABLE", 1);
         if(err){
-            fprintf(stderr,"UPLOAD: Failed to configure FIO Clock 0\n");
+            fprintf(stderr,"UPLOAD: Failed to configure EF Clock 0\n");
             uploadfail();
         }
         // If the clock setup was successful, then back-calculate the actual frequency
-        // and store it in the fiofrequency parameter.
-        dconf[devnum].fiofrequency = 1e6 * LCONF_CLOCK_MHZ / fio_clk_roll / fio_clk_div;
+        // and store it in the effrequency parameter.
+        dconf->effrequency = 1e6 * LCONF_CLOCK_MHZ / ef_clk_roll / ef_clk_div;
     }
     
-    // Configure the FIO channels
-    for(fionum=0; fionum<nfioch; fionum++){
-        channel = dconf[devnum].fioch[fionum].channel;
-        switch(dconf[devnum].fioch[fionum].signal){
+    // Configure the EF channels
+    for(efnum=0; efnum<nefch; efnum++){
+        channel = dconf->efch[efnum].channel;
+        switch(dconf->efch[efnum].signal){
         // Pulse-width modulation
-        case FIO_PWM:
+        case EF_PWM:
             // PWM input
-            if(dconf[devnum].fioch[fionum].direction==FIO_INPUT){
+            if(dconf->efch[efnum].direction==EF_INPUT){
                 // Permitted channels are 0 and 1
                 if(channel > 1){
                     fprintf(stderr,"UPLOAD: Pulse width input only permitted on channels 0 and 1. Found ch %d.\n",
-                        dconf[devnum].fioch[fionum].channel);
+                        dconf->efch[efnum].channel);
                     uploadfail();
                 }
                 // Measurement index 5
@@ -2150,25 +2150,25 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
             }else{
                 if(channel > 5 || channel == 1){
                     fprintf(stderr,"UPLOAD: Pulse width output only permitted on channels 0, 2, 3, 4, and 5. Found ch %d.\n",
-                        dconf[devnum].fioch[fionum].channel);
+                        dconf->efch[efnum].channel);
                     uploadfail();
                 }
                 // Calculate the start index
                 // Unwrap the phase first (lazy method)
-                while(dconf[devnum].fioch[fionum].phase<0.)
-                    dconf[devnum].fioch[fionum].phase += 360.;
-                itemp1 = fio_clk_roll * (dconf[devnum].fioch[fionum].phase / 360.);
-                itemp1 %= fio_clk_roll;
+                while(dconf->efch[efnum].phase<0.)
+                    dconf->efch[efnum].phase += 360.;
+                itemp1 = ef_clk_roll * (dconf->efch[efnum].phase / 360.);
+                itemp1 %= ef_clk_roll;
                 // Calculate the stop index
-                itemp2 = fio_clk_roll * dconf[devnum].fioch[fionum].duty;
-                itemp2 = (((long int) itemp1) + ((long int) itemp2))%fio_clk_roll;
+                itemp2 = ef_clk_roll * dconf->efch[efnum].duty;
+                itemp2 = (((long int) itemp1) + ((long int) itemp2))%ef_clk_roll;
                 // Measurement index 1
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
                 // Options - use clock 0
                 sprintf(stemp, "DIO%d_EF_OPTIONS", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 0x00000000);
-                if(dconf[devnum].fioch[fionum].edge==FIO_FALLING){
+                if(dconf->efch[efnum].edge==EF_FALLING){
                     // Write the start index
                     sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
@@ -2188,28 +2188,28 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                 err = err ? err : LJM_eWriteName(handle, stemp, 1);
             }
         break;
-        case FIO_COUNT:
+        case EF_COUNT:
             // counter input
-            if(dconf[devnum].fioch[fionum].direction == FIO_INPUT){
+            if(dconf->efch[efnum].direction == EF_INPUT){
                 // check for valid channels
                 if(channel > 7 || channel == 4 || channel ==5){
-                    fprintf(stderr, "UPLOAD: FIO Counter input on channel %d is not supported.\n Use FIO channel 0,1,2,3,6,or 7.",
+                    fprintf(stderr, "UPLOAD: EF Counter input on channel %d is not supported.\n Use EF channel 0,1,2,3,6,or 7.",
                         channel);
                     uploadfail();
                 }
-                switch(dconf[devnum].fioch[fionum].debounce){
-                    case FIO_DEBOUNCE_NONE:
+                switch(dconf->efch[efnum].debounce){
+                    case EF_DEBOUNCE_NONE:
                         // Use a counter with no debounce algorithm
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 8);                            
                     break;
-                    case FIO_DEBOUNCE_FIXED:
+                    case EF_DEBOUNCE_FIXED:
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 9);
                         sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                        if(dconf[devnum].fioch[fionum].edge == FIO_FALLING)
+                        if(dconf->efch[efnum].edge == EF_FALLING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 3);
-                        else if(dconf[devnum].fioch[fionum].edge == FIO_RISING)
+                        else if(dconf->efch[efnum].edge == EF_RISING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 4);
                         else{
                             fprintf(stderr,"UPLOAD: Fixed interval debounce is not supported on  'all' edges\n");
@@ -2218,30 +2218,30 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                         // Write the timeout interval
                         sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 
-                            dconf[devnum].fioch[fionum].time);
+                            dconf->efch[efnum].time);
                     break;
-                    case FIO_DEBOUNCE_RESTART:
+                    case EF_DEBOUNCE_RESTART:
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 9);
                         sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                        if(dconf[devnum].fioch[fionum].edge == FIO_FALLING)
+                        if(dconf->efch[efnum].edge == EF_FALLING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 0);
-                        else if(dconf[devnum].fioch[fionum].edge == FIO_RISING)
+                        else if(dconf->efch[efnum].edge == EF_RISING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 1);
                         else
                             err = err ? err : LJM_eWriteName(handle, stemp, 2);
                         // Write the timeout interval
                         sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 
-                            dconf[devnum].fioch[fionum].time);
+                            dconf->efch[efnum].time);
                     break;
-                    case FIO_DEBOUNCE_MINIMUM:
+                    case EF_DEBOUNCE_MINIMUM:
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 9);
                         sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                        if(dconf[devnum].fioch[fionum].edge == FIO_FALLING)
+                        if(dconf->efch[efnum].edge == EF_FALLING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 5);
-                        else if(dconf[devnum].fioch[fionum].edge == FIO_RISING)
+                        else if(dconf->efch[efnum].edge == EF_RISING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 6);
                         else{
                             fprintf(stderr,"UPLOAD: Minimum duration debounce is not supported on  'all' edges\n");
@@ -2250,7 +2250,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                         // Write the timeout interval
                         sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 
-                            dconf[devnum].fioch[fionum].time);
+                            dconf->efch[efnum].time);
                     break;
                 }
                 // Enable the EF channel
@@ -2261,17 +2261,17 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
                 uploadfail();
             }
         break;
-        case FIO_FREQUENCY:
+        case EF_FREQUENCY:
             // Check for valid channels
             if(channel > 1){
-                fprintf(stderr, "UPLOAD: FIO Frequency on channel %d is not supported. 0 and 1 are allowed.\n",
+                fprintf(stderr, "UPLOAD: EF Frequency on channel %d is not supported. 0 and 1 are allowed.\n",
                     channel);
                 uploadfail();
-            }else if(dconf[devnum].fioch[fionum].direction == FIO_OUTPUT){
-                fprintf(stderr, "UPLOAD: FIO Frequency output is not supported. Use PWM.\n");
+            }else if(dconf->efch[efnum].direction == EF_OUTPUT){
+                fprintf(stderr, "UPLOAD: EF Frequency output is not supported. Use PWM.\n");
                 uploadfail();
             }
-            if(dconf[devnum].fioch[fionum].edge == FIO_FALLING){
+            if(dconf->efch[efnum].edge == EF_FALLING){
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 4);
             }else{
@@ -2285,13 +2285,13 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
             sprintf(stemp, "DIO%d_EF_ENABLE", channel);
             err = err ? err : LJM_eWriteName(handle, stemp, 1);
         break;
-        case FIO_PHASE:
+        case EF_PHASE:
             channel = (channel / 2) * 2;
             if(channel != 0){
                 fprintf(stderr, "UPLOAD: Digital phase input is only supported on channels 0 and 1.\n");
                 uploadfail();
             }
-            if(dconf[devnum].fioch[fionum].direction == FIO_OUTPUT){
+            if(dconf->efch[efnum].direction == EF_OUTPUT){
                 fprintf(stderr, "UPLOAD: Phase output is not supported\n");
                 uploadfail();
             }
@@ -2300,12 +2300,12 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
             err = err ? err : LJM_eWriteName( handle, stemp, 6);
             sprintf(stemp, "DIO%d_EF_INDEX", channel+1);
             err = err ? err : LJM_eWriteName( handle, stemp, 6);
-            if(dconf[devnum].fioch[fionum].edge == FIO_RISING){
+            if(dconf->efch[efnum].edge == EF_RISING){
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel+1);
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
-            }else if(dconf[devnum].fioch[fionum].edge == FIO_FALLING){
+            }else if(dconf->efch[efnum].edge == EF_FALLING){
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 0);
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel+1);
@@ -2320,15 +2320,15 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
             sprintf(stemp, "DIO%d_EF_ENABLE", channel+1);
             err = err ? err : LJM_eWriteName(handle, stemp, 1);
         break;
-        case FIO_QUADRATURE:
+        case EF_QUADRATURE:
             channel = (channel/2) * 2;  // force channel to be even
             // Check for valid channels
             if(channel > 6 || channel == 4){
-                fprintf(stderr, "UPLOAD: FIO Quadrature channels %d/%d not supported. 0/1, 2/3, 6/7 are allowed.\n",
+                fprintf(stderr, "UPLOAD: EF Quadrature channels %d/%d not supported. 0/1, 2/3, 6/7 are allowed.\n",
                     channel, channel+1);
                 uploadfail();
-            }else if(dconf[devnum].fioch[fionum].direction == FIO_OUTPUT){
-                fprintf(stderr, "UPLOAD: FIO Quadrature output is not allowed.\n");
+            }else if(dconf->efch[efnum].direction == EF_OUTPUT){
+                fprintf(stderr, "UPLOAD: EF Quadrature output is not allowed.\n");
                 uploadfail();
             }
             // Measurement index 10
@@ -2352,7 +2352,7 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
         break;
         }
         if(err){
-            fprintf(stderr, "UPLOAD: Failed to configure FIO channel %d\n.", channel);
+            fprintf(stderr, "UPLOAD: Failed to configure EF channel %d\n.", channel);
             uploadfail();
         }
     }
@@ -2363,519 +2363,212 @@ int upload_config(DEVCONF* dconf, const unsigned int devnum){
 
 
 
-int download_config(DEVCONF *dconf, const unsigned int devnum, DEVCONF *out){
-    int err, aonum, ainum, fionum, reg_temp, type_temp;
-    double ftemp, ftemp1, ftemp2;
-    int handle, naich, naoch, nfioch, fioindex;
-    int DeviceType,ConnectionType,SerialNumber,IPAddress,Port,MaxBytesPerMB;
-    char stemp[LCONF_MAX_STR];
-    unsigned int channel, fio_clk_roll, fio_clk_div;
-
-    // First, initialize the output
-    init_config(out);
-
-    // Grab global information from the original configuration that cannot be
-    // obtained from the device itself.
-    handle = dconf[devnum].handle;
-    out->handle = handle;
-    naich = dconf[devnum].naich;
-    out->naich = naich;
-    naoch = dconf[devnum].naoch;
-    out->naoch = naoch;
-    nfioch = dconf[devnum].nfioch;
-    out->nfioch = nfioch;
-
-    // Test the connection and retrieve addressing parameters
-    err = LJM_GetHandleInfo(handle, 
-                            &DeviceType,
-                            &ConnectionType,
-                            &SerialNumber,
-                            &IPAddress,
-                            &Port,
-                            &MaxBytesPerMB);
-    if(err){
-        fprintf(stderr,"DOWNLOAD: No answer from device handle %d.\n", handle);
-        goto lconf_downloadfail;
-    }
-    out->connection = ConnectionType;
-    sprintf(out->serial, "%d", SerialNumber);
-
-    // Get the remaining ethernet parameters
-    err = LJM_eReadName(handle, "ETHERNET_IP", &ftemp);
-    if(err){
-        fprintf(stderr,"DOWNLOAD: Failed to read the IP address for handle %d.\n", handle);
-        goto lconf_downloadfail;
-    }
-    LJM_NumberToIP((unsigned int) ftemp, out->ip);
-    err = LJM_eReadName(handle, "ETHERNET_GATEWAY", &ftemp);
-    if(err){
-        fprintf(stderr,"DOWNLOAD: Failed to read the ethernet gateway for handle %d.\n", handle);
-        goto lconf_downloadfail;
-    }
-    LJM_NumberToIP((unsigned int) ftemp, out->gateway);
-    err = LJM_eReadName(handle, "ETHERNET_SUBNET", &ftemp);
-    if(err){
-        fprintf(stderr,"DOWNLOAD: Failed to read the ethernet subnet for handle %d.\n", handle);
-        goto lconf_downloadfail;
-    }
-    LJM_NumberToIP((unsigned int) ftemp, out->subnet);
-
-    // Loop through the analog input channels.
-    for(ainum=0;ainum<naich;ainum++){
-        // Read the channel directly from the original configuration
-        channel = dconf[devnum].aich[ainum].channel;
-        out->aich[ainum].channel = channel;
-        strncpy(out->aich[ainum].label, dconf[devnum].aich[ainum].label,
-                LCONF_MAX_STR);
-
-        /* Depreciated - uses register addresses instead of names
-        // Get the addresses for that channel's configuration data
-        airegisters(out->aich[ainum].channel,
-                    &reg_negative, &reg_range, &reg_resolution);
-        */
-        // Read the negative channel
-        stemp[0] = '\0';
-        sprintf(stemp, "AIN%d_NEGATIVE_CH", channel);
-        err = LJM_eReadName( handle, stemp, &ftemp);
-        /* Depreciated - used the register address instead of name
-        err = LJM_eReadAddress(  handle,
-                            reg_negative,
-                            LJM_UINT16,
-                            &ftemp);
-        */
-        if(err){
-            fprintf(stderr,"DOWNLOAD: Failed to read the negative AI channel number\n");
-            goto lconf_downloadfail;
-        }
-        out->aich[ainum].nchannel = (int) ftemp;
-
-        // Read the range
-        stemp[0] = '\0';
-        sprintf(stemp, "AIN%d_RANGE", channel);
-        err = LJM_eReadName( handle, stemp, &ftemp);
-        /* Depreciated -used the register address instead of the name
-        err = LJM_eReadAddress( handle,
-                            reg_range,
-                            LJM_FLOAT32,
-                            &ftemp);
-        */
-        if(err){
-            fprintf(stderr,"DOWNLOAD: Failed to read the AI channel range\n");
-            goto lconf_downloadfail;
-        }
-        out->aich[ainum].range = ftemp;
-
-        // Read the resolution
-        stemp[0] = '\0';
-        sprintf(stemp, "AIN%d_RESOLUTION_INDEX", channel);
-        err = LJM_eReadName( handle, stemp, &ftemp);
-        /* Depreciated - used the register address instead of the name
-        err = LJM_eReadAddress( handle,
-                            reg_resolution,
-                            LJM_UINT16,
-                            &ftemp);
-        */
-        if(err){
-            fprintf(stderr,"DOWNLOAD: Failed to read the AI channel resolution index at address\n");
-            goto lconf_downloadfail;
-        }
-        out->aich[ainum].resolution = (int) ftemp;
-    }
-
-    // Loop through the analog output channels
-    for(aonum=0; aonum<naoch; aonum++){
-        // Determine the channel from the STREAM_OUT#_TARGET
-        sprintf(stemp, "STREAM_OUT%d_TARGET", aonum);
-        err = err ? err : LJM_eReadName(handle, stemp, &ftemp);
-        LJM_NameToAddress("DAC0",&reg_temp,&type_temp);
-        // calculate a channel number based on the target's distance from DAC0
-        out->aoch[aonum].channel = ((int)ftemp - reg_temp)/2;
-        strncpy(out->aoch[aonum].label, dconf[devnum].aoch[aonum].label,
-                LCONF_MAX_STR);
-        // calculate a signal frequency based on the loop size
-        sprintf(stemp, "STREAM_OUT%d_LOOP_SIZE", aonum);
-        err = err ? err : LJM_eReadName(handle, stemp, &ftemp);
-        // borrow the samplehz parameter to estimate signal frequency
-        if(ftemp>0)
-            out->aoch[aonum].frequency = dconf[devnum].samplehz / ftemp;
-        else
-            out->aoch[aonum].frequency = -1;
-    }
-    if(err){
-        fprintf(stderr,"DOWNLOAD: Failed to read the analog output parameters.\n");
-        goto lconf_downloadfail;
-    }
-
-    // Retrieve the FIO clock settings if there are FIO channels
-    if(nfioch>0){
-        err = err ? err : LJM_eReadName(handle, "DIO_EF_CLOCK0_ROLL_VALUE", &ftemp);
-        fio_clk_roll = ftemp;
-        err = err ? err : LJM_eReadName(handle, "DIO_EF_CLOCK0_DIVISOR", &ftemp);
-        fio_clk_div = ftemp;
-        out->fiofrequency = ((double) 1e6 * LCONF_CLOCK_MHZ) / fio_clk_roll / fio_clk_div;
-    }
-    if(err){
-        fprintf(stderr,"DOWNLOAD: Failed to read the FIO clock settings.\n");
-        goto lconf_downloadfail;
-    }
-
-    // Check the FIO extended features
-    for(fionum=0; fionum<nfioch; fionum++){
-        // read the channel from the existing configuration
-        channel = dconf[devnum].fioch[fionum].channel;
-        out->fioch[fionum].channel = channel;
-        strncpy(out->fioch[fionum].label, dconf[devnum].fioch[fionum].label,
-                LCONF_MAX_STR);
-        // Retrieve the extended feature index for the channel
-        sprintf(stemp, "DIO%d_EF_INDEX", channel);
-        err = err ? err : LJM_eReadName(handle, stemp, &ftemp);
-        fioindex = (int) ftemp;
-        // Check the index
-        if(fioindex == 1){
-            // PWM Output
-            out->fioch[fionum].signal = FIO_PWM;
-            out->fioch[fionum].direction = FIO_OUTPUT;
-            // The choice of edge is arbitrary, so take it from the original
-            out->fioch[fionum].edge = dconf[devnum].fioch[fionum].edge;
-            if(dconf[devnum].fioch[fionum].edge==FIO_FALLING){
-                // Read the start index
-                sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                err = err ? err : LJM_eReadName( handle, stemp, &ftemp2);
-                // Read the stop index
-                sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
-                err = err ? err : LJM_eReadName( handle, stemp, &ftemp1);
-            }else{
-                // Read the start index
-                sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                err = err ? err : LJM_eReadName( handle, stemp, &ftemp1);
-                // Read the stop index
-                sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
-                err = err ? err : LJM_eReadName( handle, stemp, &ftemp2);
-            }
-            if(err){
-                fprintf(stderr,"DOWNLOAD: Failed to download FIO ch%d PWM parameters\n",
-                    channel);
-                goto lconf_downloadfail;
-            }
-            // Calculate phase
-            out->fioch[fionum].phase = ftemp1 * 360. / fio_clk_roll;
-            // Calculate duty
-            ftemp2 -= ftemp1;
-            // If the waveform has wrapped, unwrap it
-            if(ftemp2 < 0)
-                ftemp2 += fio_clk_roll;
-            out->fioch[fionum].duty = ftemp2 / fio_clk_roll;
-        }else if(fioindex == 3){
-            // Rising edge frequency measurement
-            out->fioch[fionum].signal = FIO_FREQUENCY;
-            out->fioch[fionum].direction = FIO_INPUT;
-            out->fioch[fionum].edge = FIO_RISING;
-        }else if(fioindex == 4){
-            // Falling edge frequency measurement
-            out->fioch[fionum].signal = FIO_FREQUENCY;
-            out->fioch[fionum].direction = FIO_INPUT;
-            out->fioch[fionum].edge = FIO_FALLING;
-        }else if(fioindex == 5){
-            // Pulse width measurement
-            out->fioch[fionum].signal = FIO_PWM;
-            out->fioch[fionum].direction = FIO_INPUT;
-            out->fioch[fionum].edge = dconf[devnum].fioch[fionum].edge;
-        }else if(fioindex == 6){
-            // Verify that the sister channel has also been configured
-            sprintf(stemp, "DIO%d_EF_INDEX", channel+1);
-            err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            if(ftemp != 6){
-                fprintf(stderr, "DOWNLOAD: Channel %d is set to phase, but %d is not.\n",
-                    channel, channel+1);
-            }
-            
-            // Phase measurement
-            out->fioch[fionum].signal = FIO_PHASE;
-            out->fioch[fionum].direction = FIO_INPUT;
-            // Get the edge indicator
-            sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
-            err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            if(err){
-                fprintf(stderr, "DOWNLOAD: Failed to read digital phase input parameters.\n");
-                goto lconf_downloadfail;
-            }
-            if(ftemp==0)
-                out->fioch[fionum].edge = FIO_FALLING;
-            else if(ftemp==1)
-                out->fioch[fionum].edge = FIO_RISING;
-            else{
-                fprintf(stderr,"DOWNLOAD: FIO channel %d phase measurement edge invalid (%d)\n.",
-                    channel, (int) ftemp);
-                out->fioch[fionum].edge = FIO_RISING;
-            }
-        }else if(fioindex == 8){
-            // Counter
-            out->fioch[fionum].signal = FIO_COUNT;
-            out->fioch[fionum].direction = FIO_INPUT;
-            out->fioch[fionum].debounce = FIO_DEBOUNCE_NONE;
-        }else if(fioindex == 9){
-            // Counter with debounce
-            out->fioch[fionum].signal = FIO_COUNT;
-            out->fioch[fionum].direction = FIO_INPUT;
-            // Get the timeout interval
-            sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
-            err = err ? err : LJM_eReadName( handle, stemp, &ftemp1);
-            // Get the debounce mode
-            sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-            err = err ? err : LJM_eReadName( handle, stemp, &ftemp2);
-            if(err){
-                fprintf(stderr, "DOWNLOAD: Failed to download counter debounce settings.\n");
-                goto lconf_downloadfail;
-            }
-            out->fioch[fionum].time = ftemp1;
-            // Interpret the debounce mode
-            if(ftemp2==0){
-                out->fioch[fionum].edge=FIO_FALLING;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_RESTART;
-            }else if(ftemp2==1){
-                out->fioch[fionum].edge=FIO_RISING;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_RESTART;
-            }else if(ftemp2==2){
-                out->fioch[fionum].edge=FIO_ALL;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_RESTART;
-            }else if(ftemp2==3){
-                out->fioch[fionum].edge=FIO_FALLING;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_FIXED;
-            }else if(ftemp2==4){
-                out->fioch[fionum].edge=FIO_RISING;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_FIXED;
-            }else if(ftemp2==5){
-                out->fioch[fionum].edge=FIO_FALLING;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_MINIMUM;
-            }else if(ftemp2==6){
-                out->fioch[fionum].edge=FIO_RISING;
-                out->fioch[fionum].debounce=FIO_DEBOUNCE_MINIMUM;
-            }
-        }else if(fioindex == 10){
-            out->fioch[fionum].signal = FIO_QUADRATURE;
-        }
-    }
-
-    return LCONF_NOERR;
-
-    lconf_downloadfail:
-    fprintf(stderr,"LCONFIG: Error downloading from device %d\n", devnum);
-    LJM_ErrorToString(err, err_str);
-    fprintf(stderr,"%s\n",err_str);
-    return LCONF_ERROR;
-}
-
-
-
-
-
-void show_config(DEVCONF* dconf, const unsigned int devnum){
-    int ainum,aonum,fionum,metanum,metacnt;
+void show_config(lc_devconf_t* dconf){
+    int ainum,aonum,efnum,metanum,metacnt;
     char value1[LCONF_MAX_STR], value2[LCONF_MAX_STR];
-    DEVCONF live;
+    lc_devconf_t live;
 
     // download the live parameters for compairson
-    download_config(dconf, devnum, &live);
+    //download_config(dconf, &live);
 
     // Start with the global parameters
-    printf("Device [%d]:\n", devnum);
-    sprintf(value1, "%d", dconf[devnum].connection);
+    sprintf(value1, "%d", dconf->connection);
     sprintf(value2, "%d", live.connection);
     print_color("Connection 1=USB,3=ETH", value1, value2);
-    print_color("Serial Number", dconf[devnum].serial, live.serial);
-    print_color("IP Address", dconf[devnum].ip, live.ip);
-    print_color("Gateway", dconf[devnum].gateway, live.gateway);
-    print_color("Subnet", dconf[devnum].subnet, live.subnet);
-    sprintf(value1, "%.1f", dconf[devnum].samplehz);
+    print_color("Serial Number", dconf->serial, live.serial);
+    print_color("IP Address", dconf->ip, live.ip);
+    print_color("Gateway", dconf->gateway, live.gateway);
+    print_color("Subnet", dconf->subnet, live.subnet);
+    sprintf(value1, "%.1f", dconf->samplehz);
     print_color("Sample Rate(Hz)",value1,"?");
-    sprintf(value1, "%.1f", dconf[devnum].settleus);
+    sprintf(value1, "%.1f", dconf->settleus);
     print_color("Settling Time(us)",value1,"?");
-    sprintf(value1, "%d", dconf[devnum].nsample);
+    sprintf(value1, "%d", dconf->nsample);
     print_color("Samples",value1,"?");
-    sprintf(value1, "%d", dconf[devnum].naich);
+    sprintf(value1, "%d", dconf->naich);
     sprintf(value2, "%d", live.naich);
     print_color("\nAnalog Input Channels", value1, value2);
-    for(ainum=0;ainum<dconf[devnum].naich;ainum++){
-        printf("Analog Input [%d] %s:\n",ainum, dconf[devnum].aich[ainum].label);
-        sprintf(value1, "%d", dconf[devnum].aich[ainum].channel);
+    for(ainum=0;ainum<dconf->naich;ainum++){
+        printf("Analog Input [%d] %s:\n",ainum, dconf->aich[ainum].label);
+        sprintf(value1, "%d", dconf->aich[ainum].channel);
         sprintf(value2, "%d", live.aich[ainum].channel);
         print_color("Positive Channel",value1,value2);
-        sprintf(value1, "%d", dconf[devnum].aich[ainum].nchannel);
+        sprintf(value1, "%d", dconf->aich[ainum].nchannel);
         sprintf(value2, "%d", live.aich[ainum].nchannel);
         print_color("Negative Channel",value1,value2);
-        sprintf(value1, "%.3f", dconf[devnum].aich[ainum].range);
+        sprintf(value1, "%.3f", dconf->aich[ainum].range);
         sprintf(value2, "%.3f", live.aich[ainum].range);
         print_color("Range (V)",value1,value2);
-        sprintf(value1, "%d", dconf[devnum].aich[ainum].resolution);
+        sprintf(value1, "%d", dconf->aich[ainum].resolution);
         sprintf(value2, "%d", live.aich[ainum].resolution);
         print_color("Resolution Index",value1,value2);
     }
-    sprintf(value1, "%d", dconf[devnum].naoch);
+    sprintf(value1, "%d", dconf->naoch);
     sprintf(value2, "%d", live.naoch);
     print_color("\nAnalog Output Channels", value1, value2);
-    for(aonum=0;aonum<dconf[devnum].naoch;aonum++){
-        printf("Analog Output [%d] %s:\n",aonum, dconf[devnum].aoch[aonum].label);
-        if(dconf[devnum].aoch[aonum].signal==AO_CONSTANT)  print_color("Signal", "constant", "?");
-        else if(dconf[devnum].aoch[aonum].signal==AO_SINE)  print_color("Signal", "sine", "?");
-        else if(dconf[devnum].aoch[aonum].signal==AO_SQUARE)  print_color("Signal", "square", "?");
-        else if(dconf[devnum].aoch[aonum].signal==AO_TRIANGLE)  print_color("Signal", "triangle", "?");
-        else if(dconf[devnum].aoch[aonum].signal==AO_NOISE)  print_color("Signal", "noise", "?");
+    for(aonum=0;aonum<dconf->naoch;aonum++){
+        printf("Analog Output [%d] %s:\n",aonum, dconf->aoch[aonum].label);
+        if(dconf->aoch[aonum].signal==AO_CONSTANT)  print_color("Signal", "constant", "?");
+        else if(dconf->aoch[aonum].signal==AO_SINE)  print_color("Signal", "sine", "?");
+        else if(dconf->aoch[aonum].signal==AO_SQUARE)  print_color("Signal", "square", "?");
+        else if(dconf->aoch[aonum].signal==AO_TRIANGLE)  print_color("Signal", "triangle", "?");
+        else if(dconf->aoch[aonum].signal==AO_NOISE)  print_color("Signal", "noise", "?");
         else print_color("Signal","***","?");
-        sprintf(value1, "%d", dconf[devnum].aoch[aonum].channel);
+        sprintf(value1, "%d", dconf->aoch[aonum].channel);
         sprintf(value2, "%d", live.aoch[aonum].channel);
         print_color("Channel",value1,value2);
-        sprintf(value1, "%.1f", dconf[devnum].aoch[aonum].frequency);
+        sprintf(value1, "%.1f", dconf->aoch[aonum].frequency);
         sprintf(value2, "%.1f", live.aoch[aonum].frequency);
         print_color("Frequency (Hz)",value1,value2);
-        sprintf(value1, "%.3f", dconf[devnum].aoch[aonum].amplitude);
+        sprintf(value1, "%.3f", dconf->aoch[aonum].amplitude);
         print_color("Amplitude (V)",value1,"?");
-        sprintf(value1, "%.3f", dconf[devnum].aoch[aonum].offset);
+        sprintf(value1, "%.3f", dconf->aoch[aonum].offset);
         print_color("Offset (V)",value1,"?");
-        sprintf(value1, "%.3f", dconf[devnum].aoch[aonum].duty);
+        sprintf(value1, "%.3f", dconf->aoch[aonum].duty);
         print_color("Duty Cycle",value1,"?");
     }
-    // Show FIO parameters
-    sprintf(value1, "%d", dconf[devnum].nfioch);
-    sprintf(value2, "%d", live.nfioch);
-    print_color("\nFIO Channels", value1, value2);
-    if(dconf[devnum].nfioch>0){
-        sprintf(value1, "%.1f", dconf[devnum].fiofrequency);
-        sprintf(value2, "%.1f", live.fiofrequency);
-        print_color("FIO Frequency (Hz)", value1, value2);
+    // Show EF parameters
+    sprintf(value1, "%d", dconf->nefch);
+    sprintf(value2, "%d", live.nefch);
+    print_color("\nEF Channels", value1, value2);
+    if(dconf->nefch>0){
+        sprintf(value1, "%.1f", dconf->effrequency);
+        sprintf(value2, "%.1f", live.effrequency);
+        print_color("EF Frequency (Hz)", value1, value2);
     }
-    for(fionum=0; fionum<dconf[devnum].nfioch; fionum++){
-        printf("Flexible Input/Output [%d] %s:\n", fionum, dconf[devnum].fioch[fionum].label);
-        sprintf(value1, "%d", dconf[devnum].fioch[fionum].channel);
-        sprintf(value2, "%d", live.fioch[fionum].channel);
+    for(efnum=0; efnum<dconf->nefch; efnum++){
+        printf("Flexible Input/Output [%d] %s:\n", efnum, dconf->efch[efnum].label);
+        sprintf(value1, "%d", dconf->efch[efnum].channel);
+        sprintf(value2, "%d", live.efch[efnum].channel);
         print_color("Channel",value1,value2);
-        if(dconf[devnum].fioch[fionum].signal==FIO_PWM)
+        if(dconf->efch[efnum].signal==EF_PWM)
             sprintf(value1, "PWM");
-        else if(dconf[devnum].fioch[fionum].signal==FIO_COUNT)
+        else if(dconf->efch[efnum].signal==EF_COUNT)
             sprintf(value1, "COUNT");
-        else if(dconf[devnum].fioch[fionum].signal==FIO_FREQUENCY)
+        else if(dconf->efch[efnum].signal==EF_FREQUENCY)
             sprintf(value1, "FREQUENCY");
-        else if(dconf[devnum].fioch[fionum].signal==FIO_PHASE)
+        else if(dconf->efch[efnum].signal==EF_PHASE)
             sprintf(value1, "PHASE");
-        else if(dconf[devnum].fioch[fionum].signal==FIO_QUADRATURE)
+        else if(dconf->efch[efnum].signal==EF_QUADRATURE)
             sprintf(value1, "QUADRATURE");
         else
             sprintf(value1, "NONE");
 
-        if(live.fioch[fionum].signal==FIO_PWM)
+        if(live.efch[efnum].signal==EF_PWM)
             sprintf(value2, "PWM");
-        else if(live.fioch[fionum].signal==FIO_COUNT)
+        else if(live.efch[efnum].signal==EF_COUNT)
             sprintf(value2, "COUNT");
-        else if(live.fioch[fionum].signal==FIO_FREQUENCY)
+        else if(live.efch[efnum].signal==EF_FREQUENCY)
             sprintf(value2, "FREQUENCY");
-        else if(live.fioch[fionum].signal==FIO_PHASE)
+        else if(live.efch[efnum].signal==EF_PHASE)
             sprintf(value2, "PHASE");
-        else if(live.fioch[fionum].signal==FIO_QUADRATURE)
+        else if(live.efch[efnum].signal==EF_QUADRATURE)
             sprintf(value2, "QUADRATURE");
         else
             sprintf(value2, "NONE");
         print_color("Signal", value1, value2);
 
-        if(dconf[devnum].fioch[fionum].direction==FIO_INPUT)
+        if(dconf->efch[efnum].direction==EF_INPUT)
             sprintf(value1, "INPUT");
-        else if(dconf[devnum].fioch[fionum].direction==FIO_OUTPUT)
+        else if(dconf->efch[efnum].direction==EF_OUTPUT)
             sprintf(value1, "OUTPUT");
         else
             sprintf(value1, "?");
-        if(live.fioch[fionum].direction==FIO_INPUT)
+        if(live.efch[efnum].direction==EF_INPUT)
             sprintf(value2, "INPUT");
-        else if(live.fioch[fionum].direction==FIO_OUTPUT)
+        else if(live.efch[efnum].direction==EF_OUTPUT)
             sprintf(value2, "OUTPUT");
         else
             sprintf(value2, "?");
         print_color("Direction",value1,value2);
 
-        if(dconf[devnum].fioch[fionum].edge==FIO_RISING)
+        if(dconf->efch[efnum].edge==EF_RISING)
             sprintf(value1, "RISING");
-        else if(dconf[devnum].fioch[fionum].edge==FIO_FALLING)
+        else if(dconf->efch[efnum].edge==EF_FALLING)
             sprintf(value1, "FALLING");
-        else if(dconf[devnum].fioch[fionum].edge==FIO_ALL)
+        else if(dconf->efch[efnum].edge==EF_ALL)
             sprintf(value1, "ALL");
         else
             sprintf(value1, "?");
-        if(live.fioch[fionum].edge==FIO_RISING)
+        if(live.efch[efnum].edge==EF_RISING)
             sprintf(value2, "RISING");
-        else if(live.fioch[fionum].edge==FIO_FALLING)
+        else if(live.efch[efnum].edge==EF_FALLING)
             sprintf(value2, "FALLING");
-        else if(live.fioch[fionum].edge==FIO_ALL)
+        else if(live.efch[efnum].edge==EF_ALL)
             sprintf(value2, "ALL");
         else
             sprintf(value2, "?");
         print_color("Edge",value1,value2);
 
-        sprintf(value1, "%.1f", dconf[devnum].fioch[fionum].time);
-        sprintf(value2, "%.1f", live.fioch[fionum].time);
+        sprintf(value1, "%.1f", dconf->efch[efnum].time);
+        sprintf(value2, "%.1f", live.efch[efnum].time);
         print_color("Time (us)",value1,value2);
-        sprintf(value1, "%.3f", dconf[devnum].fioch[fionum].duty);
-        sprintf(value2, "%.3f", live.fioch[fionum].duty);
+        sprintf(value1, "%.3f", dconf->efch[efnum].duty);
+        sprintf(value2, "%.3f", live.efch[efnum].duty);
         print_color("Duty cycle",value1,value2);
-        sprintf(value1, "%.1f", dconf[devnum].fioch[fionum].phase);
-        sprintf(value2, "%.1f", live.fioch[fionum].phase);
+        sprintf(value1, "%.1f", dconf->efch[efnum].phase);
+        sprintf(value2, "%.1f", live.efch[efnum].phase);
         print_color("Phase (deg)",value1,value2);
-        sprintf(value1, "%d", dconf[devnum].fioch[fionum].counts);
-        sprintf(value2, "%d", live.fioch[fionum].counts);
+        sprintf(value1, "%d", dconf->efch[efnum].counts);
+        sprintf(value2, "%d", live.efch[efnum].counts);
         print_color("Counts",value1,value2);
     }
 
     // count the meta parameters
     for(metacnt=0;\
             metacnt<LCONF_MAX_META && \
-            dconf[devnum].meta[metacnt].param[0]!='\0';\
+            dconf->meta[metacnt].param[0]!='\0';\
             metacnt++){}
     printf("\nMeta Parameters: %d\n",metacnt);
     for(metanum=0; metanum<metacnt; metanum++)
-        switch(dconf[devnum].meta[metanum].type){
+        switch(dconf->meta[metanum].type){
             case 'i':
                 printf("%19s (int): %d\n",
-                    dconf[devnum].meta[metanum].param,
-                    dconf[devnum].meta[metanum].value.ivalue);
+                    dconf->meta[metanum].param,
+                    dconf->meta[metanum].value.ivalue);
             break;
             case 'f':
                 printf("%19s (flt): %f\n",
-                    dconf[devnum].meta[metanum].param,
-                    dconf[devnum].meta[metanum].value.fvalue);
+                    dconf->meta[metanum].param,
+                    dconf->meta[metanum].value.fvalue);
             break;
             case 's':
                 printf("%19s (str): %s\n",
-                    dconf[devnum].meta[metanum].param,
-                    dconf[devnum].meta[metanum].value.svalue);
+                    dconf->meta[metanum].param,
+                    dconf->meta[metanum].value.svalue);
             break;
             default:
                 printf(LCONF_COLOR_RED "%19s ( ? ) **CORRUPT**\n" LCONF_COLOR_NULL,
-                    dconf[devnum].meta[metanum].param);
+                    dconf->meta[metanum].param);
         }
 }
 
 
 
-int update_fio(DEVCONF* dconf, const unsigned int devnum){
-    int handle, channel, fionum, itemp1, itemp2;
+int lc_update_ef(lc_devconf_t* dconf){
+    int handle, channel, efnum, itemp1, itemp2;
     double ftemp, ftemp1, ftemp2;
     char stemp[LCONF_MAX_STR];
-    unsigned int fio_clk_roll, fio_clk_div;
+    unsigned int ef_clk_roll, ef_clk_div;
     int err = 0;
 
-    handle = dconf[devnum].handle;
+    handle = dconf->handle;
 
     // Get the roll value
     err = err ? err : LJM_eReadName(handle, "DIO_EF_CLOCK0_ROLL_VALUE", &ftemp);
-    fio_clk_roll = (unsigned int) ftemp;
+    ef_clk_roll = (unsigned int) ftemp;
     // Get the divisor
     err = err ? err : LJM_eReadName(handle, "DIO_EF_CLOCK0_DIVISOR", &ftemp);
-    fio_clk_div = (unsigned int) ftemp;
+    ef_clk_div = (unsigned int) ftemp;
     
-    // Configure the FIO channels
-    for(fionum=0; fionum<dconf[devnum].nfioch; fionum++){
-        channel = dconf[devnum].fioch[fionum].channel;
-        switch(dconf[devnum].fioch[fionum].signal){
+    // Configure the EF channels
+    for(efnum=0; efnum<dconf->nefch; efnum++){
+        channel = dconf->efch[efnum].channel;
+        switch(dconf->efch[efnum].signal){
         // Pulse-width modulation
-        case FIO_PWM:
+        case EF_PWM:
             // PWM input
-            if(dconf[devnum].fioch[fionum].direction==FIO_INPUT){
+            if(dconf->efch[efnum].direction==EF_INPUT){
                 // Get the time high
                 sprintf(stemp, "DIO%d_EF_READ_A", channel);
                 err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
@@ -2884,27 +2577,27 @@ int update_fio(DEVCONF* dconf, const unsigned int devnum){
                 err = err ? err : LJM_eReadName( handle, stemp, &ftemp1);
                 ftemp2 = ftemp + ftemp1;
 
-                dconf[devnum].fioch[fionum].counts = (unsigned int) ftemp2;
-                dconf[devnum].fioch[fionum].time = ftemp2 * fio_clk_div / LCONF_CLOCK_MHZ;
-                dconf[devnum].fioch[fionum].phase = 0.;
-                if(dconf[devnum].fioch[fionum].edge==FIO_FALLING){
-                    dconf[devnum].fioch[fionum].duty = ftemp1 / ftemp2;
+                dconf->efch[efnum].counts = (unsigned int) ftemp2;
+                dconf->efch[efnum].time = ftemp2 * ef_clk_div / LCONF_CLOCK_MHZ;
+                dconf->efch[efnum].phase = 0.;
+                if(dconf->efch[efnum].edge==EF_FALLING){
+                    dconf->efch[efnum].duty = ftemp1 / ftemp2;
                 }else{
-                    dconf[devnum].fioch[fionum].duty = ftemp / ftemp2;
+                    dconf->efch[efnum].duty = ftemp / ftemp2;
                 }
 
             // PWM output
             }else{
                 // Calculate the start index
                 // Unwrap the phase first (lazy method)
-                while(dconf[devnum].fioch[fionum].phase<0.)
-                    dconf[devnum].fioch[fionum].phase += 360.;
-                itemp1 = fio_clk_roll * (dconf[devnum].fioch[fionum].phase / 360.);
-                itemp1 %= fio_clk_roll;
+                while(dconf->efch[efnum].phase<0.)
+                    dconf->efch[efnum].phase += 360.;
+                itemp1 = ef_clk_roll * (dconf->efch[efnum].phase / 360.);
+                itemp1 %= ef_clk_roll;
                 // Calculate the stop index
-                itemp2 = fio_clk_roll * dconf[devnum].fioch[fionum].duty;
-                itemp2 = (((long int) itemp1) + ((long int) itemp2))%fio_clk_roll;
-                if(dconf[devnum].fioch[fionum].edge==FIO_FALLING){
+                itemp2 = ef_clk_roll * dconf->efch[efnum].duty;
+                itemp2 = (((long int) itemp1) + ((long int) itemp2))%ef_clk_roll;
+                if(dconf->efch[efnum].edge==EF_FALLING){
                     // Write the start index
                     sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
@@ -2923,50 +2616,50 @@ int update_fio(DEVCONF* dconf, const unsigned int devnum){
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
             }
         break;
-        case FIO_COUNT:
+        case EF_COUNT:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            dconf[devnum].fioch[fionum].counts = (unsigned int) ftemp;
-            dconf[devnum].fioch[fionum].time = 0.;
-            dconf[devnum].fioch[fionum].duty = 0.;
-            dconf[devnum].fioch[fionum].phase = 0.;
+            dconf->efch[efnum].counts = (unsigned int) ftemp;
+            dconf->efch[efnum].time = 0.;
+            dconf->efch[efnum].duty = 0.;
+            dconf->efch[efnum].phase = 0.;
         break;
-        case FIO_FREQUENCY:
+        case EF_FREQUENCY:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            dconf[devnum].fioch[fionum].counts = (unsigned int) ftemp;
-            dconf[devnum].fioch[fionum].time = ftemp * fio_clk_div / LCONF_CLOCK_MHZ;
-            dconf[devnum].fioch[fionum].duty = 0.;
-            dconf[devnum].fioch[fionum].phase = 0.;
+            dconf->efch[efnum].counts = (unsigned int) ftemp;
+            dconf->efch[efnum].time = ftemp * ef_clk_div / LCONF_CLOCK_MHZ;
+            dconf->efch[efnum].duty = 0.;
+            dconf->efch[efnum].phase = 0.;
         break;
-        case FIO_PHASE:
+        case EF_PHASE:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            dconf[devnum].fioch[fionum].counts = (unsigned int) ftemp;
-            dconf[devnum].fioch[fionum].time = ftemp * fio_clk_div / LCONF_CLOCK_MHZ;
-            dconf[devnum].fioch[fionum].duty = 0.;
-            dconf[devnum].fioch[fionum].phase = 0.;
+            dconf->efch[efnum].counts = (unsigned int) ftemp;
+            dconf->efch[efnum].time = ftemp * ef_clk_div / LCONF_CLOCK_MHZ;
+            dconf->efch[efnum].duty = 0.;
+            dconf->efch[efnum].phase = 0.;
         break;
-        case FIO_QUADRATURE:
+        case EF_QUADRATURE:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            dconf[devnum].fioch[fionum].counts = (unsigned int) ftemp;
-            dconf[devnum].fioch[fionum].time = 0;
-            dconf[devnum].fioch[fionum].duty = 0.;
-            dconf[devnum].fioch[fionum].phase = 0.;
+            dconf->efch[efnum].counts = (unsigned int) ftemp;
+            dconf->efch[efnum].time = 0;
+            dconf->efch[efnum].duty = 0.;
+            dconf->efch[efnum].phase = 0.;
         break;
         default:
             // No AOsignal
         break;
         }
         if(err){
-            fprintf(stderr, "FIO_UPDATE: Failed while working on FIO channel %d\n.", channel);
+            fprintf(stderr, "EF_UPDATE: Failed while working on EF channel %d\n.", channel);
             break;
         }
     }
 
     if(err){
-        fprintf(stderr,"LCONFIG: Error updating Flexible IO parameters on device %d\n", devnum);
+        fprintf(stderr,"LCONFIG: Error updating Flexible IO parameters.\n");
         LJM_ErrorToString(err, err_str);
         fprintf(stderr,"%s\n",err_str);
         return LCONF_ERROR;
@@ -2976,13 +2669,13 @@ int update_fio(DEVCONF* dconf, const unsigned int devnum){
 
 
 
-int communicate(DEVCONF* dconf, const unsigned int devnum, 
+int lc_communicate(lc_devconf_t* dconf, 
         const unsigned int comchannel,
         const char *txbuffer, const unsigned int txlength, 
         char *rxbuffer, const unsigned int rxlength,
         const int timeout_ms){
     
-    COMCONF *com;
+    lc_comconf_t *com;
     int err, err2;
     struct timeval start, now;
     double ftemp;
@@ -2991,10 +2684,10 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
     // Verify that the channel number is legal
     if(comchannel > LCONF_MAX_NCOMCH){
         fprintf(stderr, "COMMUNICATE: Com channel, %d, is larger than the maximum, %d\n", comchannel, LCONF_MAX_COMCH);
-        return -1;
+        return LCONF_ERROR;
     }
     // Point to the selected com struct
-    com = &dconf[devnum].comch[comchannel];
+    com = &dconf->comch[comchannel];
     // Case out the different channel types, and start configuring!
     switch(com->type){
     //
@@ -3004,7 +2697,7 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
         // Test all mandatory parameters
         if(com->pin_in < 0 || com->pin_out < 0 || com->rate < 0){
             fprintf(stderr, "COMMUNICATE: A UART channel requires that COMIN, COMOUT, and COMRATE be configured\n");
-            return -1;
+            return LCONF_ERROR;
         }
         // The UART interface encodes data in 16-bit wide words, so the buffer 
         // length is twice the number of bytes that need to be transmitted
@@ -3012,31 +2705,31 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
         txbytes = (txlength >> 1);
         
         // Start configuring
-        err = LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_TX_DIONUM", (double) com->pin_out);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_RX_DIONUM", (double) com->pin_in);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_BAUD", (double) com->rate);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_DATA_BITS", (double) com->options.uart.bits);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_STOP_BITS", (double) com->options.uart.stop);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_PARITY", (double) com->options.uart.parity);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_RX_BUFFER_SIZE_BYTES", (double) rxlength);
-        err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 1);
+        err = LJM_eWriteName(dconf->handle, "ASYNCH_ENABLE", 0);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_TX_DIONUM", (double) com->pin_out);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_RX_DIONUM", (double) com->pin_in);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_BAUD", (double) com->rate);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_NUM_DATA_BITS", (double) com->options.uart.bits);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_NUM_STOP_BITS", (double) com->options.uart.stop);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_PARITY", (double) com->options.uart.parity);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_RX_BUFFER_SIZE_BYTES", (double) rxlength);
+        err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_ENABLE", 1);
         if(err){
             LJM_ErrorToString(err, err_str);
             fprintf(stderr, "COMMUNICATE: There was an error configuring the UART interface.\n%s\n", err_str);
-            return -1;
+            return LCONF_ERROR;
         }
         // If configured to transmit, now's the time.
         if(txlength){
-            err = LJM_eWriteName(dconf[devnum].handle, "ASYNCH_NUM_BYTES_TX", (double) txbytes);
-            err = err ? err : LJM_eWriteNameByteArray(dconf[devnum].handle, 
+            err = LJM_eWriteName(dconf->handle, "ASYNCH_NUM_BYTES_TX", (double) txbytes);
+            err = err ? err : LJM_eWriteNameByteArray(dconf->handle, 
                     "ASYNCH_DATA_TX", txlength, txbuffer, &err2);
-            err = err ? err : LJM_eWriteName(dconf[devnum].handle, "ASYNCH_TX_GO", 1);
+            err = err ? err : LJM_eWriteName(dconf->handle, "ASYNCH_TX_GO", 1);
             if(err){
                 LJM_ErrorToString(err, err_str);
                 fprintf(stderr, "COMMUNICATE: Failed while trying to transmit data over UART\n%s\n", err_str);
-                LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
-                return -1;
+                LJM_eWriteName(dconf->handle, "ASYNCH_ENABLE", 0);
+                return LCONF_ERROR;
             }
         }
         // Mark the time
@@ -3044,15 +2737,15 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
         // If RX is configured, loop until a timeout or the data arrive
         while(rxlength){
             // Check on the number of bytes received
-            err = LJM_eReadName(dconf[devnum].handle, "ASYNCH_NUM_BYTES_RX", &ftemp);
+            err = LJM_eReadName(dconf->handle, "ASYNCH_NUM_BYTES_RX", &ftemp);
             if(err){
                 LJM_ErrorToString(err, err_str);
                 fprintf(stderr, "COMMUNICATE: Failed while checking on the RX operation\n%s\n", err_str);
-                LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
-                return -1;
+                LJM_eWriteName(dconf->handle, "ASYNCH_ENABLE", 0);
+                return LCONF_ERROR;
             }
             if(ftemp >= rxbytes){
-                err = LJM_eReadNameByteArray(dconf[devnum].handle, 
+                err = LJM_eReadNameByteArray(dconf->handle, 
                         "ASYNCH_DATA_RX", rxlength, rxbuffer, &err2);
                 break;
             }
@@ -3060,96 +2753,97 @@ int communicate(DEVCONF* dconf, const unsigned int devnum,
             gettimeofday(&now,NULL); 
             if(timeout_ms > 0 && difftime_ms(&now,&start) > timeout_ms){
                 fprintf(stderr, "COMMUNICATE: RX operation timed out (over %dms)\n", timeout_ms);
-                LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
-                return -1;
+                LJM_eWriteName(dconf->handle, "ASYNCH_ENABLE", 0);
+                return LCONF_ERROR;
             }
             // Wait a 10ms to check again
             usleep(10000);
         }
-        LJM_eWriteName(dconf[devnum].handle, "ASYNCH_ENABLE", 0);
+        LJM_eWriteName(dconf->handle, "ASYNCH_ENABLE", 0);
         
         break;
     default:
         fprintf(stderr, "COMMUNICATE: Com channel, %d, was not configured.\n", comchannel);
-        return -1;
+        return LCONF_ERROR;
     }
+    return LCONF_NOERR;
 }
 
 
-int get_meta_int(DEVCONF* dconf, const unsigned int devnum, const char* param, int* value){
+int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;
         metanum<LCONF_MAX_META && \
-        dconf[devnum].meta[metanum].param[0] != '\0';
+        dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf[devnum].meta[metanum].param,param,LCONF_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LCONF_MAX_STR)==0){
             // check that the type is correct
-            if(dconf[devnum].meta[metanum].type!='i')
+            if(dconf->meta[metanum].type!='i')
                 fprintf(stderr,"GET_META::WARNING:: param %s holds type '%c', but was queried for an integer.\n",\
-                    param,dconf[devnum].meta[metanum].type);
-            *value = dconf[devnum].meta[metanum].value.ivalue;
+                    param,dconf->meta[metanum].type);
+            *value = dconf->meta[metanum].value.ivalue;
             return LCONF_NOERR;
         }
     fprintf(stderr,"GET_META: Failed to find meta parameter, %s\n",param);
     return LCONF_NOERR;
 }
 
-int get_meta_flt(DEVCONF* dconf, const unsigned int devnum, const char* param, double* value){
+int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;
         metanum<LCONF_MAX_META && \
-        dconf[devnum].meta[metanum].param[0] != '\0';
+        dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf[devnum].meta[metanum].param,param,LCONF_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LCONF_MAX_STR)==0){
             // check that the type is correct
-            if(dconf[devnum].meta[metanum].type!='f')
+            if(dconf->meta[metanum].type!='f')
                 fprintf(stderr,"GET_META::WARNING:: param %s holds type '%c', but was queried for an float.\n",\
-                    param,dconf[devnum].meta[metanum].type);
-            *value = dconf[devnum].meta[metanum].value.fvalue;
+                    param,dconf->meta[metanum].type);
+            *value = dconf->meta[metanum].value.fvalue;
             return LCONF_NOERR;
         }
     fprintf(stderr,"GET_META: Failed to find meta parameter, %s\n",param);
     return LCONF_NOERR;
 }
 
-int get_meta_str(DEVCONF* dconf, const unsigned int devnum, const char* param, char* value){
+int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;
         metanum<LCONF_MAX_META && \
-        dconf[devnum].meta[metanum].param[0] != '\0';
+        dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf[devnum].meta[metanum].param,param,LCONF_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LCONF_MAX_STR)==0){
             // check that the type is correct
-            if(dconf[devnum].meta[metanum].type!='s')
+            if(dconf->meta[metanum].type!='s')
                 fprintf(stderr,"GET_META::WARNING:: param %s holds type '%c', but was queried for an string.\n",\
-                    param,dconf[devnum].meta[metanum].type);
-            strncpy(value, dconf[devnum].meta[metanum].value.svalue, LCONF_MAX_STR);
+                    param,dconf->meta[metanum].type);
+            strncpy(value, dconf->meta[metanum].value.svalue, LCONF_MAX_STR);
             return LCONF_NOERR;
         }
     fprintf(stderr,"GET_META: Failed to find meta parameter, %s\n",param);
     return LCONF_ERROR;
 }
 
-int put_meta_int(DEVCONF* dconf, const unsigned int devnum, const char* param, int value){
+int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value){
     int metanum;
     for(metanum=0; metanum<LCONF_MAX_META; metanum++){
-        if(dconf[devnum].meta[metanum].param[0] == '\0'){
-            strncpy(dconf[devnum].meta[metanum].param, param, LCONF_MAX_STR);
-            dconf[devnum].meta[metanum].value.ivalue = value;
-            dconf[devnum].meta[metanum].type = 'i';
+        if(dconf->meta[metanum].param[0] == '\0'){
+            strncpy(dconf->meta[metanum].param, param, LCONF_MAX_STR);
+            dconf->meta[metanum].value.ivalue = value;
+            dconf->meta[metanum].type = 'i';
             return LCONF_NOERR;
-        }else if(strncmp(dconf[devnum].meta[metanum].param, param, LCONF_MAX_STR)==0){
-            dconf[devnum].meta[metanum].value.ivalue = value;
-            dconf[devnum].meta[metanum].type = 'i';
+        }else if(strncmp(dconf->meta[metanum].param, param, LCONF_MAX_STR)==0){
+            dconf->meta[metanum].value.ivalue = value;
+            dconf->meta[metanum].type = 'i';
             return LCONF_NOERR;
         }
     }
@@ -3157,17 +2851,17 @@ int put_meta_int(DEVCONF* dconf, const unsigned int devnum, const char* param, i
     return LCONF_ERROR;
 }
 
-int put_meta_flt(DEVCONF* dconf, const unsigned int devnum, const char* param, double value){
+int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
     int metanum;
     for(metanum=0; metanum<LCONF_MAX_META; metanum++){
-        if(dconf[devnum].meta[metanum].param[0] == '\0'){
-            strncpy(dconf[devnum].meta[metanum].param, param, LCONF_MAX_STR);
-            dconf[devnum].meta[metanum].value.fvalue = value;
-            dconf[devnum].meta[metanum].type = 'f';
+        if(dconf->meta[metanum].param[0] == '\0'){
+            strncpy(dconf->meta[metanum].param, param, LCONF_MAX_STR);
+            dconf->meta[metanum].value.fvalue = value;
+            dconf->meta[metanum].type = 'f';
             return LCONF_NOERR;
-        }else if(strncmp(dconf[devnum].meta[metanum].param, param, LCONF_MAX_STR)==0){
-            dconf[devnum].meta[metanum].value.fvalue = value;
-            dconf[devnum].meta[metanum].type = 'f';
+        }else if(strncmp(dconf->meta[metanum].param, param, LCONF_MAX_STR)==0){
+            dconf->meta[metanum].value.fvalue = value;
+            dconf->meta[metanum].type = 'f';
             return LCONF_NOERR;
         }
     }
@@ -3175,17 +2869,17 @@ int put_meta_flt(DEVCONF* dconf, const unsigned int devnum, const char* param, d
     return LCONF_ERROR;
 }
 
-int put_meta_str(DEVCONF* dconf, const unsigned int devnum, const char* param, char* value){
+int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value){
     int metanum;
     for(metanum=0; metanum<LCONF_MAX_META; metanum++){
-        if(dconf[devnum].meta[metanum].param[0] == '\0'){
-            strncpy(dconf[devnum].meta[metanum].param, param, LCONF_MAX_STR);
-            strncpy(dconf[devnum].meta[metanum].value.svalue, value, LCONF_MAX_STR);
-            dconf[devnum].meta[metanum].type = 's';
+        if(dconf->meta[metanum].param[0] == '\0'){
+            strncpy(dconf->meta[metanum].param, param, LCONF_MAX_STR);
+            strncpy(dconf->meta[metanum].value.svalue, value, LCONF_MAX_STR);
+            dconf->meta[metanum].type = 's';
             return LCONF_NOERR;
-        }else if(strncmp(dconf[devnum].meta[metanum].param, param, LCONF_MAX_STR)==0){
-            strncpy(dconf[devnum].meta[metanum].value.svalue, value, LCONF_MAX_STR);
-            dconf[devnum].meta[metanum].type = 's';
+        }else if(strncmp(dconf->meta[metanum].param, param, LCONF_MAX_STR)==0){
+            strncpy(dconf->meta[metanum].value.svalue, value, LCONF_MAX_STR);
+            dconf->meta[metanum].type = 's';
             return LCONF_NOERR;
         }
     }    
@@ -3195,40 +2889,40 @@ int put_meta_str(DEVCONF* dconf, const unsigned int devnum, const char* param, c
 
 
 
-void status_data_stream(DEVCONF* dconf, const unsigned int devnum,
+void lc_stream_status(lc_devconf_t* dconf,
         unsigned int *samples_streamed, unsigned int *samples_read,
         unsigned int *samples_waiting){
 
-    if(dconf[devnum].RB.buffer){
-        *samples_streamed = dconf[devnum].RB.samples_streamed;
-        *samples_read = dconf[devnum].RB.samples_read;
+    if(dconf->RB.buffer){
+        *samples_streamed = dconf->RB.samples_streamed;
+        *samples_read = dconf->RB.samples_read;
         // Case out the read and write status
-        if(dconf[devnum].RB.read == dconf[devnum].RB.size_samples)
-            *samples_waiting = dconf[devnum].RB.size_samples / dconf[devnum].RB.channels;
+        if(dconf->RB.read == dconf->RB.size_samples)
+            *samples_waiting = dconf->RB.size_samples / dconf->RB.channels;
         // If read has wrapped around the end of the buffer
-        else if(dconf[devnum].RB.write < dconf[devnum].RB.read)
-            *samples_waiting = (dconf[devnum].RB.size_samples -\
-                dconf[devnum].RB.read + dconf[devnum].RB.write)/\
-                dconf[devnum].RB.channels;
+        else if(dconf->RB.write < dconf->RB.read)
+            *samples_waiting = (dconf->RB.size_samples -\
+                dconf->RB.read + dconf->RB.write)/\
+                dconf->RB.channels;
         else
-            *samples_waiting = (dconf[devnum].RB.write-dconf[devnum].RB.read)/\
-                dconf[devnum].RB.channels;
+            *samples_waiting = (dconf->RB.write-dconf->RB.read)/\
+                dconf->RB.channels;
     }
 }
 
 
 
-int iscomplete_data_stream(DEVCONF* dconf, const unsigned int devnum){
-    return (dconf[devnum].RB.samples_streamed > dconf[devnum].nsample);
+int lc_stream_iscomplete(lc_devconf_t* dconf){
+    return (dconf->RB.samples_streamed > dconf->nsample);
 }
 
 
-int isempty_data_stream(DEVCONF* dconf, const unsigned int devnum){
-    return isempty_buffer(&dconf[devnum].RB);
+int lc_stream_isempty(lc_devconf_t* dconf){
+    return isempty_buffer(&dconf->RB);
 }
 
 
-int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per_read){
+int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     int ainum,aonum,index,err=0;
     int stlist[LCONF_MAX_STCH];
     int resindex, reg_temp, dummy;
@@ -3239,47 +2933,47 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     if(samples_per_read <= 0)
         samples_per_read = LCONF_SAMPLES_PER_READ;
 
-    if(dconf[devnum].naich<1 && dconf[devnum].naoch<1 && dconf[devnum].distream==0){
+    if(dconf->naich<1 && dconf->naoch<1 && dconf->distream==0){
         fprintf(stderr,"START_DATA_STREAM: No channels are configured\n");
         startfail();
     }
 
     // Initialize the resolution index
-    resindex = dconf[devnum].aich[0].resolution;
+    resindex = dconf->aich[0].resolution;
     flag = 1;   // use the flag to remember if we have already issued a warning.
     index = 0;  // Index is a parallel count for the location in stlist.
     // Assemble the list of channels and check the resolution settings
-    for(ainum=0; ainum<dconf[devnum].naich; ainum++){
+    for(ainum=0; ainum<dconf->naich; ainum++){
         // Populate the channel list
-        stlist[index++] = dconf[devnum].aich[ainum].channel * 2;
+        stlist[index++] = dconf->aich[ainum].channel * 2;
         // Do we have a conflict in resindex values?
-        if(flag && resindex != dconf[devnum].aich[ainum].resolution){
+        if(flag && resindex != dconf->aich[ainum].resolution){
             fprintf(stderr,
                     "STREAM_START::WARNING:: AICH%d has different resolution %d.\n",
                     ainum, resindex);
             flag=0;
         }
         // If this channel's resolution index is less than those previous
-        if(resindex > dconf[devnum].aich[ainum].resolution)
-            resindex = dconf[devnum].aich[ainum].resolution;
+        if(resindex > dconf->aich[ainum].resolution)
+            resindex = dconf->aich[ainum].resolution;
     }
 
     if(!flag)
         fprintf(stderr,"STREAM_START: Used resolution index %d for all streaming channels.\n",resindex);
 
     // Write the configuration parameters unique to streaming.
-    err=LJM_eWriteName(dconf[devnum].handle, 
+    err=LJM_eWriteName(dconf->handle, 
             "STREAM_RESOLUTION_INDEX", resindex);
     // Write the settling time
-    err= err ? err : LJM_eWriteName(dconf[devnum].handle, 
-            "STREAM_SETTLING_US", dconf[devnum].settleus);
+    err= err ? err : LJM_eWriteName(dconf->handle, 
+            "STREAM_SETTLING_US", dconf->settleus);
     if(err){
         fprintf(stderr,"STREAM_START: Failed to set setting and resolution settings.\n");
         startfail();
     }
 
     // Add digital input streaming?
-    if(dconf[devnum].distream)
+    if(dconf->distream)
         LJM_NameToAddress("FIO_EIO_STATE", &stlist[index++], &dummy);
 
     // Add any analog output streams to the stream scanlist
@@ -3290,22 +2984,22 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     
     // Get the STREAM_OUT0 address
     LJM_NameToAddress("STREAM_OUT0",&reg_temp,&dummy);
-    for(aonum=0;aonum<dconf[devnum].naoch;aonum++){
+    for(aonum=0;aonum<dconf->naoch;aonum++){
         stlist[index++] = reg_temp;
         // increment the index and the register
         reg_temp += 1;
     }
 
     // Determine the number of R/W blocks in the buffer
-    blocks = dconf[devnum].trigpre > dconf[devnum].nsample ? 
-                dconf[devnum].trigpre : dconf[devnum].nsample;
+    blocks = dconf->trigpre > dconf->nsample ? 
+                dconf->trigpre : dconf->nsample;
     blocks = (blocks/samples_per_read) + 1;
 
     // Configure the ring buffer
     // The number of buffer R/W blocks is calculated from the pretrigger
     // buffer size plus 1.
-    if(init_buffer(&dconf[devnum].RB, 
-                nistream_config(dconf, devnum),
+    if(init_buffer(&dconf->RB, 
+                lc_nistream(dconf),
                 samples_per_read,
                 blocks)){
         fprintf(stderr,"STREAM_START: Failed to initialize the buffer.\n");
@@ -3313,16 +3007,16 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
     }
 
     // Initialize the trigger
-    dconf[devnum].trigmem = 0;
-    if(dconf[devnum].trigchannel >= 0)
-        dconf[devnum].trigstate = TRIG_PRE;
+    dconf->trigmem = 0;
+    if(dconf->trigchannel >= 0)
+        dconf->trigstate = TRIG_PRE;
 
     // Start the stream.
-    err=LJM_eStreamStart(dconf[devnum].handle, 
+    err=LJM_eStreamStart(dconf->handle, 
             samples_per_read,
             index,
             stlist,
-            &dconf[devnum].samplehz);
+            &dconf->samplehz);
 
     if(err){
         fprintf(stderr,"STREAM_START: Failed to start the stream.\n");
@@ -3332,16 +3026,16 @@ int start_data_stream(DEVCONF* dconf, const unsigned int devnum, int samples_per
 }
 
 
-int service_data_stream(DEVCONF* dconf, const unsigned int devnum){
+int lc_stream_service(lc_devconf_t* dconf){
     int dev_backlog, ljm_backlog, size, err;
     int index, this;
     double ftemp;
     double *write_data;
 
     // Retrieve the write buffer pointer
-    write_data = get_write_buffer(&dconf[devnum].RB);
+    write_data = get_write_buffer(&dconf->RB);
     // Perform the data transfer
-    err = LJM_eStreamRead(dconf[devnum].handle, 
+    err = LJM_eStreamRead(dconf->handle, 
             write_data,
             &dev_backlog, &ljm_backlog);
     // Do some error checking
@@ -3351,121 +3045,121 @@ int service_data_stream(DEVCONF* dconf, const unsigned int devnum){
         fprintf(stderr,"READ_STREAM: Software backlog! %d\n",ljm_backlog);
     
     if(err){
-        fprintf(stderr,"LCONFIG: Error reading from data stream on device %d.\n",devnum);
+        fprintf(stderr,"LCONFIG: Error reading from data stream.\n");
         LJM_ErrorToString(err, err_str);
         fprintf(stderr,"%s\n",err_str);
         return LCONF_ERROR;
     }
     // If there was no error, update the ringbuffer registers
-    service_write_buffer(&dconf[devnum].RB);
+    service_write_buffer(&dconf->RB);
 
     // Tend to the software trigger
-    if(dconf[devnum].trigstate == TRIG_PRE){
-        if(dconf[devnum].RB.samples_streamed >= dconf[devnum].trigpre){
-            dconf[devnum].trigstate = TRIG_ARMED;
-            if(dconf[devnum].trigchannel == LCONF_TRIG_HSC){
-                err = LJM_eReadName(dconf[devnum].handle, "DIO18_EF_READ_A", &ftemp);
+    if(dconf->trigstate == TRIG_PRE){
+        if(dconf->RB.samples_streamed >= dconf->trigpre){
+            dconf->trigstate = TRIG_ARMED;
+            if(dconf->trigchannel == LCONF_TRIG_HSC){
+                err = LJM_eReadName(dconf->handle, "DIO18_EF_READ_A", &ftemp);
                 if(err){
                     fprintf(stderr,"SERVICE DATA STREAM: Failed to test the high speed counter.\n");
-                    dconf[devnum].trigmem = 0x00;
+                    dconf->trigmem = 0x00;
                     return LCONF_ERROR;
                 }
-                dconf[devnum].trigmem = (unsigned int) ftemp;
+                dconf->trigmem = (unsigned int) ftemp;
             }
         }
-    }else if(dconf[devnum].trigstate == TRIG_ARMED){
+    }else if(dconf->trigstate == TRIG_ARMED){
         // Test for a trigger event
-        size = dconf[devnum].RB.blocksize_samples;
+        size = dconf->RB.blocksize_samples;
         // Case out the edge types in advance for speed
         // test for a counter event
-        if(dconf[devnum].trigchannel == LCONF_TRIG_HSC){
-            err = LJM_eReadName(dconf[devnum].handle, "DIO18_EF_READ_A", &ftemp);
+        if(dconf->trigchannel == LCONF_TRIG_HSC){
+            err = LJM_eReadName(dconf->handle, "DIO18_EF_READ_A", &ftemp);
             if(err){
                 fprintf(stderr,"SERVICE DATA STREAM: Failed to test the high speed counter.\n");
-                dconf[devnum].trigmem = 0x00;
+                dconf->trigmem = 0x00;
                 return LCONF_ERROR;
-            }else if(ftemp > dconf[devnum].trigmem){
-                dconf[devnum].trigstate = TRIG_ACTIVE;
-                dconf[devnum].trigmem = 0x00;
+            }else if(ftemp > dconf->trigmem){
+                dconf->trigstate = TRIG_ACTIVE;
+                dconf->trigmem = 0x00;
             }
         // Test for a rising edge
-        }else if(dconf[devnum].trigedge == TRIG_RISING){
-            for(index = dconf[devnum].trigchannel;
-                    index < size; index += dconf[devnum].RB.channels){
-                if(write_data[index] > dconf[devnum].triglevel)
+        }else if(dconf->trigedge == TRIG_RISING){
+            for(index = dconf->trigchannel;
+                    index < size; index += dconf->RB.channels){
+                if(write_data[index] > dconf->triglevel)
                     this = 0b01;
                 else
                     this = 0b10;
-                if(dconf[devnum].trigmem == this){
-                    dconf[devnum].trigstate = TRIG_ACTIVE;
-                    dconf[devnum].trigmem = 0x00;
+                if(dconf->trigmem == this){
+                    dconf->trigstate = TRIG_ACTIVE;
+                    dconf->trigmem = 0x00;
                     break;
                 }else
-                    dconf[devnum].trigmem = this>>1;
+                    dconf->trigmem = this>>1;
             }
         // Falling edge
-        }else if(dconf[devnum].trigedge == TRIG_FALLING){
-            for(index = dconf[devnum].trigchannel;
-                    index < size; index += dconf[devnum].RB.channels){
-                if(write_data[index] <= dconf[devnum].triglevel)
+        }else if(dconf->trigedge == TRIG_FALLING){
+            for(index = dconf->trigchannel;
+                    index < size; index += dconf->RB.channels){
+                if(write_data[index] <= dconf->triglevel)
                     this = 0b01;
                 else
                     this = 0b10;
-                if(dconf[devnum].trigmem == this){
-                    dconf[devnum].trigstate = TRIG_ACTIVE;
-                    dconf[devnum].trigmem = 0x00;
+                if(dconf->trigmem == this){
+                    dconf->trigstate = TRIG_ACTIVE;
+                    dconf->trigmem = 0x00;
                     break;
                 }else
-                    dconf[devnum].trigmem = this>>1;
+                    dconf->trigmem = this>>1;
             }
         // Any edge
         }else{
-            for(index = dconf[devnum].trigchannel;
-                    index < size; index += dconf[devnum].RB.channels){
-                if(write_data[index] > dconf[devnum].triglevel)
+            for(index = dconf->trigchannel;
+                    index < size; index += dconf->RB.channels){
+                if(write_data[index] > dconf->triglevel)
                     this = 0b01;
                 else
                     this = ~((unsigned int)0b01);
-                if(dconf[devnum].trigmem == this){
-                    dconf[devnum].trigstate = TRIG_ACTIVE;
-                    dconf[devnum].trigmem = 0x00;
+                if(dconf->trigmem == this){
+                    dconf->trigstate = TRIG_ACTIVE;
+                    dconf->trigmem = 0x00;
                     break;
                 }else
-                    dconf[devnum].trigmem = ~this;
+                    dconf->trigmem = ~this;
             }
         }
         // Unless a trigger was detected, throw away a sample block and reduce
         // the record of samples streamed
-        if(dconf[devnum].trigstate == TRIG_ARMED){
-            service_read_buffer(&dconf[devnum].RB);
-            dconf[devnum].RB.samples_streamed -= dconf[devnum].RB.samples_per_read;
+        if(dconf->trigstate == TRIG_ARMED){
+            service_read_buffer(&dconf->RB);
+            dconf->RB.samples_streamed -= dconf->RB.samples_per_read;
         }
     }
     return LCONF_NOERR;
 }
 
 
-int read_data_stream(DEVCONF* dconf, const unsigned int devnum,
+int lc_stream_read(lc_devconf_t* dconf,
     double **data, unsigned int *channels, unsigned int *samples_per_read){
     
-    (*data) = get_read_buffer(&dconf[devnum].RB);
-    service_read_buffer(&dconf[devnum].RB);
-    (*channels) = dconf[devnum].RB.channels;
-    (*samples_per_read) = dconf[devnum].RB.samples_per_read;
+    (*data) = get_read_buffer(&dconf->RB);
+    service_read_buffer(&dconf->RB);
+    (*channels) = dconf->RB.channels;
+    (*samples_per_read) = dconf->RB.samples_per_read;
     if(*data)
         return LCONF_NOERR;
     return LCONF_ERROR;
 }
 
 
-int stop_data_stream(DEVCONF* dconf, const unsigned int devnum){
+int lc_stream_stop(lc_devconf_t* dconf){
     int err;
-    err = LJM_eStreamStop(dconf[devnum].handle);
+    err = LJM_eStreamStop(dconf->handle);
     
-    //clean_buffer(&dconf[devnum].RB);
+    //clean_buffer(&dconf->RB);
     
     if(err){
-        fprintf(stderr,"LCONFIG: Error stopping a data stream on device %d.\n",devnum);
+        fprintf(stderr,"LCONFIG: Error stopping a data stream.\n");
         LJM_ErrorToString(err, err_str);
         fprintf(stderr,"%s\n",err_str);
         return LCONF_ERROR;
@@ -3474,18 +3168,17 @@ int stop_data_stream(DEVCONF* dconf, const unsigned int devnum){
 }
 
 
-int clean_data_stream(DEVCONF* dconf, const unsigned int devnum){
-    clean_buffer(&dconf[devnum].RB);
+int lc_stream_clean(lc_devconf_t* dconf){
+    clean_buffer(&dconf->RB);
     return LCONF_NOERR;
 }
 
 
-int init_data_file(DEVCONF* dconf, const unsigned int devnum, 
-            FILE* FF){
+int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
     time_t now;
 
     // Write the configuration header
-    write_config(dconf,devnum,FF);
+    lc_write_config(dconf,FF);
     // Log the time
     time(&now);
     fprintf(FF, "#: %s", ctime(&now));
@@ -3496,12 +3189,12 @@ int init_data_file(DEVCONF* dconf, const unsigned int devnum,
 
 
 
-int write_data_file(DEVCONF* dconf, const unsigned int devnum, FILE* FF){
+int lc_datafile_write(lc_devconf_t* dconf, FILE* FF){
     int err,index,row,ainum;
     unsigned int channels, samples_per_read;
     double *data = NULL;
 
-    err = read_data_stream(dconf,devnum,&data,&channels,&samples_per_read);
+    err = lc_stream_read(dconf,&data,&channels,&samples_per_read);
     if(data){
         index = 0;
         // Write data one element at a time.

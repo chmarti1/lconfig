@@ -130,7 +130,7 @@ int main(int argc, char *argv[]){
 
     // Finally, the essentials; a data file and the device configuration
     FILE *dfile;
-    DEVCONF dconf[1];
+    lc_devconf_t dconf;
 
     // Parse the command-line options
     // use an outer foor loop as a catch-all safety
@@ -212,19 +212,19 @@ int main(int argc, char *argv[]){
     // Load the configuration
     printf("Loading configuration file...");
     fflush(stdout);
-    if(load_config(dconf, 1, config_file)){
+    if(lc_load_config(&dconf, 1, config_file)){
         fprintf(stderr, "DBURST failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
     }else
         printf("DONE\n");
 
     // Detect the number of configured device connections
-    if(ndev_config(dconf, 1)<=0){
+    if(lc_ndev(&dconf,1)<=0){
         fprintf(stderr,"DBURST did not detect any valid devices for data acquisition.\n");
         return -1;
     }
     // Detect the number of input columns
-    nich = nistream_config(dconf, 0);
+    nich = lc_nistream(&dconf);
 
     // Process the staged command-line meta parameters
     // use an outer for loop as a catch-all safety
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]){
                 return -1;
             }
             printf("flt:%s = %lf\n",param,ftemp);
-            if (put_meta_flt(dconf, 0, param, ftemp))
+            if (lc_put_meta_flt(&dconf, param, ftemp))
                 fprintf(stderr, "DBURST failed to set parameter %s to %lf\n", param, ftemp);            
             break;
         case 'i':
@@ -247,7 +247,7 @@ int main(int argc, char *argv[]){
                 return -1;
             }
             printf("int:%s = %d\n",param,itemp);
-            if (put_meta_int(dconf, 0, param, itemp))
+            if (lc_put_meta_int(&dconf, param, itemp))
                 fprintf(stderr, "DBURST failed to set parameter %s to %d\n", param, itemp);
             break;
         case 's':
@@ -256,7 +256,7 @@ int main(int argc, char *argv[]){
                 return -1;
             }
             printf("str:%s = %s\n",param,stemp);
-            if (put_meta_str(dconf, 0, param, stemp))
+            if (lc_put_meta_str(&dconf, param, stemp))
                 fprintf(stderr, "DBURST failed to set parameter %s to %s\n", param, stemp);
             break;
         // Escape condition
@@ -275,16 +275,16 @@ int main(int argc, char *argv[]){
     if(samples > 0 || duration > 0){
         // Calculate the number of samples to collect
         // Use which ever is larger: samples or duration
-        nsample = (duration * dconf[0].samplehz) / 1000;  // duration is in ms
+        nsample = (duration * dconf.samplehz) / 1000;  // duration is in ms
         nsample = nsample > samples ? nsample : samples;
-        dconf[0].nsample = nsample;
+        dconf.nsample = nsample;
     }
 
     // Print some information
     printf("  Stream channels : %d\n", nich);
-    printf("      Sample rate : %.1fHz\n", dconf[0].samplehz);
-    printf(" Samples per chan : %d (%d requested)\n", dconf[0].nsample, samples);
-    ftemp = dconf[0].nsample/dconf[0].samplehz;
+    printf("      Sample rate : %.1fHz\n", dconf.samplehz);
+    printf(" Samples per chan : %d (%d requested)\n", dconf.nsample, samples);
+    ftemp = dconf.nsample/dconf.samplehz;
     if(ftemp>60){
         ftemp /= 60;
         if(ftemp>60){
@@ -301,47 +301,47 @@ int main(int argc, char *argv[]){
 
     printf("Setting up measurement...");
     fflush(stdout);
-    if(open_config(dconf, 0)){
+    if(lc_open(&dconf)){
         fprintf(stderr, "DBURST failed to open the device.\n");
         return -1;
     }
-    if(upload_config(dconf, 0)){
+    if(lc_open(&dconf)){
         fprintf(stderr, "DBURST failed while configuring the device.\n");
-        close_config(dconf,0);
+        lc_close(&dconf);
         return -1;
     }
     printf("DONE\n");
 
     // Start the data stream
-    if(start_data_stream(dconf, 0, -1)){
+    if(lc_stream_start(&dconf, -1)){
         fprintf(stderr, "\nDBURST failed to start data collection.\n");
-        close_config(dconf,0);
+        lc_close(&dconf);
         return -1;
     }
 
     // Stream data
     printf("Streaming data");
     fflush(stdout);
-    if(dconf[0].trigstate == TRIG_PRE)
+    if(dconf.trigstate == TRIG_PRE)
         printf("\nWaiting for trigger\n");
 
-    while(!iscomplete_data_stream(dconf,0)){
-        if(service_data_stream(dconf, 0)){
+    while(!lc_stream_iscomplete(&dconf)){
+        if(lc_stream_service(&dconf)){
             fprintf(stderr, "\nDBURST failed while servicing the T7 connection!\n");
-            stop_data_stream(dconf,0);
-            close_config(dconf,0);
+            lc_stream_stop(&dconf);
+            lc_close(&dconf);
             return -1;            
         }
 
-        if(dconf[0].trigstate == TRIG_IDLE || dconf[0].trigstate == TRIG_ACTIVE){
+        if(dconf.trigstate == TRIG_IDLE || dconf.trigstate == TRIG_ACTIVE){
             printf(".");
             fflush(stdout);
         }
     }
     // Halt data collection
-    if(stop_data_stream(dconf, 0)){
+    if(lc_stream_stop(&dconf)){
         fprintf(stderr, "\nDBURST failed to halt preliminary data collection!\n");
-        close_config(dconf,0);
+        lc_close(&dconf);
         return -1;
     }
     printf("DONE\n");
@@ -357,15 +357,15 @@ int main(int argc, char *argv[]){
     }
 
     // Write the configuration header
-    init_data_file(dconf,0,dfile);
+    lc_datafile_init(&dconf,dfile);
     // Write the samples
-    while(!isempty_data_stream(dconf,0)){
-        write_data_file(dconf,0,dfile);
+    while(!lc_stream_isempty(&dconf)){
+        lc_datafile_write(&dconf,dfile);
         printf(".");
         fflush(stdout);
     }
     fclose(dfile);
-    close_config(dconf,0);
+    lc_close(&dconf);
     printf("DONE\n");
 
     printf("Exited successfully.\n");
