@@ -166,16 +166,6 @@ with init_data_file() and write_data_file() utilities.
 #define LCONF_SAMPLES_PER_READ 64  // Data read/write block size
 #define LCONF_TRIG_HSC 3000
 
-
-
-#define LCONF_COLOR_RED "\x1b[31m"
-#define LCONF_COLOR_GREEN "\x1b[32m"
-#define LCONF_COLOR_YELLOW "\x1b[33m"
-#define LCONF_COLOR_BLUE "\x1b[34m"
-#define LCONF_COLOR_MAGENTA "\x1b[35m"
-#define LCONF_COLOR_CYAN "\x1b[36m"
-#define LCONF_COLOR_NULL "\x1b[0m"
-
 #define LCONF_DEF_NSAMPLE 64
 #define LCONF_DEF_AI_NCH 199
 #define LCONF_DEF_AI_RANGE 10.
@@ -312,11 +302,12 @@ typedef struct {
     double* buffer;                 // the buffer array
 } lc_ringbuf_t;
 
+typedef enum {CON_ANY=LJM_ctANNY, CON_USB=LJM_ctUSB, CON_ETH=LJM_ctETH} lc_con_t;
 
 typedef struct devconf {
     // Global configuration
-    int connection;                 // requested connection type index
-    int connection_act;             // actual connection type index
+    lc_con_t connection;                 // requested connection type index
+    lc_con_t connection_act;             // actual connection type index
     int device;                     // The requested device type index
     int device_act;                 // The actual device type
     char ip[LCONF_MAX_STR];         // ip address string

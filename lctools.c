@@ -217,28 +217,28 @@ int lct_keypress_prompt(int look_for, const char* prompt, char* input, const uns
 .   label that matches LABEL.  If no matching channel is found, the functions
 .   return -1.
 */
-int lct_ai_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
+int lct_ai_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
     int ii;
-    for(ii=0; ii<dconf[devnum].naich; ii++){
-        if(strcmp(label, dconf[devnum].aich[ii].label)==0)
+    for(ii=0; ii<dconf->naich; ii++){
+        if(strcmp(label, dconf->aich[ii].label)==0)
             return ii;
     }
     return -1;
 }
 
-int lct_ao_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
+int lct_ao_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
     int ii;
-    for(ii=0; ii<dconf[devnum].naoch; ii++){
-        if(strcmp(label, dconf[devnum].aoch[ii].label)==0)
+    for(ii=0; ii<dconf->naoch; ii++){
+        if(strcmp(label, dconf->aoch[ii].label)==0)
             return ii;
     }
     return -1;
 }
 
-int lct_fio_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
+int lct_ef_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
     int ii;
-    for(ii=0; ii<dconf[devnum].nfioch; ii++){
-        if(strcmp(label, dconf[devnum].fioch[ii].label)==0)
+    for(ii=0; ii<dconf->nefch; ii++){
+        if(strcmp(label, dconf->efch[ii].label)==0)
             return ii;
     }
     return -1;
@@ -252,10 +252,10 @@ int lct_fio_bylabel(DEVCONF *dconf, unsigned int devnum, char label[]){
 
 
 
-int lct_diter_init(DEVCONF *dconf, unsigned int devnum, lct_diter_t *diter,
+int lct_diter_init(lc_devconf_t *dconf, lct_diter_t *diter,
                     double* data, unsigned int data_size, unsigned int channel){
     unsigned int ii;
-    ii = nistream_config(dconf,devnum);
+    ii = lc_nistream(dconf);
     if(channel >= ii){
         diter->last = NULL;
         diter->next = NULL;
@@ -293,12 +293,12 @@ double* lct_diter_next(lct_diter_t *diter){
 .
 .   When CHANNEL or SAMPLE are out of range, LTC_DATA returns a NULL pointer.
 */
-double * lct_data(DEVCONF *dconf, unsigned int devnum, 
+double * lct_data(lc_devconf_t *dconf, 
                 double data[], unsigned int data_size,
                 unsigned int channel, unsigned int sample){
     unsigned int ii;
     
-    ii = nistream_config(dconf,devnum);
+    ii = lc_nistream(dconf);
     if(channel >= ii)
         return NULL;
     ii = sample*ii + channel;
@@ -314,21 +314,21 @@ double * lct_data(DEVCONF *dconf, unsigned int devnum,
 .   calibration parameters, DATA is the array on which to operate, and DATA_SIZE
 .   is its length.  
 */
-void lct_cal_inplace(DEVCONF *dconf, unsigned int devnum, 
+void lct_cal_inplace(lc_devconf_t *dconf, 
                 double data[], unsigned int data_size){
     lct_diter_t diter;
     double *this;
     unsigned int ii;
     // Loop through the analog channels
-    for(ii = 0; ii<dconf[devnum].naich; ii++){
+    for(ii = 0; ii<dconf->naich; ii++){
         // Initialize the iteration
-        if(lct_diter_init(dconf,devnum,&diter,data,data_size,ii)){
+        if(lct_diter_init(dconf,&diter,data,data_size,ii)){
             fprintf(stderr, "LCT_CAL_INPLACE: This error should never happen!  Calibration failed.\n"\
                     "    We sincerely apologize.\n");
             return;
         }
         while(this = lct_diter_next(&diter))
-            *this = dconf[devnum].aich[ii].calslope * ((*this) - dconf[devnum].aich[ii].calzero);
+            *this = dconf->aich[ii].calslope * ((*this) - dconf->aich[ii].calzero);
     }
     return;
 }

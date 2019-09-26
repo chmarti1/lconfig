@@ -31,7 +31,19 @@
 #include <sys/sysinfo.h>    // for ram overload checking
 #include "lconfig.h"
 
+// Command-line font/color codes
+// Help on Linux terminal control characters
+// $man console_codes
+// gets the job done.
 
+#define FONT_NULL "\x1b[0m"
+#define FONT_RED "\x1b[31m"
+#define FONT_GREEN "\x1b[32m"
+#define FONT_YELLOW "\x1b[33m"
+#define FONT_BLUE "\x1b[34m"
+#define FONT_MAGENTA "\x1b[35m"
+#define FONT_CYAN "\x1b[36m"
+#define FONT_BOLD "\x1B[1m"
 
 // macros for writing lines to configuration files in WRITE_CONFIG()
 #define write_str(param,child) dconf->child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf->child) : (int) 0
@@ -159,14 +171,6 @@ void aoregisters(const unsigned int buffer,     // The output stream number (not
 }
 
 */
-
-
-void print_color(const char* head, char* value1, char* value2){
-    if(strncmp(value1,value2,LCONF_MAX_STR)==0)
-        printf("%25s: %-6s (" LCONF_COLOR_GREEN "%s" LCONF_COLOR_NULL ")\n", head, value1, value2);
-    else
-        printf("%25s: %-6s (" LCONF_COLOR_RED "%s" LCONF_COLOR_NULL ")\n", head, value1, value2);
-}
 
 
 
@@ -587,11 +591,11 @@ int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* f
 
             // look for usb, eth, or any
             if(streq(value,"usb")){
-                dconf[devnum].connection=LJM_ctUSB;
+                dconf[devnum].connection=CON_USB;
             }else if(streq(value,"eth")){
-                dconf[devnum].connection=LJM_ctETHERNET;
+                dconf[devnum].connection=CON_ETH;
             }else if(streq(value,"any")){
-                dconf[devnum].connection=LJM_ctANY;
+                dconf[devnum].connection=CON_ANY;
             }else{
                 fprintf(stderr,"LOAD: Unrecognized connection type: %s\n",value);
                 fprintf(stderr,"%s\n","Expected \"usb\", \"eth\", or \"any\".");
@@ -1586,7 +1590,7 @@ int lc_open(lc_devconf_t* dconf){
     //  Ethernet: IP, Serial, Name
     // IP specified with USB causes IP parameters to be written
     // IP specified with ANY raises a warning and is ignored
-    if(dconf->connection == LJM_ctETHERNET && dconf->ip[0]!='\0')
+    if(dconf->connection == CON_ETH && dconf->ip[0]!='\0')
         id = dconf->ip;
     else if(dconf->serial[0]!='\0')
         id = dconf->serial;
@@ -1604,7 +1608,7 @@ int lc_open(lc_devconf_t* dconf){
 
     // If an IP address was specified with ANY connection, raise a warning
     // and clear the IP address
-    if(dconf->connection == LJM_ctANY && dconf->ip[0]!='\0'){
+    if(dconf->connection == CON_ANY && dconf->ip[0]!='\0'){
         fprintf(stderr, "OPEN::WARNING:: Specifying an ip address with ANY connection is ambiguous.  Ignoring.\n");
         dconf->ip[0] = '\0';
     }
@@ -2363,7 +2367,7 @@ int lc_upload_config(lc_devconf_t* dconf){
 
 
 
-void show_config(lc_devconf_t* dconf){
+void lc_show_config(lc_devconf_t* dconf){
     int ainum,aonum,efnum,metanum,metacnt;
     char value1[LCONF_MAX_STR], value2[LCONF_MAX_STR];
     lc_devconf_t live;
@@ -2371,9 +2375,10 @@ void show_config(lc_devconf_t* dconf){
     // download the live parameters for compairson
     //download_config(dconf, &live);
 
-    // Start with the global parameters
-    sprintf(value1, "%d", dconf->connection);
-    sprintf(value2, "%d", live.connection);
+    //
+    // Connection
+    //
+    
     print_color("Connection 1=USB,3=ETH", value1, value2);
     print_color("Serial Number", dconf->serial, live.serial);
     print_color("IP Address", dconf->ip, live.ip);

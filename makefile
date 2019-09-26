@@ -15,8 +15,8 @@ lctools.o: lctools.c lctools.h lconfig.o
 
 # The Binaries...
 #
-drun.bin: lconfig.o drun.c
-	gcc lconfig.o drun.c $(LINK) -o drun.bin
+drun.bin: lconfig.o lctools.o drun.c
+	gcc lconfig.o lctools.o drun.c $(LINK) -o drun.bin
 	chmod +x drun.bin
 
 dburst.bin: lconfig.o dburst.c
