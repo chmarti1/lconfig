@@ -30,20 +30,7 @@
 #include <stdint.h>     // being careful about bit widths
 #include <sys/sysinfo.h>    // for ram overload checking
 #include "lconfig.h"
-
-// Command-line font/color codes
-// Help on Linux terminal control characters
-// $man console_codes
-// gets the job done.
-
-#define FONT_NULL "\x1b[0m"
-#define FONT_RED "\x1b[31m"
-#define FONT_GREEN "\x1b[32m"
-#define FONT_YELLOW "\x1b[33m"
-#define FONT_BLUE "\x1b[34m"
-#define FONT_MAGENTA "\x1b[35m"
-#define FONT_CYAN "\x1b[36m"
-#define FONT_BOLD "\x1B[1m"
+#include "lcmap.h"
 
 // macros for writing lines to configuration files in WRITE_CONFIG()
 #define write_str(param,child) dconf->child[0]!='\0' ? fprintf(ff, "%s \"%s\"\n", #param, dconf->child) : (int) 0
@@ -93,6 +80,40 @@
     fprintf(stderr,"%s\n",err_str);\
     return LCONF_ERROR;\
 }
+
+
+/*......................
+. Codes for color/font
+.......................*/
+// Help on Linux terminal control characters
+// $man console_codes
+// gets the job done.
+
+#define LC_FONT_NULL "\x1b[0m"
+#define LC_FONT_RED "\x1b[31m"
+#define LC_FONT_GREEN "\x1b[32m"
+#define LC_FONT_YELLOW "\x1b[33m"
+#define LC_FONT_BLUE "\x1b[34m"
+#define LC_FONT_MAGENTA "\x1b[35m"
+#define LC_FONT_CYAN "\x1b[36m"
+#define LC_FONT_BOLD "\x1b[1m"
+
+// These constants are available for run-time evaluation
+// Clear all formatting; return to console defaults
+static const char lc_font_null[] = LC_FONT_NULL;
+// Font colors
+static const char lc_font_red[] =  LC_FONT_RED;
+static const char lc_font_green[] =  LC_FONT_GREEN;
+static const char lc_font_yellow[] =  LC_FONT_YELLOW;
+static const char lc_font_blue[] =  LC_FONT_BLUE;
+static const char lc_font_magenta[] =  LC_FONT_MAGENTA;
+static const char lc_font_cyan[] =  LC_FONT_CYAN;
+// Bold font
+static const char lc_font_bold[] =  LC_FONT_BOLD;
+
+
+
+#define SHOW_PARAM "    %-18s : "
 
 /*....................
 .   Globals
@@ -240,10 +261,10 @@ void read_param(FILE *source, char *param){
 void init_config(lc_devconf_t* dconf){
     int ainum, aonum, metanum, efnum, comnum;
     // Global configuration
-    dconf->connection = -1;
-    dconf->connection_act = -1;
-    dconf->device = LJM_dtANY;
-    dconf->device_act = -1;
+    dconf->connection = LC_CON_NONE;
+    dconf->connection_act = LC_CON_NONE;
+    dconf->device = LC_DEV_ANY;
+    dconf->device_act = LC_DEV_NONE;
     dconf->serial[0] = '\0';
     dconf->name[0] = '\0';
     dconf->ip[0] = '\0';
@@ -258,8 +279,8 @@ void init_config(lc_devconf_t* dconf){
     dconf->triglevel = 0.;
     dconf->trigpre = 0;
     dconf->trigmem = 0;
-    dconf->trigstate = TRIG_IDLE;
-    dconf->trigedge = TRIG_RISING;
+    dconf->trigstate = LC_TRIG_IDLE;
+    dconf->trigedge = LC_EDGE_RISING;
     // Metas
     for(metanum=0; metanum<LCONF_MAX_META; metanum++)
         dconf->meta[metanum].param[0] = '\0';
@@ -282,7 +303,7 @@ void init_config(lc_devconf_t* dconf){
     for(aonum=0; aonum<LCONF_MAX_NAOCH; aonum++){
         dconf->aoch[aonum].channel = -1;
         dconf->aoch[aonum].frequency = -1;
-        dconf->aoch[aonum].signal = AO_CONSTANT;
+        dconf->aoch[aonum].signal = LC_AO_CONSTANT;
         dconf->aoch[aonum].amplitude = LCONF_DEF_AO_AMP;
         dconf->aoch[aonum].offset = LCONF_DEF_AO_OFF;
         dconf->aoch[aonum].duty = LCONF_DEF_AO_DUTY;
@@ -293,10 +314,10 @@ void init_config(lc_devconf_t* dconf){
     dconf->effrequency = 0.;
     for(efnum=0; efnum<LCONF_MAX_NEFCH; efnum++){
         dconf->efch[efnum].channel = -1;
-        dconf->efch[efnum].signal = EF_NONE;
-        dconf->efch[efnum].edge = EF_RISING;
-        dconf->efch[efnum].debounce = EF_DEBOUNCE_NONE;
-        dconf->efch[efnum].direction = EF_INPUT;
+        dconf->efch[efnum].signal = LC_EF_NONE;
+        dconf->efch[efnum].edge = LC_EDGE_RISING;
+        dconf->efch[efnum].debounce = LC_EF_DEBOUNCE_NONE;
+        dconf->efch[efnum].direction = LC_EF_INPUT;
         dconf->efch[efnum].time = 0.;
         dconf->efch[efnum].duty = .5;
         dconf->efch[efnum].phase = 0.;
@@ -306,7 +327,7 @@ void init_config(lc_devconf_t* dconf){
     // Communications
     dconf->ncomch = 0;
     for(comnum=0; comnum<LCONF_MAX_NCOMCH; comnum++){
-        dconf->comch[comnum].type = COM_NONE;
+        dconf->comch[comnum].type = LC_COM_NONE;
         dconf->comch[comnum].pin_in = -1;
         dconf->comch[comnum].pin_out = -1;
         dconf->comch[comnum].pin_clock = -1;
@@ -439,6 +460,10 @@ int lc_nistream(lc_devconf_t* dconf){
     if(dconf->distream)
         out += 1;
     return out;
+}
+
+int lc_isopen(lc_devconf_t* dconf){
+    return (dconf->handle >= 0);
 }
 
 int lc_nostream(lc_devconf_t* dconf){
@@ -588,15 +613,7 @@ int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* f
                 fprintf(stderr,"LOAD: Too many devices specified. Maximum allowed is %d.\n", devmax);
                 loadfail();
             }
-
-            // look for usb, eth, or any
-            if(streq(value,"usb")){
-                dconf[devnum].connection=CON_USB;
-            }else if(streq(value,"eth")){
-                dconf[devnum].connection=CON_ETH;
-            }else if(streq(value,"any")){
-                dconf[devnum].connection=CON_ANY;
-            }else{
+            if(lcm_get_value(lcm_connection, value, &dconf[devnum].connection)){
                 fprintf(stderr,"LOAD: Unrecognized connection type: %s\n",value);
                 fprintf(stderr,"%s\n","Expected \"usb\", \"eth\", or \"any\".");
                 loadfail();
@@ -609,13 +626,7 @@ int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* f
 Found \"%s\"\n", param);
             return LCONF_ERROR;
         }else if(streq(param,"device")){
-            if(streq(value, "any"))
-                dconf[devnum].device = LJM_dtANY;
-            else if(streq(value, "t7"))
-                dconf[devnum].device = LJM_dtT7;
-            else if(streq(value, "t4"))
-                dconf[devnum].device = LJM_dtT4;
-            else{
+            if(lcm_get_value(lcm_device, value, &dconf[devnum].device)){
                 fprintf(stderr, "LOAD: Unrecognized device type: %s\n", value);
                 fprintf(stderr, "Expected \"any\" \"t7\" or \"t4\"\n");
                 loadfail();
@@ -704,7 +715,6 @@ Found \"%s\"\n", param);
         // The AIRANGE parameter
         //
         }else if(streq(param,"airange")){
-            ainum = dconf[devnum].naich-1;
             // Test that there is a configured channel already
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
@@ -719,7 +729,6 @@ Found \"%s\"\n", param);
         // The AINEGATIVE parameter
         //
         }else if(streq(param,"ainegative")){
-            ainum = dconf[devnum].naich-1;
             // Test that there is a configured channel already
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
@@ -755,7 +764,6 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // The AIRESOLUTION parameter
         //
         }else if(streq(param,"airesolution")){
-            ainum = dconf[devnum].naich-1;
             if(ainum<0){
                 fprintf(stderr,"LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
                 loadfail();
@@ -855,7 +863,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             dconf[devnum].naoch++;
             // Set the channel and all the default parameters
             dconf[devnum].aoch[aonum].channel = itemp;
-            dconf[devnum].aoch[aonum].signal = AO_CONSTANT;
+            dconf[devnum].aoch[aonum].signal = LC_AO_CONSTANT;
             dconf[devnum].aoch[aonum].amplitude = LCONF_DEF_AO_AMP;
             dconf[devnum].aoch[aonum].offset = LCONF_DEF_AO_OFF;
             dconf[devnum].aoch[aonum].duty = LCONF_DEF_AO_DUTY;
@@ -863,18 +871,11 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // The AOSIGNAL parameter
         //
         }else if(streq(param,"aosignal")){
-            aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
                 loadfail();
             }
-            // Case out valid AOsignal values
-            if(strncmp(value,"constant",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_CONSTANT;
-            else if(strncmp(value,"sine",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_SINE;
-            else if(strncmp(value,"square",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_SQUARE;
-            else if(strncmp(value,"triangle",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_TRIANGLE;
-            else if(strncmp(value,"noise",LCONF_MAX_STR)==0) dconf[devnum].aoch[aonum].signal = AO_NOISE;
-            else{
+            if(lcm_get_value(lcm_aosignal, value, &dconf[devnum].aoch[aonum].signal)){
                 fprintf(stderr,"LOAD: Illegal AOsignal type: %s\n",value);
                 loadfail();
             }
@@ -882,7 +883,6 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // AOFREQUENCY
         //
         }else if(streq(param,"aofrequency")){
-            aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
                 loadfail();
@@ -899,7 +899,6 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // AOAMPLITUDE
         //
         }else if(streq(param,"aoamplitude")){
-            aonum = dconf[devnum].naoch-1;
             if(aonum<0){
                 fprintf(stderr,"LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
                 loadfail();
@@ -982,13 +981,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // TRIGEDGE parameter
         //
         }else if(streq(param,"trigedge")){
-            if(streq(value,"rising"))
-                dconf[devnum].trigedge = TRIG_RISING;
-            else if(streq(value,"falling"))
-                dconf[devnum].trigedge = TRIG_FALLING;
-            else if(streq(value,"all"))
-                dconf[devnum].trigedge = TRIG_ALL;
-            else{
+            if(lcm_get_value(lcm_edge, value, &dconf[devnum].trigedge)){
                 fprintf(stderr,"LOAD: Unrecognized TRIGedge parameter: %s\n", value);
                 loadfail();
             }
@@ -1042,10 +1035,10 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             // set the channel number
             dconf[devnum].efch[efnum].channel = itemp;
             // initialize the other parameters
-            dconf[devnum].efch[efnum].signal = EF_NONE;
-            dconf[devnum].efch[efnum].edge = EF_RISING;
-            dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_NONE;
-            dconf[devnum].efch[efnum].direction = EF_INPUT;
+            dconf[devnum].efch[efnum].signal = LC_EF_NONE;
+            dconf[devnum].efch[efnum].edge = LC_EDGE_RISING;
+            dconf[devnum].efch[efnum].debounce = LC_EF_DEBOUNCE_NONE;
+            dconf[devnum].efch[efnum].direction = LC_EF_INPUT;
             dconf[devnum].efch[efnum].time = LCONF_DEF_EF_TIMEOUT;
             dconf[devnum].efch[efnum].phase = 0.;
             dconf[devnum].efch[efnum].duty = 0.5;
@@ -1053,17 +1046,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // EFSIGNAL parameter
         //
         }else if(streq(param,"efsignal")){
-            if(streq(value,"pwm")){
-                dconf[devnum].efch[efnum].signal = EF_PWM;
-            }else if(streq(value,"count")){
-                dconf[devnum].efch[efnum].signal = EF_COUNT;
-            }else if(streq(value,"frequency")){
-                dconf[devnum].efch[efnum].signal = EF_FREQUENCY;
-            }else if(streq(value,"phase")){
-                dconf[devnum].efch[efnum].signal = EF_PHASE;
-            }else if(streq(value,"quadrature")){
-                dconf[devnum].efch[efnum].signal = EF_QUADRATURE;
-            }else{
+            if(lcm_get_value(lcm_ef_signal, value, &dconf[devnum].efch[efnum].signal)){
                 fprintf(stderr,"LOAD: Illegal EF signal: %s\n",value);
                 loadfail(); 
             }
@@ -1072,11 +1055,11 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         //
         }else if(streq(param,"efedge")){
             if(streq(value,"rising")){
-                dconf[devnum].efch[efnum].edge = EF_RISING;
+                dconf[devnum].efch[efnum].edge = LC_EDGE_RISING;
             }else if(streq(value,"falling")){
-                dconf[devnum].efch[efnum].edge = EF_FALLING;
+                dconf[devnum].efch[efnum].edge = LC_EDGE_FALLING;
             }else if(streq(value,"all")){
-                dconf[devnum].efch[efnum].edge = EF_ALL;
+                dconf[devnum].efch[efnum].edge = LC_EDGE_ANY;
             }else{
                 fprintf(stderr,"LOAD: Illegal EF edge: %s\n",value);
                 loadfail(); 
@@ -1086,13 +1069,13 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         //
         }else if(streq(param,"efdebounce")){
             if(streq(value,"none")){
-                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_NONE;
+                dconf[devnum].efch[efnum].debounce = LC_EF_DEBOUNCE_NONE;
             }else if(streq(value,"fixed")){
-                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_FIXED;
+                dconf[devnum].efch[efnum].debounce = LC_EF_DEBOUNCE_FIXED;
             }else if(streq(value,"restart")){
-                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_RESTART;
+                dconf[devnum].efch[efnum].debounce = LC_EF_DEBOUNCE_RESET;
             }else if(streq(value,"minimum")){
-                dconf[devnum].efch[efnum].debounce = EF_DEBOUNCE_MINIMUM;
+                dconf[devnum].efch[efnum].debounce = LC_EF_DEBOUNCE_MINIMUM;
             }else{
                 fprintf(stderr,"LOAD: Illegal EF debounce mode: %s\n",value);
                 loadfail();
@@ -1102,9 +1085,9 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         //
         }else if(streq(param,"efdirection")){
             if(streq(value,"input")){
-                dconf[devnum].efch[efnum].direction = EF_INPUT;
+                dconf[devnum].efch[efnum].direction = LC_EF_INPUT;
             }else if(streq(value,"output")){
-                dconf[devnum].efch[efnum].direction = EF_OUTPUT;
+                dconf[devnum].efch[efnum].direction = LC_EF_OUTPUT;
             }else{
                 fprintf(stderr,"LOAD: Illegal EF direction: %s\n",value);
                 loadfail();
@@ -1160,17 +1143,24 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 fprintf(stderr,"LOAD: Too many COMchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NCOMCH);
                 loadfail();
             }
-            // Case out the legal modes
+            if(lcm_get_value(lcm_com_channel, value, &dconf[devnum].comch[comnum].type)){
+                fprintf(stderr, "LOAD: Unsupported COMchannel mode: %s\n", value);
+                loadfail();
+            }
+            
+            // Case out the legal modes to apply the channel defaults
             // UART
-            if(streq(value,"uart")){
-                dconf[devnum].comch[comnum].type = COM_UART;
+            switch(dconf[devnum].comch[comnum].type){
+            case LC_COM_UART:
                 // Apply the UART defaults
                 dconf[devnum].comch[comnum].rate = 9600.;
                 dconf[devnum].comch[comnum].options.uart.bits = 8;
-                dconf[devnum].comch[comnum].options.uart.parity = PARITY_NONE;
+                dconf[devnum].comch[comnum].options.uart.parity = LC_PARITY_NONE;
                 dconf[devnum].comch[comnum].options.uart.stop = 1;
-            }else{
-                fprintf(stderr, "LOAD: Unsupported COMchannel mode: %s\n", value);
+                break;
+            default:
+                fprintf(stderr, "LOAD: %s COM channels are not yet implemented.\n", 
+                        lcm_get_message(lcm_com_channel, dconf[devnum].comch[comnum].type));
                 loadfail();
             }
             // Increment the number of active channels
@@ -1236,7 +1226,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
             }
             switch(dconf[devnum].comch[comnum].type){
             // == UART OPTIONS == //
-            case COM_UART:
+            case LC_COM_UART:
                 if(strlen(value)!=3 || sscanf(value, "%1d%c%1d", &itemp, &ctemp, &itemp2) != 3){
                     fprintf(stderr, "LOAD: UART COMOPTIONS parameters must be in 8N1 (BIT PARITY STOP) notation.\n    Received: %s\n", value);
                     loadfail();
@@ -1250,15 +1240,15 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 switch(ctemp){
                 case 'n':
                 case 'N':
-                    dconf[devnum].comch[comnum].options.uart.parity = PARITY_NONE;
+                    dconf[devnum].comch[comnum].options.uart.parity = LC_PARITY_NONE;
                     break;
                 case 'e':
                 case 'E':
-                    dconf[devnum].comch[comnum].options.uart.parity = PARITY_EVEN;
+                    dconf[devnum].comch[comnum].options.uart.parity = LC_PARITY_EVEN;
                     break;
                 case 'o':
                 case 'O':
-                    dconf[devnum].comch[comnum].options.uart.parity = PARITY_ODD;
+                    dconf[devnum].comch[comnum].options.uart.parity = LC_PARITY_ODD;
                     break;
                 default:
                     fprintf(stderr, "LOAD: UART COMOPTIONS parity character must be N, E, or O.  Received: %d\n", ctemp);
@@ -1336,48 +1326,15 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
 
     fprintf(ff,"# Configuration automatically generated by WRITE_CONFIG()\n");
 
-    if(dconf->connection==LJM_ctUSB)
-        fprintf(ff,"connection usb\n");
-    else
-        fprintf(ff,"connection eth\n");
-        
-    // Actual connection comment
-    switch(dconf->connection_act){
-    case LJM_ctUSB:
-        fprintf(ff, "#connection (actual) usb\n");
-        break;
-    case LJM_ctETHERNET:
-        fprintf(ff, "#connection (actual) eth\n");
-        break;
-    default:
-        fprintf(ff, "#connection (actual) unknown: %d\n", dconf->device_act);
-    }
-    
-    // Device
-    switch(dconf->device){
-    case LJM_dtT4:
-        fprintf(ff, "device t4\n");
-        break;
-    case LJM_dtT7:
-        fprintf(ff, "device t7\n");
-        break;
-    case LJM_dtANY:
-    default:
-        fprintf(ff, "device any\n");
-    }
-    // Actual device comment
-    switch(dconf->device_act){
-    case LJM_dtT4:
-        fprintf(ff, "#device (actual) t4\n");
-        break;
-    case LJM_dtT7:
-        fprintf(ff, "#device (actual) t7\n");
-        break;
-    case LJM_dtANY:
-    default:
-        fprintf(ff, "#device (actual) unknown: (%d)\n", dconf->device_act);
-    }
-
+    fprintf(ff, "connection %s\n", 
+            lcm_get_config(lcm_connection, dconf->connection));
+    fprintf(ff, "#connection (actual) %s\n", 
+            lcm_get_config(lcm_connection, dconf->connection_act));
+    fprintf(ff, "device %s\n", 
+            lcm_get_config(lcm_device, dconf->device));
+    fprintf(ff, "#device (actual) %s\n", 
+            lcm_get_config(lcm_device, dconf->device_act));
+            
     write_str(name,name);
     write_str(serial,serial);
     write_str(ip,ip);
@@ -1413,12 +1370,8 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
     for(aonum=0; aonum<dconf->naoch; aonum++){
         write_aoint(aochannel,channel);
         write_aostr(aolabel,label);
-        if(dconf->aoch[aonum].signal==AO_CONSTANT)  fprintf(ff,"aosignal constant\n");
-        else if(dconf->aoch[aonum].signal==AO_SINE)  fprintf(ff,"aosignal sine\n");
-        else if(dconf->aoch[aonum].signal==AO_SQUARE)  fprintf(ff,"aosignal square\n");
-        else if(dconf->aoch[aonum].signal==AO_TRIANGLE)  fprintf(ff,"aosignal triangle\n");
-        else if(dconf->aoch[aonum].signal==AO_NOISE)  fprintf(ff,"aosignal noise\n");
-        else fprintf(ff,"signal ***\n");
+        fprintf(ff, "aosignal %s\n",
+                lcm_get_config(lcm_aosignal, dconf->aoch[aonum].signal));
         write_aoflt(aofrequency,frequency);
         write_aoflt(aoamplitude,amplitude);
         write_aoflt(aooffset,offset);
@@ -1433,12 +1386,8 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
         else
             write_int(trigchannel,trigchannel);
         write_flt(triglevel,triglevel);
-        if(dconf->trigedge == TRIG_RISING)
-            fprintf(ff,"trigedge rising\n");
-        else if(dconf->trigedge == TRIG_FALLING)
-            fprintf(ff,"trigedge falling\n");
-        else
-            fprintf(ff,"trigedge all\n");
+        fprintf(ff, "trigedge %s\n",
+                lcm_get_config(lcm_edge, dconf->trigedge));
         write_int(trigpre,trigpre);
     }
 
@@ -1454,64 +1403,41 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
         write_efstr(eflabel,label);
 
         // Input/output
-        if(dconf->efch[efnum].direction==EF_INPUT)
-            fprintf(ff, "efdirection input\n");
-        else
-            fprintf(ff, "efdirection output\n");
-
+        fprintf(ff, "efdirection %s\n",
+                lcm_get_config(lcm_ef_direction, dconf->efch[efnum].direction));
         // Signal type
-        if(dconf->efch[efnum].signal==EF_NONE){
-            fprintf(ff, "efsignal none\n");
-        }else if(dconf->efch[efnum].signal==EF_PWM){
-            fprintf(ff, "efsignal pwm\n");
-            // Duty
-            write_efflt(efduty,duty);
-            // Phase
-            write_efflt(efdegrees,phase);
-        }else if(dconf->efch[efnum].signal==EF_COUNT){
-            fprintf(ff, "efsignal count\n");
-        }else if(dconf->efch[efnum].signal==EF_FREQUENCY){
-            fprintf(ff, "efsignal frequency\n");
-        }else if(dconf->efch[efnum].signal==EF_PHASE){
-            fprintf(ff, "efsignal phase\n");
-        }else if(dconf->efch[efnum].signal==EF_QUADRATURE){
-            fprintf(ff, "efsignal quadrature\n");
-        }
-        // Debounce (None is the default - do nothing)
-        if(dconf->efch[efnum].debounce==EF_DEBOUNCE_FIXED)
-            fprintf(ff, "efdebounce fixed\n");
-        else if(dconf->efch[efnum].debounce==EF_DEBOUNCE_RESTART)
-            fprintf(ff, "efdebounce restart\n");
-        else if(dconf->efch[efnum].debounce==EF_DEBOUNCE_MINIMUM)
-            fprintf(ff, "efdebounce minimum\n");
-        // Edge type (rising is the default - do nothing)
-        if(dconf->efch[efnum].edge==EF_FALLING)  
-            fprintf(ff, "efedge falling\n");
-        else if(dconf->efch[efnum].edge==EF_ALL)  
-            fprintf(ff, "efedge all\n");
+        fprintf(ff, "efsignal %s\n",
+                lcm_get_config(lcm_ef_signal, dconf->efch[efnum].signal));
+        // Debounce
+        if(dconf->efch[efnum].debounce != LC_EF_DEBOUNCE_NONE)
+            fprintf(ff, "efdebounce %s\n",
+                    lcm_get_config(lcm_ef_debounce, dconf->efch[efnum].debounce));
+        // Edge type
+        if(dconf->efch[efnum].edge)
+            fprintf(ff, "efedge %s\n",
+                    lcm_get_config(lcm_edge, dconf->efch[efnum].edge));
         // Timeout
-        if(dconf->efch[efnum].time){
+        if(dconf->efch[efnum].time)
             write_efflt(efusec,time);
-        }
     }
 
     // COM parameters
     for(comnum=0; comnum<dconf->ncomch; comnum++){
         switch(dconf->comch[comnum].type){
-        case COM_UART:
+        case LC_COM_UART:
             fprintf(ff, "comchannel uart\n");
             fprintf(ff, "comin %d\n", dconf->comch[comnum].pin_in);
             fprintf(ff, "comout %d\n", dconf->comch[comnum].pin_out);
             fprintf(ff, "comrate %f\n", dconf->comch[comnum].rate);
             fprintf(ff, "comoptions %d", dconf->comch[comnum].options.uart.bits);
             switch(dconf->comch[comnum].options.uart.parity){
-            case PARITY_NONE:
+            case LC_PARITY_NONE:
                 fprintf(ff, "N");
                 break;
-            case PARITY_EVEN:
+            case LC_PARITY_EVEN:
                 fprintf(ff, "E");
                 break;
-            case PARITY_ODD:
+            case LC_PARITY_ODD:
                 fprintf(ff, "O");
                 break;
             }
@@ -1590,7 +1516,7 @@ int lc_open(lc_devconf_t* dconf){
     //  Ethernet: IP, Serial, Name
     // IP specified with USB causes IP parameters to be written
     // IP specified with ANY raises a warning and is ignored
-    if(dconf->connection == CON_ETH && dconf->ip[0]!='\0')
+    if(dconf->connection == LC_CON_ETH && dconf->ip[0]!='\0')
         id = dconf->ip;
     else if(dconf->serial[0]!='\0')
         id = dconf->serial;
@@ -1608,7 +1534,7 @@ int lc_open(lc_devconf_t* dconf){
 
     // If an IP address was specified with ANY connection, raise a warning
     // and clear the IP address
-    if(dconf->connection == CON_ANY && dconf->ip[0]!='\0'){
+    if(dconf->connection == LC_CON_ANY && dconf->ip[0]!='\0'){
         fprintf(stderr, "OPEN::WARNING:: Specifying an ip address with ANY connection is ambiguous.  Ignoring.\n");
         dconf->ip[0] = '\0';
     }
@@ -1696,7 +1622,7 @@ int lc_open(lc_devconf_t* dconf){
 
 int lc_close(lc_devconf_t* dconf){
     int err;
-    if(dconf->handle>=0){
+    if(lc_isopen(dconf)){
         err = LJM_Close(dconf->handle);
         if(err){
             fprintf(stderr,"LCONFIG: Error closing device.\n");
@@ -1749,7 +1675,7 @@ int lc_upload_config(lc_devconf_t* dconf){
     handle = dconf->handle;
 
     // Verify that the device is open
-    if(dconf->handle < 0){
+    if(!lc_isopen(dconf)){
         fprintf(stderr, "UPLOAD: The device connection is not open.\n");
         return LCONF_ERROR;
     }
@@ -1758,7 +1684,7 @@ int lc_upload_config(lc_devconf_t* dconf){
     // Global parameters...
 
     // If the requested conneciton was USB, assert the IP parameters
-    if(dconf->connection == LJM_ctUSB){
+    if(dconf->connection == LC_CON_USB){
         flag=0;
         err = 0;
         if(dconf->ip[0] != '\0'){
@@ -1955,13 +1881,13 @@ int lc_upload_config(lc_devconf_t* dconf){
 
         // Case out the different signal types
         // AO_CONSTANT
-        if(dconf->aoch[aonum].signal==AO_CONSTANT){
+        if(dconf->aoch[aonum].signal==LC_AO_CONSTANT){
             for(index=0; index<samples; index++)
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp,\
                     dconf->aoch[aonum].offset);
         // AO_SINE
-        }else if(dconf->aoch[aonum].signal==AO_SINE){
+        }else if(dconf->aoch[aonum].signal==LC_AO_SINE){
             // initialize generators
             gr = 1.; gi = 0;
             ftemp = TWOPI / samples;
@@ -1981,7 +1907,7 @@ int lc_upload_config(lc_devconf_t* dconf){
                 gr = ftemp;
             }
         // AO_SQUARE
-        }else if(dconf->aoch[aonum].signal==AO_SQUARE){
+        }else if(dconf->aoch[aonum].signal==LC_AO_SQUARE){
             itemp = samples*dconf->aoch[aonum].duty;
             if(itemp>samples) itemp = samples;
             // Calculate the high level
@@ -1997,7 +1923,7 @@ int lc_upload_config(lc_devconf_t* dconf){
                 // Only write to the buffer if an error has not been encountered
                 err = err ? err : LJM_eWriteAddress(handle, reg_temp, type_temp, ftemp);
         // AO_TRIANGLE
-        }else if(dconf->aoch[aonum].signal==AO_TRIANGLE){
+        }else if(dconf->aoch[aonum].signal==LC_AO_TRIANGLE){
             itemp = samples*dconf->aoch[aonum].duty;
             if(itemp>=samples) itemp = samples-1;
             else if(itemp<=0) itemp = 1;
@@ -2019,7 +1945,7 @@ int lc_upload_config(lc_devconf_t* dconf){
                 gr -= er;
             }
         // AO_NOISE
-        }else if(dconf->aoch[aonum].signal==AO_NOISE){
+        }else if(dconf->aoch[aonum].signal==LC_AO_NOISE){
             for(index=0; index<samples; index++){
                 // generate a random number between -1 and 1
                 ftemp = (2.*((double)rand())/RAND_MAX - 1.);
@@ -2129,9 +2055,9 @@ int lc_upload_config(lc_devconf_t* dconf){
         channel = dconf->efch[efnum].channel;
         switch(dconf->efch[efnum].signal){
         // Pulse-width modulation
-        case EF_PWM:
+        case LC_EF_PWM:
             // PWM input
-            if(dconf->efch[efnum].direction==EF_INPUT){
+            if(dconf->efch[efnum].direction==LC_EF_INPUT){
                 // Permitted channels are 0 and 1
                 if(channel > 1){
                     fprintf(stderr,"UPLOAD: Pulse width input only permitted on channels 0 and 1. Found ch %d.\n",
@@ -2172,7 +2098,7 @@ int lc_upload_config(lc_devconf_t* dconf){
                 // Options - use clock 0
                 sprintf(stemp, "DIO%d_EF_OPTIONS", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 0x00000000);
-                if(dconf->efch[efnum].edge==EF_FALLING){
+                if(dconf->efch[efnum].edge==LC_EDGE_FALLING){
                     // Write the start index
                     sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
@@ -2192,9 +2118,9 @@ int lc_upload_config(lc_devconf_t* dconf){
                 err = err ? err : LJM_eWriteName(handle, stemp, 1);
             }
         break;
-        case EF_COUNT:
+        case LC_EF_COUNT:
             // counter input
-            if(dconf->efch[efnum].direction == EF_INPUT){
+            if(dconf->efch[efnum].direction == LC_EF_INPUT){
                 // check for valid channels
                 if(channel > 7 || channel == 4 || channel ==5){
                     fprintf(stderr, "UPLOAD: EF Counter input on channel %d is not supported.\n Use EF channel 0,1,2,3,6,or 7.",
@@ -2202,18 +2128,18 @@ int lc_upload_config(lc_devconf_t* dconf){
                     uploadfail();
                 }
                 switch(dconf->efch[efnum].debounce){
-                    case EF_DEBOUNCE_NONE:
+                    case LC_EF_DEBOUNCE_NONE:
                         // Use a counter with no debounce algorithm
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 8);                            
                     break;
-                    case EF_DEBOUNCE_FIXED:
+                    case LC_EF_DEBOUNCE_FIXED:
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 9);
                         sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                        if(dconf->efch[efnum].edge == EF_FALLING)
+                        if(dconf->efch[efnum].edge == LC_EDGE_FALLING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 3);
-                        else if(dconf->efch[efnum].edge == EF_RISING)
+                        else if(dconf->efch[efnum].edge == LC_EDGE_RISING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 4);
                         else{
                             fprintf(stderr,"UPLOAD: Fixed interval debounce is not supported on  'all' edges\n");
@@ -2224,13 +2150,13 @@ int lc_upload_config(lc_devconf_t* dconf){
                         err = err ? err : LJM_eWriteName(handle, stemp, 
                             dconf->efch[efnum].time);
                     break;
-                    case EF_DEBOUNCE_RESTART:
+                    case LC_EF_DEBOUNCE_RESET:
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 9);
                         sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                        if(dconf->efch[efnum].edge == EF_FALLING)
+                        if(dconf->efch[efnum].edge == LC_EDGE_FALLING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 0);
-                        else if(dconf->efch[efnum].edge == EF_RISING)
+                        else if(dconf->efch[efnum].edge == LC_EDGE_RISING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 1);
                         else
                             err = err ? err : LJM_eWriteName(handle, stemp, 2);
@@ -2239,13 +2165,13 @@ int lc_upload_config(lc_devconf_t* dconf){
                         err = err ? err : LJM_eWriteName(handle, stemp, 
                             dconf->efch[efnum].time);
                     break;
-                    case EF_DEBOUNCE_MINIMUM:
+                    case LC_EF_DEBOUNCE_MINIMUM:
                         sprintf(stemp, "DIO%d_EF_INDEX", channel);
                         err = err ? err : LJM_eWriteName(handle, stemp, 9);
                         sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                        if(dconf->efch[efnum].edge == EF_FALLING)
+                        if(dconf->efch[efnum].edge == LC_EDGE_FALLING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 5);
-                        else if(dconf->efch[efnum].edge == EF_RISING)
+                        else if(dconf->efch[efnum].edge == LC_EDGE_RISING)
                             err = err ? err : LJM_eWriteName(handle, stemp, 6);
                         else{
                             fprintf(stderr,"UPLOAD: Minimum duration debounce is not supported on  'all' edges\n");
@@ -2265,17 +2191,17 @@ int lc_upload_config(lc_devconf_t* dconf){
                 uploadfail();
             }
         break;
-        case EF_FREQUENCY:
+        case LC_EF_FREQUENCY:
             // Check for valid channels
             if(channel > 1){
                 fprintf(stderr, "UPLOAD: EF Frequency on channel %d is not supported. 0 and 1 are allowed.\n",
                     channel);
                 uploadfail();
-            }else if(dconf->efch[efnum].direction == EF_OUTPUT){
+            }else if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
                 fprintf(stderr, "UPLOAD: EF Frequency output is not supported. Use PWM.\n");
                 uploadfail();
             }
-            if(dconf->efch[efnum].edge == EF_FALLING){
+            if(dconf->efch[efnum].edge == LC_EDGE_FALLING){
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 4);
             }else{
@@ -2289,13 +2215,13 @@ int lc_upload_config(lc_devconf_t* dconf){
             sprintf(stemp, "DIO%d_EF_ENABLE", channel);
             err = err ? err : LJM_eWriteName(handle, stemp, 1);
         break;
-        case EF_PHASE:
+        case LC_EF_PHASE:
             channel = (channel / 2) * 2;
             if(channel != 0){
                 fprintf(stderr, "UPLOAD: Digital phase input is only supported on channels 0 and 1.\n");
                 uploadfail();
             }
-            if(dconf->efch[efnum].direction == EF_OUTPUT){
+            if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
                 fprintf(stderr, "UPLOAD: Phase output is not supported\n");
                 uploadfail();
             }
@@ -2304,12 +2230,12 @@ int lc_upload_config(lc_devconf_t* dconf){
             err = err ? err : LJM_eWriteName( handle, stemp, 6);
             sprintf(stemp, "DIO%d_EF_INDEX", channel+1);
             err = err ? err : LJM_eWriteName( handle, stemp, 6);
-            if(dconf->efch[efnum].edge == EF_RISING){
+            if(dconf->efch[efnum].edge == LC_EDGE_RISING){
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel+1);
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
-            }else if(dconf->efch[efnum].edge == EF_FALLING){
+            }else if(dconf->efch[efnum].edge == LC_EDGE_FALLING){
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 0);
                 sprintf(stemp, "DIO%d_EF_CONFIG_A", channel+1);
@@ -2324,14 +2250,14 @@ int lc_upload_config(lc_devconf_t* dconf){
             sprintf(stemp, "DIO%d_EF_ENABLE", channel+1);
             err = err ? err : LJM_eWriteName(handle, stemp, 1);
         break;
-        case EF_QUADRATURE:
+        case LC_EF_QUADRATURE:
             channel = (channel/2) * 2;  // force channel to be even
             // Check for valid channels
             if(channel > 6 || channel == 4){
                 fprintf(stderr, "UPLOAD: EF Quadrature channels %d/%d not supported. 0/1, 2/3, 6/7 are allowed.\n",
                     channel, channel+1);
                 uploadfail();
-            }else if(dconf->efch[efnum].direction == EF_OUTPUT){
+            }else if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
                 fprintf(stderr, "UPLOAD: EF Quadrature output is not allowed.\n");
                 uploadfail();
             }
@@ -2370,153 +2296,82 @@ int lc_upload_config(lc_devconf_t* dconf){
 void lc_show_config(lc_devconf_t* dconf){
     int ainum,aonum,efnum,metanum,metacnt;
     char value1[LCONF_MAX_STR], value2[LCONF_MAX_STR];
+    char *fmt;
     lc_devconf_t live;
 
     // download the live parameters for compairson
     //download_config(dconf, &live);
 
-    //
-    // Connection
-    //
+    // Connection Status
+    printf(SHOW_PARAM LC_FONT_BOLD "%s%s\n" LC_FONT_NULL, 
+            "Connection Status", 
+            dconf->handle<0 ? lc_font_red : lc_font_green,
+            lcm_get_message(lcm_connection_status, dconf->handle >= 0));
+    // Connection type
+    printf(SHOW_PARAM "%s (actual: " LC_FONT_BOLD "%s)\n" LC_FONT_NULL,
+            "Connection Type",
+            lcm_get_message(lcm_connection, dconf->connection),
+            lcm_get_message(lcm_connection, dconf->connection_act));
+    // Device Name    
+    printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL, 
+            "Device Name", dconf->name);
+    // Serial Number
+    printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL, 
+            "Serial Number", dconf->serial);
     
-    print_color("Connection 1=USB,3=ETH", value1, value2);
-    print_color("Serial Number", dconf->serial, live.serial);
-    print_color("IP Address", dconf->ip, live.ip);
-    print_color("Gateway", dconf->gateway, live.gateway);
-    print_color("Subnet", dconf->subnet, live.subnet);
-    sprintf(value1, "%.1f", dconf->samplehz);
-    print_color("Sample Rate(Hz)",value1,"?");
-    sprintf(value1, "%.1f", dconf->settleus);
-    print_color("Settling Time(us)",value1,"?");
-    sprintf(value1, "%d", dconf->nsample);
-    print_color("Samples",value1,"?");
-    sprintf(value1, "%d", dconf->naich);
-    sprintf(value2, "%d", live.naich);
-    print_color("\nAnalog Input Channels", value1, value2);
+    // Networking
+    printf("** Network Parameters **\n");
+    printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL, 
+            "IP Address", dconf->ip);
+    printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL,
+            "Gateway", dconf->gateway);
+    printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL,
+            "Subnet", dconf->subnet);
+
+    // Analog Inputs
+    printf("** Analog Input Parameters **\n");
+    printf(SHOW_PARAM LC_FONT_BOLD "%.1f" LC_FONT_NULL "Hz\n", 
+            "Sample Rate", dconf->samplehz);
+    printf(SHOW_PARAM LC_FONT_BOLD "%.0f" LC_FONT_NULL "us\n", 
+            "Settling Time", dconf->settleus);
+    printf(SHOW_PARAM LC_FONT_BOLD "%d\n" LC_FONT_NULL, 
+            "Samples", dconf->nsample);
     for(ainum=0;ainum<dconf->naich;ainum++){
-        printf("Analog Input [%d] %s:\n",ainum, dconf->aich[ainum].label);
-        sprintf(value1, "%d", dconf->aich[ainum].channel);
-        sprintf(value2, "%d", live.aich[ainum].channel);
-        print_color("Positive Channel",value1,value2);
-        sprintf(value1, "%d", dconf->aich[ainum].nchannel);
-        sprintf(value2, "%d", live.aich[ainum].nchannel);
-        print_color("Negative Channel",value1,value2);
-        sprintf(value1, "%.3f", dconf->aich[ainum].range);
-        sprintf(value2, "%.3f", live.aich[ainum].range);
-        print_color("Range (V)",value1,value2);
-        sprintf(value1, "%d", dconf->aich[ainum].resolution);
-        sprintf(value2, "%d", live.aich[ainum].resolution);
-        print_color("Resolution Index",value1,value2);
+        printf("--> Analog Input [" LC_FONT_BOLD "%d" LC_FONT_NULL "] (%s) <--\n",
+                ainum, dconf->aich[ainum].label);
+        printf( SHOW_PARAM LC_FONT_BOLD "%d\n" LC_FONT_NULL, 
+                "AI Channel", dconf->aich[ainum].channel);
+        printf( SHOW_PARAM LC_FONT_BOLD "%d" LC_FONT_NULL " (%s)\n", 
+                "AI Negative Chan",
+                dconf->aich[ainum].nchannel,
+                dconf->aich[ainum].nchannel==LCONF_SE_NCH ? "Single-Ended" : "Differential");
+        printf( SHOW_PARAM LC_FONT_BOLD "+/-%.2f" LC_FONT_NULL "V\n", 
+                "Range", dconf->aich[ainum].range);
+        printf( SHOW_PARAM LC_FONT_BOLD "%d\n" LC_FONT_NULL, 
+                "Resolution Index", dconf->aich[ainum].resolution);
     }
-    sprintf(value1, "%d", dconf->naoch);
-    sprintf(value2, "%d", live.naoch);
-    print_color("\nAnalog Output Channels", value1, value2);
-    for(aonum=0;aonum<dconf->naoch;aonum++){
-        printf("Analog Output [%d] %s:\n",aonum, dconf->aoch[aonum].label);
-        if(dconf->aoch[aonum].signal==AO_CONSTANT)  print_color("Signal", "constant", "?");
-        else if(dconf->aoch[aonum].signal==AO_SINE)  print_color("Signal", "sine", "?");
-        else if(dconf->aoch[aonum].signal==AO_SQUARE)  print_color("Signal", "square", "?");
-        else if(dconf->aoch[aonum].signal==AO_TRIANGLE)  print_color("Signal", "triangle", "?");
-        else if(dconf->aoch[aonum].signal==AO_NOISE)  print_color("Signal", "noise", "?");
-        else print_color("Signal","***","?");
-        sprintf(value1, "%d", dconf->aoch[aonum].channel);
-        sprintf(value2, "%d", live.aoch[aonum].channel);
-        print_color("Channel",value1,value2);
-        sprintf(value1, "%.1f", dconf->aoch[aonum].frequency);
-        sprintf(value2, "%.1f", live.aoch[aonum].frequency);
-        print_color("Frequency (Hz)",value1,value2);
-        sprintf(value1, "%.3f", dconf->aoch[aonum].amplitude);
-        print_color("Amplitude (V)",value1,"?");
-        sprintf(value1, "%.3f", dconf->aoch[aonum].offset);
-        print_color("Offset (V)",value1,"?");
-        sprintf(value1, "%.3f", dconf->aoch[aonum].duty);
-        print_color("Duty Cycle",value1,"?");
+    
+    // Analog Outputs
+    if(dconf->naoch > 0){
+        printf("** Analog Outputs **\n");
+        printf(SHOW_PARAM LC_FONT_BOLD "%.1f" LC_FONT_NULL "Hz (Same as AI rate)\n", 
+                "Sample Rate", dconf->samplehz);
     }
-    // Show EF parameters
-    sprintf(value1, "%d", dconf->nefch);
-    sprintf(value2, "%d", live.nefch);
-    print_color("\nEF Channels", value1, value2);
-    if(dconf->nefch>0){
-        sprintf(value1, "%.1f", dconf->effrequency);
-        sprintf(value2, "%.1f", live.effrequency);
-        print_color("EF Frequency (Hz)", value1, value2);
-    }
-    for(efnum=0; efnum<dconf->nefch; efnum++){
-        printf("Flexible Input/Output [%d] %s:\n", efnum, dconf->efch[efnum].label);
-        sprintf(value1, "%d", dconf->efch[efnum].channel);
-        sprintf(value2, "%d", live.efch[efnum].channel);
-        print_color("Channel",value1,value2);
-        if(dconf->efch[efnum].signal==EF_PWM)
-            sprintf(value1, "PWM");
-        else if(dconf->efch[efnum].signal==EF_COUNT)
-            sprintf(value1, "COUNT");
-        else if(dconf->efch[efnum].signal==EF_FREQUENCY)
-            sprintf(value1, "FREQUENCY");
-        else if(dconf->efch[efnum].signal==EF_PHASE)
-            sprintf(value1, "PHASE");
-        else if(dconf->efch[efnum].signal==EF_QUADRATURE)
-            sprintf(value1, "QUADRATURE");
-        else
-            sprintf(value1, "NONE");
-
-        if(live.efch[efnum].signal==EF_PWM)
-            sprintf(value2, "PWM");
-        else if(live.efch[efnum].signal==EF_COUNT)
-            sprintf(value2, "COUNT");
-        else if(live.efch[efnum].signal==EF_FREQUENCY)
-            sprintf(value2, "FREQUENCY");
-        else if(live.efch[efnum].signal==EF_PHASE)
-            sprintf(value2, "PHASE");
-        else if(live.efch[efnum].signal==EF_QUADRATURE)
-            sprintf(value2, "QUADRATURE");
-        else
-            sprintf(value2, "NONE");
-        print_color("Signal", value1, value2);
-
-        if(dconf->efch[efnum].direction==EF_INPUT)
-            sprintf(value1, "INPUT");
-        else if(dconf->efch[efnum].direction==EF_OUTPUT)
-            sprintf(value1, "OUTPUT");
-        else
-            sprintf(value1, "?");
-        if(live.efch[efnum].direction==EF_INPUT)
-            sprintf(value2, "INPUT");
-        else if(live.efch[efnum].direction==EF_OUTPUT)
-            sprintf(value2, "OUTPUT");
-        else
-            sprintf(value2, "?");
-        print_color("Direction",value1,value2);
-
-        if(dconf->efch[efnum].edge==EF_RISING)
-            sprintf(value1, "RISING");
-        else if(dconf->efch[efnum].edge==EF_FALLING)
-            sprintf(value1, "FALLING");
-        else if(dconf->efch[efnum].edge==EF_ALL)
-            sprintf(value1, "ALL");
-        else
-            sprintf(value1, "?");
-        if(live.efch[efnum].edge==EF_RISING)
-            sprintf(value2, "RISING");
-        else if(live.efch[efnum].edge==EF_FALLING)
-            sprintf(value2, "FALLING");
-        else if(live.efch[efnum].edge==EF_ALL)
-            sprintf(value2, "ALL");
-        else
-            sprintf(value2, "?");
-        print_color("Edge",value1,value2);
-
-        sprintf(value1, "%.1f", dconf->efch[efnum].time);
-        sprintf(value2, "%.1f", live.efch[efnum].time);
-        print_color("Time (us)",value1,value2);
-        sprintf(value1, "%.3f", dconf->efch[efnum].duty);
-        sprintf(value2, "%.3f", live.efch[efnum].duty);
-        print_color("Duty cycle",value1,value2);
-        sprintf(value1, "%.1f", dconf->efch[efnum].phase);
-        sprintf(value2, "%.1f", live.efch[efnum].phase);
-        print_color("Phase (deg)",value1,value2);
-        sprintf(value1, "%d", dconf->efch[efnum].counts);
-        sprintf(value2, "%d", live.efch[efnum].counts);
-        print_color("Counts",value1,value2);
+    for(aonum=0; aonum<dconf->naoch; aonum++){
+        printf("--> Analog Output [" LC_FONT_BOLD "%d" LC_FONT_NULL "] (%s)\n",
+                aonum, dconf->aoch[aonum].label);
+        printf(SHOW_PARAM LC_FONT_BOLD "%d" LC_FONT_NULL "\n", 
+                "AO Channel", dconf->aoch[aonum].channel);
+        printf(SHOW_PARAM LC_FONT_BOLD "%s" LC_FONT_NULL "\n",
+                "Signal", lcm_get_message(lcm_aosignal,dconf->aoch[aonum].signal));
+        printf(SHOW_PARAM LC_FONT_BOLD "%0.3f" LC_FONT_NULL "V\n", 
+                "Amplitude", dconf->aoch[aonum].amplitude);
+        printf(SHOW_PARAM LC_FONT_BOLD "%0.3f" LC_FONT_NULL "V\n", 
+                "Offset", dconf->aoch[aonum].offset);
+        printf(SHOW_PARAM LC_FONT_BOLD "%0.1f" LC_FONT_NULL "Hz\n", 
+                "Frequency", dconf->aoch[aonum].frequency);
+        printf(SHOW_PARAM LC_FONT_BOLD "%0.3f" LC_FONT_NULL "%%\n", 
+                "Duty Cycle", dconf->aoch[aonum].duty);
     }
 
     // count the meta parameters
@@ -2543,8 +2398,10 @@ void lc_show_config(lc_devconf_t* dconf){
                     dconf->meta[metanum].value.svalue);
             break;
             default:
-                printf(LCONF_COLOR_RED "%19s ( ? ) **CORRUPT**\n" LCONF_COLOR_NULL,
-                    dconf->meta[metanum].param);
+                printf("%s%19s ( ? ) **CORRUPT**%s\n",
+                    lc_font_red,
+                    dconf->meta[metanum].param,
+                    lc_font_null);
         }
 }
 
@@ -2571,9 +2428,9 @@ int lc_update_ef(lc_devconf_t* dconf){
         channel = dconf->efch[efnum].channel;
         switch(dconf->efch[efnum].signal){
         // Pulse-width modulation
-        case EF_PWM:
+        case LC_EF_PWM:
             // PWM input
-            if(dconf->efch[efnum].direction==EF_INPUT){
+            if(dconf->efch[efnum].direction==LC_EF_INPUT){
                 // Get the time high
                 sprintf(stemp, "DIO%d_EF_READ_A", channel);
                 err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
@@ -2585,7 +2442,7 @@ int lc_update_ef(lc_devconf_t* dconf){
                 dconf->efch[efnum].counts = (unsigned int) ftemp2;
                 dconf->efch[efnum].time = ftemp2 * ef_clk_div / LCONF_CLOCK_MHZ;
                 dconf->efch[efnum].phase = 0.;
-                if(dconf->efch[efnum].edge==EF_FALLING){
+                if(dconf->efch[efnum].edge==LC_EDGE_FALLING){
                     dconf->efch[efnum].duty = ftemp1 / ftemp2;
                 }else{
                     dconf->efch[efnum].duty = ftemp / ftemp2;
@@ -2602,7 +2459,7 @@ int lc_update_ef(lc_devconf_t* dconf){
                 // Calculate the stop index
                 itemp2 = ef_clk_roll * dconf->efch[efnum].duty;
                 itemp2 = (((long int) itemp1) + ((long int) itemp2))%ef_clk_roll;
-                if(dconf->efch[efnum].edge==EF_FALLING){
+                if(dconf->efch[efnum].edge==LC_EDGE_FALLING){
                     // Write the start index
                     sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
@@ -2621,7 +2478,7 @@ int lc_update_ef(lc_devconf_t* dconf){
                 err = err ? err : LJM_eWriteName( handle, stemp, 1);
             }
         break;
-        case EF_COUNT:
+        case LC_EF_COUNT:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
             dconf->efch[efnum].counts = (unsigned int) ftemp;
@@ -2629,7 +2486,7 @@ int lc_update_ef(lc_devconf_t* dconf){
             dconf->efch[efnum].duty = 0.;
             dconf->efch[efnum].phase = 0.;
         break;
-        case EF_FREQUENCY:
+        case LC_EF_FREQUENCY:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
             dconf->efch[efnum].counts = (unsigned int) ftemp;
@@ -2637,7 +2494,7 @@ int lc_update_ef(lc_devconf_t* dconf){
             dconf->efch[efnum].duty = 0.;
             dconf->efch[efnum].phase = 0.;
         break;
-        case EF_PHASE:
+        case LC_EF_PHASE:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
             dconf->efch[efnum].counts = (unsigned int) ftemp;
@@ -2645,7 +2502,7 @@ int lc_update_ef(lc_devconf_t* dconf){
             dconf->efch[efnum].duty = 0.;
             dconf->efch[efnum].phase = 0.;
         break;
-        case EF_QUADRATURE:
+        case LC_EF_QUADRATURE:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
             err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
             dconf->efch[efnum].counts = (unsigned int) ftemp;
@@ -2698,7 +2555,7 @@ int lc_communicate(lc_devconf_t* dconf,
     //
     // UART
     //
-    case COM_UART:
+    case LC_COM_UART:
         // Test all mandatory parameters
         if(com->pin_in < 0 || com->pin_out < 0 || com->rate < 0){
             fprintf(stderr, "COMMUNICATE: A UART channel requires that COMIN, COMOUT, and COMRATE be configured\n");
@@ -3014,7 +2871,7 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     // Initialize the trigger
     dconf->trigmem = 0;
     if(dconf->trigchannel >= 0)
-        dconf->trigstate = TRIG_PRE;
+        dconf->trigstate = LC_TRIG_PRE;
 
     // Start the stream.
     err=LJM_eStreamStart(dconf->handle, 
@@ -3059,9 +2916,9 @@ int lc_stream_service(lc_devconf_t* dconf){
     service_write_buffer(&dconf->RB);
 
     // Tend to the software trigger
-    if(dconf->trigstate == TRIG_PRE){
+    if(dconf->trigstate == LC_TRIG_PRE){
         if(dconf->RB.samples_streamed >= dconf->trigpre){
-            dconf->trigstate = TRIG_ARMED;
+            dconf->trigstate = LC_TRIG_ARMED;
             if(dconf->trigchannel == LCONF_TRIG_HSC){
                 err = LJM_eReadName(dconf->handle, "DIO18_EF_READ_A", &ftemp);
                 if(err){
@@ -3072,7 +2929,7 @@ int lc_stream_service(lc_devconf_t* dconf){
                 dconf->trigmem = (unsigned int) ftemp;
             }
         }
-    }else if(dconf->trigstate == TRIG_ARMED){
+    }else if(dconf->trigstate == LC_TRIG_ARMED){
         // Test for a trigger event
         size = dconf->RB.blocksize_samples;
         // Case out the edge types in advance for speed
@@ -3084,11 +2941,11 @@ int lc_stream_service(lc_devconf_t* dconf){
                 dconf->trigmem = 0x00;
                 return LCONF_ERROR;
             }else if(ftemp > dconf->trigmem){
-                dconf->trigstate = TRIG_ACTIVE;
+                dconf->trigstate = LC_TRIG_ACTIVE;
                 dconf->trigmem = 0x00;
             }
         // Test for a rising edge
-        }else if(dconf->trigedge == TRIG_RISING){
+        }else if(dconf->trigedge == LC_EDGE_RISING){
             for(index = dconf->trigchannel;
                     index < size; index += dconf->RB.channels){
                 if(write_data[index] > dconf->triglevel)
@@ -3096,14 +2953,14 @@ int lc_stream_service(lc_devconf_t* dconf){
                 else
                     this = 0b10;
                 if(dconf->trigmem == this){
-                    dconf->trigstate = TRIG_ACTIVE;
+                    dconf->trigstate = LC_TRIG_ACTIVE;
                     dconf->trigmem = 0x00;
                     break;
                 }else
                     dconf->trigmem = this>>1;
             }
         // Falling edge
-        }else if(dconf->trigedge == TRIG_FALLING){
+        }else if(dconf->trigedge == LC_EDGE_FALLING){
             for(index = dconf->trigchannel;
                     index < size; index += dconf->RB.channels){
                 if(write_data[index] <= dconf->triglevel)
@@ -3111,7 +2968,7 @@ int lc_stream_service(lc_devconf_t* dconf){
                 else
                     this = 0b10;
                 if(dconf->trigmem == this){
-                    dconf->trigstate = TRIG_ACTIVE;
+                    dconf->trigstate = LC_TRIG_ACTIVE;
                     dconf->trigmem = 0x00;
                     break;
                 }else
@@ -3126,7 +2983,7 @@ int lc_stream_service(lc_devconf_t* dconf){
                 else
                     this = ~((unsigned int)0b01);
                 if(dconf->trigmem == this){
-                    dconf->trigstate = TRIG_ACTIVE;
+                    dconf->trigstate = LC_TRIG_ACTIVE;
                     dconf->trigmem = 0x00;
                     break;
                 }else
@@ -3135,7 +2992,7 @@ int lc_stream_service(lc_devconf_t* dconf){
         }
         // Unless a trigger was detected, throw away a sample block and reduce
         // the record of samples streamed
-        if(dconf->trigstate == TRIG_ARMED){
+        if(dconf->trigstate == LC_TRIG_ARMED){
             service_read_buffer(&dconf->RB);
             dconf->RB.samples_streamed -= dconf->RB.samples_per_read;
         }

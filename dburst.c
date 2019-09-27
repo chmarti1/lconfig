@@ -322,7 +322,7 @@ int main(int argc, char *argv[]){
     // Stream data
     printf("Streaming data");
     fflush(stdout);
-    if(dconf.trigstate == TRIG_PRE)
+    if(dconf.trigstate == LC_TRIG_PRE)
         printf("\nWaiting for trigger\n");
 
     while(!lc_stream_iscomplete(&dconf)){
@@ -333,7 +333,7 @@ int main(int argc, char *argv[]){
             return -1;            
         }
 
-        if(dconf.trigstate == TRIG_IDLE || dconf.trigstate == TRIG_ACTIVE){
+        if(dconf.trigstate == LC_TRIG_IDLE || dconf.trigstate == LC_TRIG_ACTIVE){
             printf(".");
             fflush(stdout);
         }

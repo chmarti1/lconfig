@@ -140,6 +140,9 @@ with init_data_file() and write_data_file() utilities.
 - Replaced configuration array/index pairs with a single configuration pointer
 - Removed DOWNLOAD_CONFIG
 - Changed "FIO" to "EF" to conform to LJ's extended features naming.
+- Created the LCM mapping interface for consistent mappings between enumerated
+    types, their configuration strings, and human-readable messgaes.  This ALSO
+    corrected a bug in the extended feature debounce filter settings.
 
 */
 
@@ -166,8 +169,10 @@ with init_data_file() and write_data_file() utilities.
 #define LCONF_SAMPLES_PER_READ 64  // Data read/write block size
 #define LCONF_TRIG_HSC 3000
 
+#define LCONF_SE_NCH 199    // single-ended negative channel number
+
 #define LCONF_DEF_NSAMPLE 64
-#define LCONF_DEF_AI_NCH 199
+#define LCONF_DEF_AI_NCH LCONF_SE_NCH
 #define LCONF_DEF_AI_RANGE 10.
 #define LCONF_DEF_AI_RES 0
 #define LCONF_DEF_AO_AMP 1.
@@ -177,7 +182,6 @@ with init_data_file() and write_data_file() utilities.
 
 #define LCONF_NOERR 0
 #define LCONF_ERROR 1
-
 
 
 /*
@@ -213,7 +217,7 @@ typedef struct {
 typedef struct {
     unsigned int    channel;      // Channel number (0 or 1)
     // What function type is being generated?
-    enum {AO_CONSTANT, AO_SINE, AO_SQUARE, AO_TRIANGLE, AO_NOISE} signal;
+    enum {LC_AO_CONSTANT, LC_AO_SINE, LC_AO_SQUARE, LC_AO_TRIANGLE, LC_AO_NOISE} signal;
     double          amplitude;    // How big?
     double          frequency;    // Signal frequency in Hz
     double          offset;       // What is the mean value?
@@ -222,30 +226,29 @@ typedef struct {
     char            label[LCONF_MAX_STR];   // Output channel label
 } lc_aoconf_t;
 
+typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
+
 // Flexible Input/Output configuration struct
 // This includes everything needed to configure an extended feature EF channel
 typedef struct {
     // Flexible IO mode enumerated type
-    enum {  EF_NONE,   // No extended features
-            EF_PWM,    // Pulse width modulation (input/output)
-            EF_COUNT,  // Counter (input/output)
-            EF_FREQUENCY,  // Frequency (input)
-            EF_PHASE,  // Line-to-line phase (input)
-            EF_QUADRATURE  // Encoder quadrature (input)
+    enum {  LC_EF_NONE,   // No extended features
+            LC_EF_PWM,    // Pulse width modulation (input/output)
+            LC_EF_COUNT,  // Counter (input/output)
+            LC_EF_FREQUENCY,  // Frequency (input)
+            LC_EF_PHASE,  // Line-to-line phase (input)
+            LC_EF_QUADRATURE  // Encoder quadrature (input)
         } signal;
 
-    enum {  EF_RISING,     // Rising edge
-            EF_FALLING,    // Falling edge
-            EF_ALL         // Rising and falling edges
-        } edge;
+    lc_edge_t edge;
 
-    enum {  EF_DEBOUNCE_NONE,      // No debounce
-            EF_DEBOUNCE_FIXED,     // Fixed debounce timer (rising, falling)
-            EF_DEBOUNCE_RESTART,   // Self restarting timer (rising, falling, all)
-            EF_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
+    enum {  LC_EF_DEBOUNCE_NONE,      // No debounce
+            LC_EF_DEBOUNCE_FIXED,     // Fixed debounce timer (rising, falling)
+            LC_EF_DEBOUNCE_RESET,     // Self restarting timer (rising, falling, all)
+            LC_EF_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
         } debounce;
 
-    enum {  EF_INPUT, EF_OUTPUT } direction;
+    enum {  LC_EF_INPUT, LC_EF_OUTPUT } direction;
     int channel;
     double time;        // Time parameter (us)
     double duty;        // PWM duty cycle (0-1)
@@ -257,7 +260,7 @@ typedef struct {
 // Digital Communications Configuration Structure
 //
 typedef struct {
-    enum {COM_NONE, COM_UART, COM_1WIRE, COM_SPI, COM_I2C, COM_SBUS} type;
+    enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
     char label[LCONF_MAX_STR];
     double rate;
     int pin_in;
@@ -266,7 +269,7 @@ typedef struct {
     union {
         struct {
             unsigned int bits;
-            enum {PARITY_NONE=0, PARITY_ODD=1, PARITY_EVEN=2} parity;
+            enum {LC_PARITY_NONE=0, LC_PARITY_ODD=1, LC_PARITY_EVEN=2} parity;
             unsigned int stop;
         } uart;
     } options;
@@ -302,14 +305,36 @@ typedef struct {
     double* buffer;                 // the buffer array
 } lc_ringbuf_t;
 
-typedef enum {CON_ANY=LJM_ctANNY, CON_USB=LJM_ctUSB, CON_ETH=LJM_ctETH} lc_con_t;
+
+typedef enum {
+    LC_CON_NONE=-1,
+    LC_CON_USB=LJM_ctUSB, 
+    LC_CON_ANY=LJM_ctANY, 
+    LC_CON_ANY_TCP=LJM_ctANY_TCP,
+    LC_CON_ETH=LJM_ctETHERNET_ANY,
+    LC_CON_ETH_TCP = LJM_ctETHERNET_TCP,
+    LC_CON_ETH_UDP = LJM_ctETHERNET_UDP,
+    LC_CON_WIFI = LJM_ctWIFI_ANY,
+    LC_CON_WIFI_TCP = LJM_ctWIFI_TCP,
+    LC_CON_WIFI_UDP = LJM_ctWIFI_UDP
+} lc_con_t;
+
+
+typedef enum {
+    LC_DEV_NONE=-1,
+    LC_DEV_ANY=LJM_dtANY, 
+    LC_DEV_T4=LJM_dtT4,
+    LC_DEV_T7=LJM_dtT7,
+    LC_DEV_TX=LJM_dtTSERIES,
+    LC_DEV_DIGIT=LJM_dtDIGIT
+} lc_dev_t;
 
 typedef struct devconf {
     // Global configuration
     lc_con_t connection;                 // requested connection type index
     lc_con_t connection_act;             // actual connection type index
-    int device;                     // The requested device type index
-    int device_act;                 // The actual device type
+    lc_dev_t device;                     // The requested device type index
+    lc_dev_t device_act;                 // The actual device type
     char ip[LCONF_MAX_STR];         // ip address string
     char gateway[LCONF_MAX_STR];    // gateway address string
     char subnet[LCONF_MAX_STR];     // subnet mask string
@@ -339,8 +364,8 @@ typedef struct devconf {
     unsigned int trigpre;           // How many pre-trigger samples?
     unsigned int trigmem;           // Persistent memory for the trigger
     double triglevel;               // What voltage should the trigger seek?
-    enum {TRIG_RISING, TRIG_FALLING, TRIG_ALL} trigedge; // Trigger edge
-    enum {TRIG_IDLE, TRIG_PRE, TRIG_ARMED, TRIG_ACTIVE} trigstate; // Trigger state
+    lc_edge_t trigedge; // Trigger edge
+    enum {LC_TRIG_IDLE, LC_TRIG_PRE, LC_TRIG_ARMED, LC_TRIG_ACTIVE} trigstate; // Trigger state
     // Meta & filestream
     lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
     lc_ringbuf_t RB;                  // ring buffer
@@ -363,6 +388,13 @@ sequentially.  Fortunately, load_config always works sequentially.
 */
 int lc_ndev(lc_devconf_t* dconf, // Array of device configuration structs
                 const unsigned int devmax); // maximum number of devices allowed
+
+/* LC_ISOPEN
+Returns a 1 if the configuration struct has a non-negative handle value; 
+indicating that the LC_OPEN function has been called to establish a connection.
+Returns 0 otherwise.
+*/
+int lc_isopen(lc_devconf_t* dconf);
 
 /* LC_NISTREAM
 Returns the number of input stream channels configured. These will be the number 
