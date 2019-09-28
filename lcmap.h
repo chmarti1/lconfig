@@ -120,12 +120,25 @@ static const lcm_map_t lcm_ef_debounce[] = {
 // COM Channel
 //
 static const lcm_map_t lcm_com_channel[] = {
-    {.value=LC_COM_NONE, .message="None"},
+    {.value=LC_COM_NONE, .message="None", .config="none"},
     {.value=LC_COM_UART, .message="Asynchronous Rx/Tx", .config="uart"},
     {.value=LC_COM_SPI, .message="Serial Peripheral Interface", .config="spi"},
     {.value=LC_COM_I2C, .message="Inter-Integrated Circuit", .config="i2c"},
     {.value=LC_COM_1WIRE, .message="One-Wire", .config="1wire"},
     {.value=LC_COM_SBUS, .message="S-Bus", .config="sbus"},
+    {.value=-1}
+};
+
+//
+// COM Parity
+//
+static const lcm_map_t lcm_com_parity[] = {
+    {.value=LC_PARITY_NONE, .message="None", .config="N"},
+    {.value=LC_PARITY_EVEN, .message="Even", .config="E"},
+    {.value=LC_PARITY_ODD, .message="Odd", .config="O"},
+    {.value=LC_PARITY_NONE, .message="None", .config="n"},
+    {.value=LC_PARITY_EVEN, .message="Even", .config="e"},
+    {.value=LC_PARITY_ODD, .message="Odd", .config="o"},
     {.value=-1}
 };
 
@@ -183,7 +196,7 @@ int lcm_get_value(const lcm_map_t map[], char config[], int *value){
         // If this is the end of the map, 
         if(map[ii].value<0)
             return -1;
-        else if(strcmp(map[ii].config,config) == 0){
+        else if(map[ii].config && strcmp(map[ii].config,config) == 0){
             *value = map[ii].value;
             return 0;
         }

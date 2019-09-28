@@ -922,11 +922,59 @@ of the buffers.  The LJM interface encodes UART data in 16-bit registers padded
 with zeros, so the even-indices are neither transmitted nor received.
 
 Returns -1 if there is an error.
+
+For non-blocking listening to a COM channel, see the LC_COM_LISTEN and 
+LC_COM_READ functions.
 */
 int lc_communicate(lc_devconf_t* dconf, const unsigned int comchannel,
         const char *txbuffer, const unsigned int txlength, 
         char *rxbuffer, const unsigned int rxlength,
         const int timeout_ms);
+        
+
+/*COM_START
+COM_READ
+COM_WRITE
+COM_STOP
+
+The START, READ, WRITE, and STOP operations control a COM interface.
+
+The LC_COM_START function uploads the configuration for the COM channel and 
+enables the feature.  The LJM receive buffer is configured to have the size
+RXLENGTH in bytes.  For UART, this should be twice the number of bytes the 
+application plans to transmit because the LJM UART interface uses 16-bit-wide
+buffers.  The other COM interfaces use byte buffers, so the same deliberate 
+oversizing is not needed.  Returns -1 on failure and 0 on success.
+
+The LC_COM_STOP funciton disables the COM interface without reading or writing
+to it.  Returns a -1 on failure and 0 on success.
+
+The LC_COM_WRITE function transmits the contents of the TXBUFFER over an active
+COM interface.  TXLENGTH is the number of bytes in the TXBUFFER array.  For UART
+interfaces, only odd indices of the TXBUFFER should be used since the LJM UART
+interface uses 16-bit wide buffers, and the most significant 8-bits are ignored.
+Returns -1 on failure and 0 on success.
+
+The LC_COM_READ function reads from the COM receive buffer into the RXBUFFER 
+array up to a maximum of RXLENGTH bytes.  Reading can be done in one of three 
+modes depending on the value passed to TIMEOUT_MS.  When TIMEOUT_MS is positive,
+LC_COM_READ will wait until exactly RXLENGTH bytes of data are available or 
+until TIMEOUT_MS milliseconds have passed.  When TIMEOUT_MS is negative, 
+LC_COM_READ will read any data available and return immediately.  When 
+TIMEOUT_MS is zero, LC_COM_READ will wait indefinitely for the data to become
+available.  Unlike the WRITE, START, and STOP funcitons, the LC_COM_READ 
+funciton returns the number of bytes read on success, and -1 on failure. 
+*/
+int lc_com_start(lc_devconf_t* dconf, const unsigned int comchannel,
+        const unsigned int rxlength);
+        
+int lc_com_stop(lc_devconf_t* dconf, const unsigned int comchannel);
+        
+int lc_com_write(lc_devconf_t* dconf, const unsigned int comchannel,
+        const char *txbuffer, const unsigned int txlength);
+        
+int lc_com_read(lc_devconf_t* dconf, const unsigned int comchannel,
+        char *rxbuffer, const unsigned int rxlength, int timeout_ms);
 
 /*LC_STREAM_STATUS
 Report on a data stream's status

@@ -6,7 +6,7 @@ DRUN="$(TODIR)/drun"
 LINK=-lLabJackM -lm
 
 # The LCONFIG object file
-lconfig.o: lconfig.c lconfig.h
+lconfig.o: lconfig.c lconfig.h lcmap.h
 	gcc -Wall -c lconfig.c -o lconfig.o
 
 # The LCTOOLS object file
