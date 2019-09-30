@@ -1,4 +1,4 @@
-# LCONFIG
+# LCONFIG README
 
 Headers and utilities for laboratory measurements and machine control with the [LabJack T4 and T7](https://labjack.com/products)
 
@@ -11,13 +11,18 @@ Version 3.06
 
 ### Foreword
 
-This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder and is linked here:
+This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder and is linked below.
+
+For detailed documentation on the LCONFIG package, use these links:
 
 - [Documentation](docs/documentation.md)
 - [The LConfig API](docs/api.md)
 - [Reference](docs/reference.md)
 
 ---
+***
+d
+### Contents 
 
 - [About](#about)
 - [License](#license)
@@ -68,6 +73,8 @@ LCONFIG allows automatic configuration and control of most of the T4/T7's advanc
     - Rising/falling/any edge on any AI channel
     - Can use the high-speed counter to identify a digital trigger
     - Supports pretrigger buffering
+- Digital Communication Interface
+    - UART interface
 - Automatic generation of data files
     - The active configuratino is embedded in the data
     - Stream directly to a file
@@ -90,10 +97,10 @@ To get the repository,
 $ git clone http://github.com/chmarti1/lconfig
 $ cd lconfig
 $ sudo make install	# Installs binaries to /usr/local/bin
-$ drun -h   # Prints help
-$ dburst -h
+$ lcrun -h   # Prints help
+$ lcburst -h
 ```
-`drun` and `dburst` are binaries built on the LCONFIG system.  `drun` continuously streams data to a file, but the read/write times for most hard drives prevents realizing the full speed of the T7.  `dburst` collects a high speed burst of data and then writes it to a file.  Both executables use the LCONFIG library to load a configuration file, open the appropriate device connections, initiate the data transfer, and write data files automatically.
+`lcrun` and `lcburst` are binaries built on the LCONFIG system.  `lcrun` continuously streams data to a file, but the read/write times for most hard drives prevents realizing the full speed of the T7.  `lcburst` collects a high speed burst of data and then writes it to a file.  Both executables use the LCONFIG library to load a configuration file, open the appropriate device connections, initiate the data transfer, and write data files automatically.
 
 For writing your own executables, a quick tutorial on programming with the LCONFIG system is laid out in LCONFIG_README with the gritty details in this README.  The absolute authoritative documentation for LCONFIG is the comments in the prototype section of the header itself.  It is always updated with each version change.  Versions 2.03 and older used a different system for streaming than version 3.00 and later, so older branches are still available on the git page.
 
@@ -188,6 +195,8 @@ airesolution 0
 ## Future Improvements
 
 Some of the parameters have not been thoroughly tested; especailly the extended features.  I have done some basic testing, but I would not be surprised to learn that there are bugs that need attention there.  Please contact me if you find any!
+
+As of version 4.00, only the UART digital COM interface is implemented.  It is not currently a high priority to implement the other interfaces, but one day...
 
 ## Known Bugs
 

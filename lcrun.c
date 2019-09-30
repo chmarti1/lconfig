@@ -23,11 +23,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <time.h>   // For forming file names from timestamps
 
-#define CONFIG_FILE "drun.conf"
-#define PRE_FILE    "drun_pre.dat"
-#define POST_FILE   "drun_post.dat"
-#define DATA_FILE   "drun.dat"
+#define CONFIG_FILE "lcrun.conf"
 #define MAXLOOP     "-1"
 #define NBUFFER     65535
 #define NDEV        3
@@ -37,9 +35,9 @@
 /*...................
 .   Global Options
 ...................*/
-char    pre_file[MAXSTR] = PRE_FILE,   // The pre-stream data file name
-        post_file[MAXSTR] = POST_FILE,  // The post-stream data file
-        data_file[MAXSTR] = DATA_FILE,  // The data file
+char    pre_file[MAXSTR] = "",   // The pre-stream data file name
+        post_file[MAXSTR] = "",  // The post-stream data file
+        data_file[MAXSTR] = "",  // The data file
         config_file[MAXSTR] = CONFIG_FILE,  //  The configuration file
         maxloop[MAXSTR] = MAXLOOP,  // maximum number of reads
         metastage[LCONF_MAX_META][MAXSTR+1];
@@ -78,7 +76,7 @@ const char help_text[] = \
 "  will be used for a post-continuous data set.\n"\
 "\n"\
 "  In all cases, each data set will be written to its own file so that\n"\
-"  DRUN creates one to three files each time it is run.\n"\
+"  LCRUN creates one to three files each time it is run.\n"\
 "\n"\
 "-c CONFIGFILE\n"\
 "  By default, LCRUN will look for \"lcrun.conf\" in the working\n"\
@@ -89,18 +87,18 @@ const char help_text[] = \
 "\n"\
 "-d DATAFILE\n"\
 "  This option overrides the default continuous data file name\n"\
-"  \"drun.dat\"\n"\
-"     $ drun -d mydatafile.dat\n"\
+"  \"YYYYMMDDHHmmSS_lcrun.dat\"\n"\
+"     $ lcrun -d mydatafile.dat\n"\
 "\n"\
 "-r PREFILE\n"\
 "  This option overrides the default pre-continuous data file name\n"\
-"  \"drun_pre.dat\"\n"\
-"     $ drun -r myprefile.dat\n"\
+"  \"YYYYMMDDHHmmSS_lcrun_pre.dat\"\n"\
+"     $ lcrun -r myprefile.dat\n"\
 "\n"\
 "-p POSTFILE\n"\
 "  This option overrides the default post-continuous data file name\n"\
-"  \"drun_post.dat\"\n"\
-"     $ drun -p mypostfile.dat\n"\
+"  \"YYYYMMDDHHmmSS_lcrun_post.dat\"\n"\
+"     $ lcrun -p mypostfile.dat\n"\
 "\n"\
 "-n MAXREAD\n"\
 "  This option accepts an integer number of read operations after which\n"\
@@ -115,10 +113,10 @@ const char help_text[] = \
 "  These flags signal the creation of a meta parameter at the command\n"\
 "  line.  f,i, and s signal the creation of a float, integer, or string\n"\
 "  meta parameter that will be written to the data file header.\n"\
-"     $ drun -f height=5.25 -i temperature=22 -s day=Monday\n"\
+"     $ lcrun -f height=5.25 -i temperature=22 -s day=Monday\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017 C.Martin\n";
+"(c)2017-2019 C.Martin\n";
 
 
 /*....................
@@ -135,6 +133,7 @@ int main(int argc, char *argv[]){
     char stemp[MAXSTR];
     unsigned int count; // count the number of loops for safe exit
     lc_devconf_t dconf[NDEV];
+    time_t start;
     FILE* dfile;
 
     // Parse the command-line options
@@ -145,7 +144,7 @@ int main(int argc, char *argv[]){
     printf("Loading configuration file...");
     if(lc_load_config(dconf, NDEV, config_file)){
         printf("FAILED\n");
-        fprintf(stderr, "DRUN failed while loading the configuration file \"%s\"\n", config_file);
+        fprintf(stderr, "LCRUN failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
     }else
         printf("DONE\n");
@@ -153,47 +152,57 @@ int main(int argc, char *argv[]){
     // Detect the number of configured device connections
     ndev = lc_ndev(dconf, NDEV);
 
+    // Build file names from a timestamp
+    time(&start);
+    strftime(stemp, MAXSTR, "%Y%m%d%H%M%S", localtime(&start));
+    if(data_file[0] == '\0')
+        sprintf(data_file, "%s_lcrun.dat", stemp);
+    if(pre_file[0] == '\0')
+        sprintf(pre_file, "%s_lcrun_pre.dat", stemp);
+    if(post_file[0] == '\0')
+        sprintf(post_file, "%s_lcrun_post.dat", stemp);
+
     // Process the staged command-line meta parameters
     for(metacount--; metacount>=0; metacount--){
         if(metastage[metacount][0]=='f'){
             if(sscanf(&metastage[metacount][1],"%[^=]=%lf",(char*)&param, &ftemp) != 2){
-                fprintf(stderr, "DRUN expected param=float format, but found %s\n", &metastage[metacount][1]);
+                fprintf(stderr, "LCRUN expected param=float format, but found %s\n", &metastage[metacount][1]);
                 return -1;
             }
             printf("flt:%s = %lf\n",param,ftemp);
             if (lc_put_meta_flt(&dconf[0], param, ftemp) || 
                 lc_put_meta_flt(&dconf[1], param, ftemp) ||
                 lc_put_meta_flt(&dconf[2], param, ftemp))
-                fprintf(stderr, "DRUN failed to set parameter %s to %lf\n", param, ftemp);
+                fprintf(stderr, "LCRUN failed to set parameter %s to %lf\n", param, ftemp);
         }else if(metastage[metacount][0]=='i'){
             if(sscanf(&metastage[metacount][1],"%[^=]=%d",(char*)&param, &itemp) != 2){
-                fprintf(stderr, "DRUN expected param=integer format, but found %s\n", &metastage[metacount][1]);
+                fprintf(stderr, "LCRUN expected param=integer format, but found %s\n", &metastage[metacount][1]);
                 return -1;
             }
             printf("int:%s = %d\n",param,itemp);
             if (lc_put_meta_int(&dconf[0], param, itemp) || 
                 lc_put_meta_int(&dconf[1], param, itemp) ||
                 lc_put_meta_int(&dconf[2], param, itemp))
-                fprintf(stderr, "DRUN failed to set parameter %s to %d\n", param, itemp);
+                fprintf(stderr, "LCRUN failed to set parameter %s to %d\n", param, itemp);
         }else if(metastage[metacount][0]=='s'){
             if(sscanf(&metastage[metacount][1],"%[^=]=%s",(char*)&param, (char*)&stemp) != 2){
-                fprintf(stderr, "DRUN expected param=string format, but found %s\n", &metastage[metacount][1]);
+                fprintf(stderr, "LCRUN expected param=string format, but found %s\n", &metastage[metacount][1]);
                 return -1;
             }
             printf("flt:%s = %s\n",param,stemp);
             if (lc_put_meta_str(&dconf[0], param, stemp) || 
                 lc_put_meta_str(&dconf[1], param, stemp) ||
                 lc_put_meta_str(&dconf[2], param, stemp))
-                fprintf(stderr, "DRUN failed to set parameter %s to %s\n", param, stemp);
+                fprintf(stderr, "LCRUN failed to set parameter %s to %s\n", param, stemp);
         }else{
-            fprintf(stderr, "DRUN unexpected error parsing staged command-line meta parameters!\n");
+            fprintf(stderr, "LCRUN unexpected error parsing staged command-line meta parameters!\n");
             return -1;
         }
     }
 
     // Verify that there are any configurations to execute
     if(ndev<=0){
-        fprintf(stderr,"DRUN did not detect any valid devices for data acquisition.\n");
+        fprintf(stderr,"LCRUN did not detect any valid devices for data acquisition.\n");
         return -1;
     }else{
         // Unless additional devices are found, use the first for streaming
@@ -208,25 +217,25 @@ int main(int argc, char *argv[]){
         printf("Performing preliminary static measurements...");
         if(lc_open(&dconf[0])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed to open the preliminary data collection device.\n");
+            fprintf(stderr, "LCRUN failed to open the preliminary data collection device.\n");
             return -1;
         }
         if(lc_upload_config(&dconf[0])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed while configuring preliminary data collection.\n");
+            fprintf(stderr, "LCRUN failed while configuring preliminary data collection.\n");
             lc_close(&dconf[0]);
             return -1;
         }
         if(lc_stream_start(&dconf[0], -1)){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed to start preliminary data collection.\n");
+            fprintf(stderr, "LCRUN failed to start preliminary data collection.\n");
             lc_close(&dconf[0]);
             return -1;
         }
         // STREAM!
         while(!lc_stream_iscomplete(&dconf[0])){
             if(lc_stream_service(&dconf[0])){
-                fprintf(stderr, "\nDRUN failed while servicing the T7 connection!\n");
+                fprintf(stderr, "\nLCRUN failed while servicing the T7 connection!\n");
                 lc_stream_stop(&dconf[0]);
                 lc_close(&dconf[0]);
                 return -1;
@@ -234,14 +243,14 @@ int main(int argc, char *argv[]){
         }
         if(lc_stream_stop(&dconf[0])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed to halt preliminary data collection!\n");
+            fprintf(stderr, "LCRUN failed to halt preliminary data collection!\n");
             lc_close(&dconf[0]);
             return -1;
         }
 
         dfile = fopen(pre_file,"w");
         if(dfile == NULL){
-            fprintf(stderr, "DRUN failed to open pre-data file: %s\n", pre_file);
+            fprintf(stderr, "LCRUN failed to open pre-data file: %s\n", pre_file);
             lc_close(&dconf[0]);
             return -1;
         }
@@ -254,16 +263,15 @@ int main(int argc, char *argv[]){
         printf("DONE\n");
     }
 
-
     // Perform the streaming data collection process
     if(lc_open(&dconf[stream_dev])){
         printf("FAILED\n");
-        fprintf(stderr, "DRUN failed to open the device for streaming.\n");
+        fprintf(stderr, "LCRUN failed to open the device for streaming.\n");
         return -1;
     }
     if(lc_upload_config(&dconf[stream_dev])){
         printf("FAILED\n");
-        fprintf(stderr, "DRUN failed while configuring the data stream.\n");
+        fprintf(stderr, "LCRUN failed while configuring the data stream.\n");
         lc_close(&dconf[stream_dev]);
         return -1;
     }
@@ -272,7 +280,7 @@ int main(int argc, char *argv[]){
     // Prep the data file
     dfile = fopen(data_file,"w");
     if(dfile == NULL){
-        fprintf(stderr, "DRUN failed to open pre-data file: %s\n", pre_file);
+        fprintf(stderr, "LCRUN failed to open pre-data file: %s\n", pre_file);
         lc_close(&dconf[0]);
         return -1;
     }
@@ -286,7 +294,7 @@ int main(int argc, char *argv[]){
     // Start the data collection
     if(lc_stream_start(&dconf[stream_dev], -1)){
         printf("FAILED\n");
-        fprintf(stderr, "DRUN failed to start the data stream.\n");
+        fprintf(stderr, "LCRUN failed to start the data stream.\n");
         lc_close(&dconf[stream_dev]);
         return -1;
     }
@@ -295,7 +303,7 @@ int main(int argc, char *argv[]){
     for(count=0; go; count++){
         if(lc_stream_service(&dconf[stream_dev])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed while trying to service the data stream!\n");
+            fprintf(stderr, "LCRUN failed while trying to service the data stream!\n");
             lc_stream_stop(&dconf[stream_dev]);
             lc_close(&dconf[stream_dev]);
             lct_finish_keypress();
@@ -313,7 +321,7 @@ int main(int argc, char *argv[]){
 
     if(lc_stream_stop(&dconf[stream_dev])){
         printf("FAILED\n");
-        fprintf(stderr, "DRUN failed to halt the data stream!\n");
+        fprintf(stderr, "LCRUN failed to halt the data stream!\n");
         lc_close(&dconf[stream_dev]);
         return -1;
     }
@@ -325,25 +333,25 @@ int main(int argc, char *argv[]){
         printf("Performing post static measurements...");
         if(lc_open(&dconf[2])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed to open the post data collection device.\n");
+            fprintf(stderr, "LCRUN failed to open the post data collection device.\n");
             return -1;
         }
         if(lc_upload_config(&dconf[2])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed while configuring post data collection.\n");
+            fprintf(stderr, "LCRUN failed while configuring post data collection.\n");
             lc_close(&dconf[2]);
             return -1;
         }
         if(lc_stream_start(&dconf[2], -1)){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed to start post data collection.\n");
+            fprintf(stderr, "LCRUN failed to start post data collection.\n");
             lc_close(&dconf[2]);
             return -1;
         }
         // STREAM!
         while(!lc_stream_iscomplete(&dconf[2])){
             if(lc_stream_service(&dconf[2])){
-                fprintf(stderr, "\nDRUN failed while servicing the T7 connection!\n");
+                fprintf(stderr, "\nLCRUN failed while servicing the T7 connection!\n");
                 lc_stream_stop(&dconf[2]);
                 lc_close(&dconf[2]);
                 return -1;
@@ -351,14 +359,14 @@ int main(int argc, char *argv[]){
         }
         if(lc_stream_stop(&dconf[2])){
             printf("FAILED\n");
-            fprintf(stderr, "DRUN failed to halt preliminary data collection!\n");
+            fprintf(stderr, "LCRUN failed to halt preliminary data collection!\n");
             lc_close(&dconf[2]);
             return -1;
         }
 
         dfile = fopen(post_file,"w");
         if(dfile == NULL){
-            fprintf(stderr, "DRUN failed to open post-data file: %s\n", post_file);
+            fprintf(stderr, "LCRUN failed to open post-data file: %s\n", post_file);
             lc_close(&dconf[2]);
             return -1;
         }

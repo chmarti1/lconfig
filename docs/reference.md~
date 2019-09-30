@@ -1,10 +1,8 @@
 [back](documentation.md)
 
-Version 4.00<br>
-September 2019<br>
+Version 3.06<br>
+June 2019<br>
 Chris Martin<br>
-
-This is a handy quick-reference for functions and configuration options, but the authoritative and up-to-date documentation on the api and configuration interface is always in the `lconfig.h` and `lctools.h` headers themselves.
 
 ## <a name="ref:top"></a> Reference
 - [Table of configuration parameters](#params)
@@ -58,12 +56,6 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | efusec     | floating point [>0]                     | Flexible IO   | A generic time parameter for configuring EF channels.
 | efdegrees  | floating point                          | Flexible IO   | A generic phase parameter for configuring EF channels.
 | efduty     | floating point [0-1]                    | Flexible IO   | Duty cycle for a PWM output.
-| comchannel | uart, spi, i2c, 1wire, sbus             | COM           | The digital communications channel type.
-| comin      | integer                                 | COM           | The digital communications input DIO pin number.
-| comout     | integer                                 | COM           | The digital communications output DIO pin number.
-| comclock   | integer                                 | COM           | The digital communications clock DIO pin number.
-| comrate    | floating point > 0                      | COM           | The digital communications data rate in bits per second.
-| comoptions | string                                  | COM           | The digital communications channel options; a specialized string that depends on the channel type.  (e.g. UART: 8N1 bits parity stop)
 | meta        | flt/float, int/integer, str/string, stop/end/none | Meta | Starts a meta parameter stanza.  Any unrecognized parameter name after this directive will be treated as a new meta parameter of the specified type.  If stop, end, or none is specified, the meta stanza is ended, and unrecognized parameters will cause errors again.
 | flt:param   | floating point                          | Meta | Specifies a single floating point meta parameter.
 | int:param   | integer                                 | Meta | Specifies a single integer parameter
@@ -78,243 +70,123 @@ These are the data types provided by `lconfig.h`.
 ### lc_aiconf_t Struct
 
 Holds data relevant to the configuration of a single analog input channel
-```C
-// Analog input configuration
-// This includes everyting the DAQ needs to configure and AI channel
-typedef struct {
-    unsigned int    channel;     // channel number (0-13)
-    unsigned int    nchannel;    // negative channel number (0-13 or 199)
-    double          range;       // bipolar input range (0.01, 0.1, 1.0, or 10.)
-    unsigned int    resolution;  // resolution index (0-8) see T7 docs
-    double          calslope;   // calibration slope
-    double          calzero;    // calibration offset
-    char            calunits[LCONF_MAX_STR];   // calibration units
-    char            label[LCONF_MAX_STR];   // channel label
-} lc_aiconf_t;
-```
 
-[top](#ref:top)
-
+| Member | Type | Description
+|------|:---:|------
+| channel  | `unsigned int` | The physical channel number
+| nchannel | `unsigned int` | The physical number of the negative channel
+| range    | `double`       | The bipolar range (.01, .1, 1, 10)
+| resolution | `unsigned int` | The channel's resolution index
+| calslope | `double` | The channel's calibration slope (m = slope * (v - zero))
+| calzero | `double` | The channel's calibration zero
+| label | `char [LCONF_MAX_STR]` | The channel's text label
 
 ### lc_aoconf_t Struct
 
 A structure that holds data relevant to the configuration of a single analog output channel
 
-```C
-// Analog output configuration
-// This includes everything we need to know to construct a signal for output
-typedef struct {
-    unsigned int    channel;      // Channel number (0 or 1)
-    // What function type is being generated?
-    enum {LC_AO_CONSTANT, LC_AO_SINE, LC_AO_SQUARE, LC_AO_TRIANGLE, LC_AO_NOISE} signal;
-    double          amplitude;    // How big?
-    double          frequency;    // Signal frequency in Hz
-    double          offset;       // What is the mean value?
-    double          duty;         // Duty cycle for a square wave or triangle wave
-                                  // duty=1 results in all-high square and an all-rising triangle (sawtooth)
-    char            label[LCONF_MAX_STR];   // Output channel label
-} lc_aoconf_t;
-```
-
-[top](#ref:top)
-
-
-### Enumerated types
-
-The supported LabJack connection types mapped to their LJM header values.
-```C
-typedef enum {
-    LC_CON_NONE=-1,
-    LC_CON_USB=LJM_ctUSB, 
-    LC_CON_ANY=LJM_ctANY, 
-    LC_CON_ANY_TCP=LJM_ctANY_TCP,
-    LC_CON_ETH=LJM_ctETHERNET_ANY,
-    LC_CON_ETH_TCP = LJM_ctETHERNET_TCP,
-    LC_CON_ETH_UDP = LJM_ctETHERNET_UDP,
-    LC_CON_WIFI = LJM_ctWIFI_ANY,
-    LC_CON_WIFI_TCP = LJM_ctWIFI_TCP,
-    LC_CON_WIFI_UDP = LJM_ctWIFI_UDP
-} lc_con_t;
-```
-
-The supported LabJack devices mapped to their LJM header values.
-```C
-typedef enum {
-    LC_DEV_NONE=-1,
-    LC_DEV_ANY=LJM_dtANY, 
-    LC_DEV_T4=LJM_dtT4,
-    LC_DEV_T7=LJM_dtT7,
-    LC_DEV_TX=LJM_dtTSERIES,
-    LC_DEV_DIGIT=LJM_dtDIGIT
-} lc_dev_t;
-```
-
-An enumerated type defining an edge type for triggering and extended features.
-
-```C
-typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
-```
-
-[top](#ref:top)
-
+| Member | Type | Valid for | Default | Description
+|---|:---:|:---:|:---:|:---
+|channel | `unsigned int` | all | - | Specifies the physical DAC channel
+|signal | `enum` | all | - | Specifies the type of signal: `LC_AO_CONSTANT` (a DC signal with no AC), `LC_AO_SINE`, `LC_AO_SQUARE`, `LC_AO_TRIANGLE`, `LC_AO_NOISE` (a series of pseudo-random samples)
+|amplitude | `double` | sine, square, triangle, noise | `LCONF_DEF_AO_AMP` | Specifies the amplitude (max-mean) of the AC signal component in volts
+|offset | `double` | all | `LCONF_DEF_AO_OFF` | Specifies a DC offset to superimpose with the signal in volts
+|frequency | `double` | all | - | Specifies the rate at which the signal should repeat in Hz.  Determines the lowest frequency content in a white noise signal.  Constant signals should always be specified with a large frequency.
+|duty | `double` | square, triangle | 0.5 | For a square wave, `duty` indicates the fractional time spent at the high value.  For a triangle wave, `duty` indicates the fractional time spent rising.
 
 ### lc_efconf_t Struct
 
-Extended features configuration for a single channel
+A structure that holds data relevant to the configuration of a single flexible I/O channel
 
-```C
-// Flexible Input/Output configuration struct
-// This includes everything needed to configure an extended feature EF channel
-typedef struct {
-    // Flexible IO mode enumerated type
-    enum {  LC_EF_NONE,   // No extended features
-            LC_EF_PWM,    // Pulse width modulation (input/output)
-            LC_EF_COUNT,  // Counter (input/output)
-            LC_EF_FREQUENCY,  // Frequency (input)
-            LC_EF_PHASE,  // Line-to-line phase (input)
-            LC_EF_QUADRATURE  // Encoder quadrature (input)
-        } signal;
-
-    lc_edge_t edge;
-
-    enum {  LC_EF_DEBOUNCE_NONE,      // No debounce
-            LC_EF_DEBOUNCE_FIXED,     // Fixed debounce timer (rising, falling)
-            LC_EF_DEBOUNCE_RESET,     // Self restarting timer (rising, falling, all)
-            LC_EF_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
-        } debounce;
-
-    enum {  LC_EF_INPUT, LC_EF_OUTPUT } direction;
-    int channel;
-    double time;        // Time parameter (us)
-    double duty;        // PWM duty cycle (0-1)
-    double phase;       // Phase parameters (degrees)
-    unsigned int counts; // Pulse count
-    char label[LCONF_MAX_STR];
-} lc_efconf_t;
-
-```
-
-[top](#ref:top)
-
-
-### lc_comconf_t Struct
-
-```C
-// Digital Communications Configuration Structure
-//
-typedef struct {
-    enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
-    char label[LCONF_MAX_STR];
-    double rate;                // Data rate in bits/sec
-    int pin_in;                 // Physical input DIO pin
-    int pin_out;                // Physical output DIO pin
-    int pin_clock;              // Physical clock DIO pin
-    // All interface-specific configuration options are included in the
-    // "options" union.  There is a separate member for each supported interface
-    union {
-        struct {
-            unsigned int bits;
-            enum {LC_PARITY_NONE=0, LC_PARITY_ODD=1, LC_PARITY_EVEN=2} parity;
-            unsigned int stop;
-        } uart;
-    } options;
-} lc_comconf_t;
-```
-
-[top](#ref:top)
-
-
-### lc_meta_t Struct
-
-```C
-// The lc_meta_t is a struct for user-defined flexible parameters.
-// These are not used to configure the DAQ, but simply data of record
-// relevant to the measurement.  They may be needed by the parent program
-// they could hold calibration information, or they may simply be a way
-// to make notes about the experiment.
-typedef struct {
-    char param[LCONF_MAX_STR];      // parameter name
-    union {
-        char svalue[LCONF_MAX_STR];
-        int ivalue;
-        double fvalue;
-    } value;                        // union for flexible data types
-    char type;                      // reminder of what type we have
-} lc_meta_t;
-```
-[top](#ref:top)
-
+| Member | Type | Valid for | Default | Description
+|---|:---:|:---:|:---:|:---
+|channel | `int` | all | - | Specifies the physical EF channel [0-7]
+|direction | `enum` | all | `LC_EF_INPUT` | Specifies input/output direction: `LC_EF_INPUT`, `LC_EF_OUTPUT`
+|signal | `enum` | all | - | Specifies the behavior for the channel: `LC_EF_NONE`, `LC_EF_PWM`, `LC_EF_COUNT`, `LC_EF_FREQUENCY`, `LC_EF_PHASE`, `LC_EF_QUADRATURE`
+|edge | `enum` | pwm, phase, count | `LC_EF_RISING` | Specifies which edge should be interpreted by the channel: `LC_EF_RISING`, `LC_EF_FALLING`, `LC_EF_ALL`
+|debounce | `enum` | count | `LC_EF_DEBOUNCE_NONE` | Specifies which debounce filter should be used by the interrupt counter: `LC_EF_DEBOUNCE_NONE`, `LC_EF_DEBOUNCE_FIXED`, `LC_EF_DEBOUNCE_RESTART`, `LC_EF_DEBOUNCE_MINIMUM`
+|time  | `double` | count, pwm, frequency, phase | 0. | In microseconds, specifies the debounce duration for counters, indicates the measured period in PWM and frequency modes, and indicates the measured delay in phase mode.
+|phase | `double` | pwm | 0. | In degrees, indicates the phase of a PWM output.  This can be useful for motor driver applications.
+|duty | `double` | pwm | 0.5 | Indicates the duty cycle (measured or commanded) of a PWM signal.
+|counts | `unsigned int` | count, pwm, phase, frequency | 0 | Indicates the status of a counter input, the measured period of a PWM or frequency input (in ticks), or the measured delay of a phase input (in ticks).
 
 ### lc_ringbuf_t Struct
 
 This structure is responsible for managing the data stream behind the scenes.  This ring buffer struct is designed to allow data to stream continuously in chunks called "blocks."  These are nothing more than the size of the data blocks sent by `LJM_eReadStream()`, and LCONFIG always sets them to LCONF_SAMPLES_PER_READ samples per channel.
 
-```C
-// Ring Buffer structure
-// The LCONF ring buffer supports reading and writing in R/W blocks that mimic
-// the T7 stream read block.  
-typedef struct {
-    unsigned int size_samples;      // length of the buffer array (NOT per channel)
-    unsigned int blocksize_samples; // size of each read/write block
-    unsigned int samples_per_read;  // samples per channel in each block
-    unsigned int samples_read;      // number of samples read since streaming began
-    unsigned int samples_streamed;  // number of samples streamed from the T7
-    unsigned int channels;          // channels in the stream
-    unsigned int read;              // beginning index of the next read block
-    unsigned int write;             // beginning index of the next write block
-    double* buffer;                 // the buffer array
-} lc_ringbuf_t;
-```
-[top](#ref:top)
+| Member | Subordinate | Type | Description 
+|---|---|:---:|:---
+|size_samples | | `unsigned int` | The total size of the buffer (NOT per channel)
+|blocksize_samples | | `unsigned int` | The total size of each read/write block (NOT per channel)
+|samples_per_read | | `unsigned int` | Samples per channel in each read/write block
+|samples_read | | `unsigned int` | A record of the samples per channel read from the buffer by the application.
+|samples_streamed | | `unsigned int` | A record of the samples per channel read into the buffer from the T7.
+|channels | | `unsigned int` | The number of channels currently in the data stream.
+|read | | `unsigned int` | The index in the data buffer to start reading.  When `read == write`, the buffer is empty.  When the buffer is emptied, `read` is forced to be equal to `size_samples`.
+|write | | `unsigned int` | The index in the data buffer where new samples should be written.
+|buffer | | `double *` | The starting address of the buffer.
+
+### lc_meta_t Struct
+
+A structure that defines a single meta parameter
+
+| Member | Subordinate | Type | Description 
+|---|---|:---:|:---
+|param | | `char[LCONF_MAX_STR]` | The string name of the meta parameter
+|value | | `union` | A union for containing the value as an integer, double, or string
+| | svalue | `char[LCONF_MAX_STR]` | A string value
+| | ivalue | `int` | An integer value
+| | fvalue | `double` | A floating point value
+|type | | `char` | A character indicating the meta type: `'f'` for float, `'i'` for int, or `'s'` for a string
+
+### lc_comconf_t Struct
+
+A structure that defines a digital communications interface.  Some of the members are only used for specific interfaces, so the "Valid for" column describes how.
+
+| Member | Type | Valid for | Default | Description
+|---|:---:|:---:|:---:|:---
+|type | `enum` | - | `LC_COM_NONE` | Defines the channel signal type: `LC_COM_NONE`, `LC_COM_UART`, `LC_COM_1WIRE`, `LC_COM_SPI`, `LC_COM_I2C`, `LC_COM_SBUS`.
+|label | `char[LCONF_MAX_STR]` | all | - | Label string for the channel
+|rate | `double` | type-dependent | all | - | The data rate for the channel
+|pin_in | `int` | UART | -1 | The physical DIO pin number for the input channel
+|pin_out | `int` | UART | -1 | The physical DIO pin number for the output channel
+|pin_clock | `int` | - | -1 | The physical DIP pin number for the clock signal
+|options | `union` | all | - | A union of structs used for type-specific configuration
 
 
 ### lc_devconf_t Struct
 
 This structure contains all of the information needed to configure a device.  This is the workhorse data type, and usually it is the only one that needs to be explicitly used in the host application.
 
-```C
-typedef struct devconf {
-    // Global configuration
-    lc_con_t connection;                 // requested connection type index
-    lc_con_t connection_act;             // actual connection type index
-    lc_dev_t device;                     // The requested device type index
-    lc_dev_t device_act;                 // The actual device type
-    char ip[LCONF_MAX_STR];         // ip address string
-    char gateway[LCONF_MAX_STR];    // gateway address string
-    char subnet[LCONF_MAX_STR];     // subnet mask string
-    char serial[LCONF_MAX_STR];     // serial number string
-    char name[LCONF_MAX_NAME];      // device name string
-    int handle;                     // device handle
-    double samplehz;                // *sample rate in Hz
-    double settleus;                // *settling time in us
-    unsigned int nsample;           // *number of samples per read
-    // Analog input
-    lc_aiconf_t aich[LCONF_MAX_NAICH];    // analog input configuration array
-    unsigned int naich;             // number of configured analog input channels
-    // Digital input streaming
-    unsigned int distream;          // input stream mask
-    // Analog output
-    lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
-    unsigned int naoch;             // number of configured analog output channels
-    // Flexible Input/output
-    double effrequency;            // flexible input/output frequency
-    lc_efconf_t efch[LCONF_MAX_NEFCH]; // flexible digital input/output
-    unsigned int nefch;            // how many of the EF are configured?
-    // Communication
-    lc_comconf_t comch[LCONF_MAX_COMCH]; // Communication channels
-    unsigned int ncomch;            // how many of the com channels are configured?
-    // Trigger
-    int trigchannel;                // Which channel should be used for the trigger?
-    unsigned int trigpre;           // How many pre-trigger samples?
-    unsigned int trigmem;           // Persistent memory for the trigger
-    double triglevel;               // What voltage should the trigger seek?
-    lc_edge_t trigedge; // Trigger edge
-    enum {LC_TRIG_IDLE, LC_TRIG_PRE, LC_TRIG_ARMED, LC_TRIG_ACTIVE} trigstate; // Trigger state
-    // Meta & filestream
-    lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
-    lc_ringbuf_t RB;                  // ring buffer
-} lc_devconf_t;
-```
+| Member | Type | Valid values | Description
+|---|:---:|:---:|---
+|connection | `int` | `LJM_ctUSB`, `LJM_ctETH`, `LJM_ctANY` | Integer corresponding to the connection type.  The values are those recognized by LabJack's `LJM_Open` function.
+|connection_act | `int` | -1, `LJM_ctUSB`, `LJM_ctETH` | The actual connection used (useful when ANY was specified).  -1 when the device is not open.
+|device | `int` | `LJM_dtANY`, `LJM_dtT4`, `LJM_dtT7` | Specifies a type of device.
+|device_act| `int` | -1, `LJM_T4`, `LJM_T7` | Specifies the type of devices actually opened.  -1 when no device is open.
+|ip | `char[LCONF_MAX_STR]` | XXX.XXX.XXX.XXX | The T7's IP address.  Used to WRITE the IP address in USB mode, and used to find the device in ETH mode.
+|gateway | `char[LCONF_MAX_STR]` | XXX.XXX.XXX.XXX | The default TCP/IP gateway.
+|subnet | `char[LCONF_MAX_STR]` | XXX.XXX.XXX.XXX | The TCP/IP subnet mask.
+|serial | `char[LCONF_MAX_STR]` | decimal characters | The device serial number. Used to find the device in USB mode and only if an IP address is not supplied in ETH mode.
+|aich | `AICONF[LCONF_MAX_NAICH]` | - | An array of `AICONF` structs for configuring input channels.
+|naich | `unsigned int` | - | The number of aich entries that have been configured
+|diostream | `int` | - | A 16-bit mask for which of the EF/EIO channels should be streamed
+|aoch | `AOCONF[LCONF_MAX_NAOCH]` | - | An array of `AOCONF` structs for configuring output channels
+|naoch | `unsigned int` | - | The number of aoch entries that have been configured
+|trigchannel |  `int` | -1 | The `aich` channel to test for a trigger event
+|trigmem |  `unsigned int` | 0 | Memory used in the trigger test
+|triglevel | `double` | 0. | The trigger threshold in volts
+|trigedge | `enum{TRIG_RISING, TRIG_FALLING, TRIG_ALL}` | `TRIG_RISING` | Trigger edge type
+|trigstate | `enum{TRIG_IDLE, TRIG_PRE, TRIG_ARMED, TRIG_ACTIVE}`, | `TRIG_IDLE` | Trigger operational state
+|effrequency | `double` | -1 | The flexible digital input/output rollover frequency
+|efch | `EFCONF[LCONF_MAX_NEFCH]` | - | An array of `EFCONF` structs for configuring flexible digital I/O channels
+|nefch| `unsigned int` | - | The number of efch entries that have been configured
+|handle | `int` | - | The device handle returned by the `LJM_Open` function
+|samplehz | `double`| positive frequency | The sample rate in Hz. This value will be overwritten with the ACTUAL device sample rate once an acquisition process has begun.
+|settleus | `double`| positive time | The multiplexer settling time for each sample in microseconds
+|nsample | `unsigned int` | - | Number of samples to read per each stream read operation
+|meta | `METACONF[LCONF_MAX_META]` | - | An array of meta configuration parameters
+|RB | `RINGBUFFER` | - | The data stream's buffer
 
 [top](#ref:top)
 

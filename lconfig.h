@@ -37,7 +37,7 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LCONF_VERSION 3.06   // Track modifications in the header
+#define LCONF_VERSION 4.00   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LCONF_VERSION
@@ -138,11 +138,17 @@ with init_data_file() and write_data_file() utilities.
 - Implemented a new funciton naming scheme
 - Implemented digital communications interface
 - Replaced configuration array/index pairs with a single configuration pointer
+    in virtually all lconfig functions.
 - Removed DOWNLOAD_CONFIG
 - Changed "FIO" to "EF" to conform to LJ's extended features naming.
 - Created the LCM mapping interface for consistent mappings between enumerated
     types, their configuration strings, and human-readable messgaes.  This ALSO
     corrected a bug in the extended feature debounce filter settings.
+- Renamed the binaries from drun and dburst to lcrun and lcburst
+- Added LCTOOLS tools for building simple UIs in terminals without Ncurses
+- Rewrote LC_SHOW_CONFIG to no longer attempt to verify live parameters
+- Added LC_COMMUNICATE, LC_COM_START, LC_COM_STOP, LC_COM_READ, and LC_COM_WRITE
+    for digital communications support.
 
 */
 
@@ -181,7 +187,7 @@ with init_data_file() and write_data_file() utilities.
 #define LCONF_DEF_EF_TIMEOUT 1000
 
 #define LCONF_NOERR 0
-#define LCONF_ERROR 1
+#define LCONF_ERROR -1
 
 
 /*
@@ -262,10 +268,12 @@ typedef struct {
 typedef struct {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
     char label[LCONF_MAX_STR];
-    double rate;
-    int pin_in;
-    int pin_out;
-    int pin_clock;
+    double rate;                // Data rate in bits/sec
+    int pin_in;                 // Physical input DIO pin
+    int pin_out;                // Physical output DIO pin
+    int pin_clock;              // Physical clock DIO pin
+    // All interface-specific configuration options are included in the
+    // "options" union.  There is a separate member for each supported interface
     union {
         struct {
             unsigned int bits;
@@ -914,8 +922,12 @@ an array to transmit over the channel of length TXLENGTH.  The RXBUFFER is an
 array of data to listen for with length RXLENGTH.
 
 If positive, the TIMEOUT_MS is the time in milliseconds to wait for a reply 
-before rasing an error.  If RXLENGTH is zero, the reply is ignored, and if 
-TIMEOUT_MS is negative, then COMMUNICATE will wait indefinitely.
+before rasing an error.  If TIMEOUT_MS is negative, then COMMUNICATE will 
+immediately respond with whatever data were waiting.  If TIMEOUT_MS is precisely
+zero, then COMMUNICATE will wait indefinitely until RXLENGTH bytes of data are
+available.  Otherwise, TIMEOUT_MS is the number of milliseconds to wait for 
+RXLENGTH bytes to arrive.  If RXLENGTH is zero, then the read operation will be
+skipped altogether.
 
 In UART mode, the applicaiton should only read and write to odd-indexed values
 of the buffers.  The LJM interface encodes UART data in 16-bit registers padded

@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 3.06<br>
-June 2019<br>
+Version 4.00<br>
+September 2019<br>
 Chris Martin<br>
 
 ## Post processing

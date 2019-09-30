@@ -1,6 +1,6 @@
 TODIR=/usr/local/bin
-DBURST="$(TODIR)/dburst"
-DRUN="$(TODIR)/drun"
+LCBURST="$(TODIR)/lcburst"
+LCRUN="$(TODIR)/lcrun"
 
 #LINK=-lljacklm -lLabJackM -lm
 LINK=-lLabJackM -lm
@@ -15,13 +15,13 @@ lctools.o: lctools.c lctools.h lconfig.o
 
 # The Binaries...
 #
-drun.bin: lconfig.o lctools.o drun.c
-	gcc lconfig.o lctools.o drun.c $(LINK) -o drun.bin
-	chmod +x drun.bin
+lcrun.bin: lconfig.o lctools.o lcrun.c
+	gcc lconfig.o lctools.o lcrun.c $(LINK) -o lcrun.bin
+	chmod +x lcrun.bin
 
-dburst.bin: lconfig.o dburst.c
-	gcc lconfig.o dburst.c $(LINK) -o dburst.bin
-	chmod +x dburst.bin
+lcburst.bin: lconfig.o lcburst.c
+	gcc lconfig.o lctools.o lcburst.c $(LINK) -o lcburst.bin
+	chmod +x lcburst.bin
 
 test: lconfig.o test.c
 	gcc lconfig.o test.c $(LINK) -o test
@@ -31,8 +31,8 @@ clean:
 	rm -f *.o
 	rm -f *.bin
 
-install: dburst.bin drun.bin
-	cp -f drun.bin $(DRUN)
-	chmod 755 $(DRUN)
-	cp -f dburst.bin $(DBURST)
-	chmod 755 $(DBURST)
+install: lcburst.bin lcrun.bin
+	cp -f lcrun.bin $(LCRUN)
+	chmod 755 $(LCRUN)
+	cp -f lcburst.bin $(LCBURST)
+	chmod 755 $(LCBURST)

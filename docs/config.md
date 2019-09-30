@@ -15,6 +15,8 @@ Chris Martin<br>
 - [Digital input streaming](#di)
 - [Analog output](#ao)
 - [Triggering](#trigger)
+- [Extended features](#ef)
+- [Digital communication](#com)
 - [Meta parameters](#meta)
 
 
@@ -245,6 +247,53 @@ airange 10
 trigchannel 0
 triglevel 2.5
 trigedge rising
+```
+
+### <a name="ef"></a> Extended features
+
+Digital input-output extended features can be configured just like an analog input or output.  The biggest difference is that they do not participate in streaming, so applications need to interact with them via the `lc_update_ef` function.
+
+An extended feature channel is created by the `EFCHANNEL` parameter, which accepts a single integer digital pin number on which the channel is to be configured.  Like the analog channels, extended features can be given a string label using the `EFLABEL` parameter.
+
+The function of the channel is determined by the `EFSIGNAL` and `EFDIRECTION` parameters.  The direction indicates whether the channel is an input or an output.  The signal indicates what kind of extended feature is to be used.
+
+Because of the way LabJacks manage the internal timing for the extended features, all extended feature output signals share a single global `EFFREQUENCY` parameter that defines their repetition rate.  For example, the following example configures two pulse-width-modulated outputs with one signal phase-shifted relative to the first.  Both signals will share the same 1000Hz frequency.
+
+```bash
+effrequency 1000
+
+efchannel 0
+eflabel "Primary PWM Output"
+efsignal pwm
+efdirection output
+efduty 0.75
+
+efchannel 1
+eflabel "Secondary PWM Output"
+efsignal pwm
+efdirection output
+efduty 0.25
+efdegrees 270
+```
+
+The LCONFIG system supports most of the LabJack EF features, but the functional interface is not very thoroughly developed as of version 4.00.  Enabling features require calling the `lc_update_ef()` function, and applications must acquire measurement results directly from the `lc_devconf_t` struct.  This is intended to change in the near future.
+
+For now, the behavior of the extended features is sufficiently complicated and changing quickly enough, that detailed documentation here is not warranted.  For detailed documentation of the extended features support, see the comments of the `lc_load_config()` function in the `lconfig.h` header file.
+
+### <a name="com"></a> Digital communication
+
+LabJack's T-series includes support for Universal Asynchronous Receive/Transmit (UART), Serial Peripheral Interface (SPI), Inter-Integrated Circuit (I2C), One-Wire, and SBUS digital interfaces.  As of version 4.00, LConfig only supports UART, but there are plans to expand support in the future.
+
+Unlike the other interfaces, COM channels are not set up starting with their physical pin number because most COM channels include a number of physical pins.  Instead, COM channels are created by the `COMCHANNEL` parameter, which is expected to be followed by `UART`, `SPI`, `I2C`, `1WIRE`, or `SBUS`.  The parameters that follow will depend on which interface is selected.
+
+The example below shows a typical configuration for a UART channel.  Here, we see the Rx and Tx pin numbers are selected by the `COMIN` and `COMOUT` parameters.  The baud rate is selected by the `COMRATE` parameter.  The `COMOPTIONS` parameter expects a formatted string to specify the number of bits per transmission, the "parity", and the number of stop bits.  Parity can be (N)one, (E)ven, or (O)dd.  
+
+```bash
+comchannel uart
+comin 8
+comout 9
+comrate 9600
+comoptions 8N1
 ```
 
 ### <a name="meta"></a> Meta parameters

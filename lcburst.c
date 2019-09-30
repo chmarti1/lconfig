@@ -58,7 +58,11 @@ const char help_text[] = \
 "\n"\
 "-c CONFIGFILE\n"\
 "  Specifies the LCONFIG configuration file to be used to configure the\n"\
-"  LabJack T7.  By default, LCBURST will look for lcburst.conf\n"\
+"  LabJack.  By default, LCBURST will look for lcburst.conf\n"\
+"\n"\
+"-d DATAFILE\n"\
+"  Specifies the data file to output.  This overrides the default, which is\n"\
+"  constructed from the current date and time: \"YYYYMMDDHHmmSS_lcburst.dat\"\n"\
 "\n"\
 "-f param=value\n"\
 "-i param=value\n"\
@@ -124,9 +128,10 @@ int main(int argc, char *argv[]){
     char    optchar;
     // Configuration results
     char    config_file[MAXSTR] = DEF_CONFIGFILE,
-            data_file[MAXSTR] = DEF_DATAFILE;
+            data_file[MAXSTR] = "\0";
     int     samples = 0, 
             duration = 0;
+    time_t  start;
 
     // Finally, the essentials; a data file and the device configuration
     FILE *dfile;
@@ -267,6 +272,11 @@ int main(int argc, char *argv[]){
         default:
             break;
         }
+    }
+    // If the data file was not configured, use the timestamp to create a name
+    if(data_file[0] == '\0'){
+        time(&start);
+        strftime(data_file, MAXSTR, "%Y%m%d%H%M%S_lcburst.dat", localtime(&start));
     }
 
     // Calculate the number of samples to collect

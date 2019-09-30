@@ -566,7 +566,8 @@ int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* f
     FILE* ff;
 
     if(devmax>LCONF_MAX_NDEV){
-        print_error( "LCONFIG: LOAD_CONFIG called with %d devices, but only %d are supported.\n");
+        print_error( "LCONFIG: LOAD_CONFIG called with %d devices, but only %d are supported.\n",
+                devmax, LCONF_MAX_NDEV);
         return LCONF_ERROR;
     }
 
@@ -2280,9 +2281,7 @@ int lc_upload_config(lc_devconf_t* dconf){
 
 void lc_show_config(lc_devconf_t* dconf){
     int ainum,aonum,efnum,comnum,metanum,metacnt, itemp, ii;
-    char value1[LCONF_MAX_STR], value2[LCONF_MAX_STR];
-    char *fmt;
-    lc_devconf_t live;
+    char value1[LCONF_MAX_STR];
 
     // download the live parameters for compairson
     //download_config(dconf, &live);
@@ -2297,6 +2296,11 @@ void lc_show_config(lc_devconf_t* dconf){
             "Connection Type",
             lcm_get_message(lcm_connection, dconf->connection),
             lcm_get_message(lcm_connection, dconf->connection_act));
+    // Device type
+    printf(SHOW_PARAM "%s (actual: " LC_FONT_BOLD "%s)\n" LC_FONT_NULL,
+            "Device Type",
+            lcm_get_message(lcm_device, dconf->device),
+            lcm_get_message(lcm_device, dconf->device_act));
     // Device Name    
     printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL, 
             "Device Name", dconf->name);
@@ -2432,7 +2436,7 @@ void lc_show_config(lc_devconf_t* dconf){
                 "Direction", lcm_get_message(lcm_ef_direction, dconf->efch[efnum].direction));
         printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL,
                 "Signal Type", lcm_get_message(lcm_ef_signal, dconf->efch[efnum].signal));
-        printf(SHOW_PARAM LC_FONT_BOLD "%d\n" LC_FONT_NULL,
+        printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL,
                 "Signal Type", lcm_get_message(lcm_ef_signal, dconf->efch[efnum].signal));
     }
 
@@ -2598,7 +2602,6 @@ int lc_communicate(lc_devconf_t* dconf,
         char *rxbuffer, const unsigned int rxlength,
         const int timeout_ms){
     
-    int received;
     if(lc_com_start(dconf, comchannel, rxlength)){
         print_error("COMMUNICATE: Failed to start.\n");
         return LCONF_ERROR;
@@ -2623,8 +2626,7 @@ int lc_com_start(lc_devconf_t* dconf, const unsigned int comchannel,
         const unsigned int rxlength){
 
     lc_comconf_t *com;
-    int err, err2;
-    double ftemp;
+    int err;
     
     // Verify that the channel number is legal
     if(comchannel > LCONF_MAX_NCOMCH){
@@ -2660,12 +2662,15 @@ int lc_com_start(lc_devconf_t* dconf, const unsigned int comchannel,
             print_error( "COM_START: There was an error configuring the UART interface.\n%s\n", err_str);
             return LCONF_ERROR;
         }
-        break;
+        return LCONF_NOERR;
     default:
         print_error( "COM_START: Channel %d interface, %s, is not supported.\n", 
                 comchannel, lcm_get_message(lcm_com_channel, com->type));
         return LCONF_ERROR;
     }
+    
+    print_error("COM_START: This error should never appear!\n  Bad things have happened!\n");
+    return LCONF_ERROR;
 }
 
  
