@@ -7,7 +7,7 @@ Assistant Professor of Mechanical Engineering<br>
 Penn State University<br>
  [crm28@psu.edu](mailto:crm28@psu.edu)
 
-Version 3.06
+Version 4.00
 
 ### Foreword
 
@@ -20,8 +20,7 @@ For detailed documentation on the LCONFIG package, use these links:
 - [Reference](docs/reference.md)
 
 ---
-***
-d
+
 ### Contents 
 
 - [About](#about)
@@ -38,9 +37,9 @@ This little **L**aboratory **CONFIG**uration system is designed to work with tex
 
 All of the acquisition tools are written in C, and only the top-level binaries are specifically written for Linux.  Some minor tweaks should make the base system suitable for Windows.  Still, unless you are ready to dive into the source, I don't recommend it.
 
-I have included two binaries, `drun` and `dburst`, built on the LConfig system that do most of the jobs I need in the lab that also serve as examples for how to use LConfig.  `dburst` collects high speed data in short bursts, and `drun` streams data directly to a data file until I tell it to stop.  It will run as long as you have hard drive space, so tests that last for days, months, or years become possible.  If these binaries don't work for you, the back-end configuration is contained in `lconfig.c` and `lconfig.h`.  I occasionally build specialized codes on them, but for the most part, the `d*` binaries are good enough.
+I have included two binaries, `lcrun` and `lcburst`, built on the LConfig system that do most of the jobs I need in the lab that also serve as examples for how to use LConfig.  `lcburst` collects high speed data in short bursts, and `lcrun` streams data directly to a data file until I tell it to stop.  It will run as long as you have hard drive space, so tests that last for days, months, or years become possible.  If these binaries don't work for you, the back-end configuration is contained in `lconfig.c`, `lconfig.h`, `lctools.c`, and `lctools.h`.  I occasionally build specialized codes on them, but for the most part, the binaries are good enough.
 
-While I do my best to keep this README up to date, the authoritative documentation for the behavior of LCONFIG is contained in `lconfig.h`.  Each function has comments that defines its behavior, and there are even some examples that indicate how the functions should be used.  There is also a changelog commented at the top of the header.
+While I do my best to keep this README up to date, the authoritative documentation for the behavior of LCONFIG is contained in the headers, `lconfig.h` and `lctools.h`.  Each function has comments that defines its behavior, and there are even some examples that indicate how the functions should be used.  The comments to the `lc_load_config()` function give a detailed description for each configuration parameter.  There is also a changelog commented at the top of the header.
 
 ## Features
 LCONFIG allows automatic configuration and control of most of the T4/T7's advanced features with a few added features for easier post-processing of the data.
