@@ -261,9 +261,9 @@ int lct_diter_init(lc_devconf_t *dconf, lct_diter_t *diter,
         diter->next = NULL;
         return -1;
     }
-    diter->increment = sizeof(double) * ii;
+    diter->increment = &data[channel+ii] - &data[channel];
     diter->next = &data[channel];
-    diter->last = &data[data_size];
+    diter->last = &data[data_size-1];
     return 0;
 }
 
@@ -333,3 +333,57 @@ void lct_cal_inplace(lc_devconf_t *dconf,
     return;
 }
 
+/* LCT_CAL
+.   Apply the channel calibration from AI channel AINUM to a raw voltage 
+.	measurement.  Returns the calibrated measurement in engineering units.
+.	If the AINUM value is not a valid analog input channel, LCT_CAL returns
+.	-1.  Otherwise, the value in DATA is adjusted in-place.
+*/
+int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data){
+	if(ainum >= dconf->naich){
+		fprintf(stderr, "LCT_CAL: Analog input channel %d is out of range.  Only %d are configured.\n", ainum, dconf->naich);
+		return LCONF_ERROR;
+	}
+	*data = (*data - dconf->aich[ainum].calzero) * dconf->aich[ainum].calslope;
+	return LCONF_NOERR;
+}
+
+
+int lct_stream_mean(lc_devconf_t *dconf, double values[], unsigned int maxchannels){
+	lct_diter_t diter;
+	double *block, *samples;
+	int ii, N, nistream;
+	unsigned int channels, samples_per_read;
+	
+	nistream = lc_nistream(dconf);
+	if(maxchannels < nistream){
+		fprintf(stderr, "LCT_MEAN: The device is configured for %d channels, but memory for only %d was provided\n", nistream, maxchannels);
+		return LCONF_ERROR;
+	}
+	
+	// Initialize the sample count
+	N = 0;
+	// Initialize the values
+	memset(values, 0, maxchannels*sizeof(double));
+	// 
+	lc_stream_read(dconf, &block, &channels, &samples_per_read);
+	if(!block)
+		return LCONF_NOERR;
+	while(block){
+		lct_diter_init(dconf, &diter, block, channels*samples_per_read, 0);
+		N += samples_per_read;
+		while(samples = lct_diter_next(&diter)){
+			for(ii=0; ii<nistream; ii++){
+				values[ii] += samples[ii];
+				//printf("%f  ", samples[ii]);
+			}
+			//printf("\n");
+		}
+		lc_stream_read(dconf, &block, &channels, &samples_per_read);
+	}
+	//printf("...\n");
+	// Finally, divide by the number of samples
+	for(ii=0;ii<nistream;ii++)
+		values[ii] /= N;
+	return LCONF_NOERR;
+}

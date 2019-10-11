@@ -22,6 +22,14 @@
 simplified user interface, applying calibrations, and referencing data using the
 LCONFIG system.  The display functions leverage the console control and escape
 sequences for the Linux console environment.
+
+CHANGELOG
+
+v1.1	10/2019		
+- Debugged the diter utility functions.
+- Added STREAM_MEAN and CAL functions
+
+v1.0	9/2019		ORIGINAL RELEASE
 */
 
 #ifndef __LCTOOLS
@@ -288,5 +296,18 @@ double * lct_data(lc_devconf_t *dconf,
 void lct_cal_inplace(lc_devconf_t *dconf, 
                 double data[], unsigned int data_size);
 
+
+/* LCT_CAL
+.   Apply the channel calibration from AI channel AINUM to a raw voltage 
+.	measurement.  Returns the calibrated measurement in engineering units.
+*/
+int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data);
+
+
+/* LCT_STREAM_MEAN
+.	Retrieve the averages for all data currently in the buffer.  
+.	STREAM_MEAN calls LC_DATA_READ until the buffer is empty.
+*/
+int lct_stream_mean(lc_devconf_t *dconf, double values[], unsigned int maxchannels);
 
 #endif

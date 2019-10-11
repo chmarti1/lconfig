@@ -1988,12 +1988,12 @@ int lc_upload_config(lc_devconf_t* dconf){
     lc_efchannels(dconf, &minch, &maxch);
     for(efnum=minch; efnum<=maxch; efnum++){
         sprintf(stemp, "DIO%d_EF_ENABLE", efnum);
-        err = err ? err : LJM_eWriteName(handle, stemp, 0);
+        if(LJM_eWriteName(handle, stemp, 0)){
+			print_error("UPLOAD: Failed to disable DIO extended features on channel DIO%d\n", efnum);
+			uploadfail();
+		}
     }
-    if(err){
-        print_error("UPLOAD: Failed to disable DIO extended features\n");
-        uploadfail();
-    }
+
     // Determine the clock 0 rollover and clock divisor from the EFFREQUENCY parameter
     if(dconf->effrequency>0)
         ftemp = 1e6 * LCONF_CLOCK_MHZ / dconf->effrequency;

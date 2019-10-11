@@ -150,6 +150,11 @@ with init_data_file() and write_data_file() utilities.
 - Added LC_COMMUNICATE, LC_COM_START, LC_COM_STOP, LC_COM_READ, and LC_COM_WRITE
     for digital communications support.
 
+** 4.01
+10/2019
+- Returned LC_STREAM_CLEAN to the header file to allow repeated use of a 
+	stream.
+
 */
 
 #define TWOPI 6.283185307179586
@@ -1085,6 +1090,13 @@ int lc_stream_read(lc_devconf_t* dconf, double **data,
 Halt an active stream on device devnum.
 */
 int lc_stream_stop(lc_devconf_t* dconf);
+
+/*STREAM_CLEAN
+De-allocates the memory assigned to the internal ring-buffer.  This is 
+not automatically done by LC_STREAM_STOP so that data will be available
+after the collection process has completed.
+ */
+int lc_stream_clean(lc_devconf_t* dconf);
 
 /*
 .
