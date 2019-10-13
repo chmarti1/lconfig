@@ -153,8 +153,12 @@ with init_data_file() and write_data_file() utilities.
 ** 4.01
 10/2019
 - Returned LC_STREAM_CLEAN to the header file to allow repeated use of a 
-	stream.
+    stream.
 
+** 4.02
+10/2019
+- No changes to the core LCONFIG system; updated lconfig.py for post-processing
+    consistent with the 4.00 changes.
 */
 
 #define TWOPI 6.283185307179586

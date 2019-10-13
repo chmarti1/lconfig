@@ -6,7 +6,7 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 
-__version__ = '4.00'
+__version__ = '4.02'
 
 
 
@@ -216,12 +216,15 @@ LE2 = LEnum(LE)
 DEF_DEV = {
     'connection':LEnum(['any', 'usb', 'eth'], values=[0,1,3]),
     'serial':'',
+    'device':LEnum(['any', 't4', 't7', 'tx', 'digit'], values=[0, 4, 7, 84, 200]),
+    'name':'',
     'ip':'',
     'gateway':'',
     'subnet':'',
     'samplehz':-1.,
     'settleus':1.,
     'nsample':64,
+    'distream':0,
     'trigchannel':-1,
     'triglevel':0.,
     'trigpre':0,
@@ -266,7 +269,7 @@ DEF_EFCH = {
 }
 
 DEF_COMCH = {
-    'comchannel':LEnum(['uart', 'spi', 'i2c', '1wire', 'sbus']),
+    'comchannel':LEnum(['none', 'uart', '1wire', 'spi', 'i2c', 'sbus']),
     'comrate':-1,
     'comin':-1,
     'comout':-1,
@@ -290,6 +293,8 @@ LConf objects are initialized with a mandatory LConfig file
     
 Once loaded, the parameters are accessed using the "get" method: 
     LC.get(devnum=0, param='samplehz')
+    LC.get(devnum=0, aich=2, param='airange')
+See help(LC.get) for more information.
 
 The optional 'data' keyword prompts the LConf object to read in the file
 as a data file instead of just a configuration file.  Additionally, the
@@ -308,7 +313,8 @@ There are methods to determine some information on what was configured
     LC.ndata()          Number of data points loaded
     LC.naich(devnum)    Number of analog inputs on device devnum
     LC.naoch(devnum)    Number of analog outputs on device devnum
-    LC.nefch(devnum)   Number of flexible IO channels on device devnum
+    LC.nefch(devnum)    Number of flexible IO channels on device devnum
+    LC.ncomch(devnum)   Number of com channels on device devnum
     
 The labels of all configured channels can also be retrieved
     LC.get_labels(devnum, source='aich')
@@ -355,7 +361,7 @@ is not intended for direct access.  Instead, use the get() function.
                     # parameters are defined by their defaults in 
                     # DEF_DEV
                     self._devconf.append({
-                            'aich':[], 'aoch':[], 'efch':[], 'meta':{}})
+                            'aich':[], 'aoch':[], 'efch':[], 'meta':{}, 'comch':[]})
                 # Detect a new analog input channel        
                 elif param == 'aichannel':
                     # Append a minimal dictionary
@@ -368,6 +374,8 @@ is not intended for direct access.  Instead, use the get() function.
                 elif param == 'efchannel':
                     # Append a minimal dictionary
                     self._devconf[-1]['efch'].append({})
+                elif param == 'comsignal':
+                    self._devconf[-1]['comch'].append({})
                     
                 #####
                 # Deal with the parameter
@@ -385,6 +393,10 @@ is not intended for direct access.  Instead, use the get() function.
                 elif param in DEF_EFCH:
                     self._devconf[-1]['efch'][-1][param] = \
                             _filter_value(value, DEF_EFCH[param])
+                elif param in DEF_COMCH:
+                    self._devconf[-1]['comch'][-1][param] = \
+                            _filter_value(value, DEF_COMCH[param])
+                            
                 # Check for meta parameters
                 elif param == 'meta':
                     if value == 'str' or value == 'string':
@@ -508,8 +520,12 @@ is not intended for direct access.  Instead, use the get() function.
         return len(self._devconf[devnum]['aoch'])
         
     def nefch(self, devnum):
-        """Return the number of flexible IO channels in device devnum"""
+        """Return the number of extended feature IO channels in device devnum"""
         return len(self._devconf[devnum]['efch'])
+        
+    def ncomch(self, devnum):
+        """Return the number of digital communication channels in device devnum"""
+        return len(self._devconf[devnum]['comch'])
         
     def ndata(self):
         """Return the number of data samples in the data set.  If no 
@@ -535,9 +551,9 @@ also be retrieved.
         return out
         
 
-    def get(self, devnum, param, aich=None, efch=None, aoch=None):
+    def get(self, devnum, param, aich=None, efch=None, aoch=None, comch=None):
         """Retrieve a parameter value
-    get(devnum, param, aich=None, efch=None, aoch=None)
+    get(devnum, param, aich=None, efch=None, aoch=None, comch=None)
 
 ** Global Parameters **
 To return a global parameter from device number devnum.  For example,
@@ -563,8 +579,8 @@ The aich can also be used to call out a channel by its label.  Channels
 without a label can never be matched, even if the string is empty.
     D.get(0, 'airange', aich='Ambient Temperature')
     
-** EF and AO configuration **
-The same rules apply for the analog output and ef channels.
+** COM, EF, and AO configuration **
+The same rules apply for the analog output, com, and ef channels.
     D.get(0, 'aosignal', aoch=0)
     
 """
@@ -595,6 +611,13 @@ The same rules apply for the analog output and ef channels.
                 efch = self._get_label(devnum, 'efch', efch)
             source = source['efch'][efch]
             default = DEF_EFCH
+        elif comch is not None:
+            # If the reference is by label, search for the correct label
+            flag = False
+            if isinstance(comch,str):
+                comch = self._get_label(devnum, 'comch', comch)
+            source = source['comch'][efch]
+            default = DEF_COMCH
             
         # If the recall is multiple    
         if hasattr(param, '__iter__'):
