@@ -214,7 +214,7 @@ LE2 = LEnum(LE)
 ###
 
 DEF_DEV = {
-    'connection':LEnum(['any', 'usb', 'eth'], values=[0,1,3]),
+    'connection':LEnum(['any', 'usb', 'eth', 'ethernet'], values=[0,1,3,3]),
     'serial':'',
     'device':LEnum(['any', 't4', 't7', 'tx', 'digit'], values=[0, 4, 7, 84, 200]),
     'name':'',
