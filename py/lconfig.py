@@ -675,6 +675,17 @@ The same rules apply for the analog output, com, and ef channels.
             raise Exception('Unrecognized parameter: %s'%param)
 
 
+    def get_meta(self, devnum, param):
+        """Retrieve a meta parameter by its name
+    value = get_meta(param)
+
+If param is a list or tuple, then the result will be returned as a tuple.
+"""
+        if isinstance(param, (tuple, list)):
+            return tuple([self.get_meta(devnum, this) for this in param])
+        return self._devconf[devnum]['meta'][param]
+
+
     def get_channel(self, aich, downsample=None, start=None, stop=None):
         """Retrieve data from channel aich
     x = get_channel(aich)
@@ -1150,9 +1161,6 @@ is 1 (no filter).
         
         # Get the channel data
         y = self.get_dichannel(dich)
-        if diff:
-            y = np.diff(y, diff)
-            y *= self.get(0, 'samplehz')**diff
         
         # State machine variables
         rising_index = None
@@ -1178,13 +1186,13 @@ is 1 (no filter).
                 if test:
                     falling_index = index
                     if rising_index and edge_mode >= 0:
-                        indices.append(rising_index+diff)
+                        indices.append(rising_index)
                         rising_index = None
                 # If the sample is less than
                 else:
                     rising_index = index
                     if falling_index and edge_mode <= 0:
-                        indices.append(falling_index+diff)
+                        indices.append(falling_index)
                         falling_index = None
                 
             if count and len(indices) >= count:
