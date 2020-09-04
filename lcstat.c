@@ -26,8 +26,8 @@
 #include <stdio.h>      // duh
 #include <time.h>       // for file stream time stamps
 
-#define DEF_CONFIGFILE  "lcburst.conf"
-#define DEF_DATAFILE    "lcburst.dat"
+#define DEF_CONFIGFILE  "lcstat.conf"
+#define DEF_DATAFILE    "lcstat.dat"
 #define DEF_SAMPLES     "-1"
 #define DEF_DURATION    "-1"
 #define MAXSTR          128
@@ -49,30 +49,24 @@ int parse_options(int argc, char*argv[]);
 . Help text
 .....................*/
 const char help_text[] = \
-"lcburst [-h] [-c CONFIGFILE] [-n SAMPLES] [-t DURATION] [-d DATAFILE]\n"\
-"     [-f|i|s param=value]\n"\
-"  Runs a single high-speed burst data colleciton operation. Data are\n"\
-"  streamed directly into ram and then saved to a file after collection\n"\
-"  is complete.  This allows higher data rates than streaming to the hard\n"\
-"  drive.\n"\
+"lcstat [-hps] [-c CONFIGFILE] [-n SAMPLES]\n"\
+"  LCSTAT is a utility that shows the status of the configured channels\n"\
+"  in real time.  The intent is that it be used to aid with debugging and\n"\
+"  setup of experiments from the command line.\n"
+"\n"\
+"  Measurement results are displayed in a table with a row for each\n"\
+"  channel configured and a column for various statistics on the signal.\n"\
+"  Measurements are streamed for at least the number of samples specified\n"\
+"  by the NSAMPLE configuration parameter or by the number specified by\n"\
+"  the -n option.\n"\
 "\n"\
 "-c CONFIGFILE\n"\
 "  Specifies the LCONFIG configuration file to be used to configure the\n"\
-"  LabJack T7.  By default, LCBURST will look for lcburst.conf\n"\
-"\n"\
-"-f param=value\n"\
-"-i param=value\n"\
-"-s param=value\n"\
-"  These flags signal the creation of a meta parameter at the command\n"\
-"  line.  f,i, and s signal the creation of a float, integer, or string\n"\
-"  meta parameter that will be written to the data file header.\n"\
-"     $ LCBURST -f height=5.25 -i temperature=22 -s day=Monday\n"\
+"  LabJack.  By default, LCSTAT will look for lcstat.conf\n"\
 "\n"\
 "-n SAMPLES\n"\
-"  Specifies the integer number of samples per channel desired.  This is\n"\
-"  treated as a minimum, since LCBURST will collect samples in packets\n"\
-"  of LCONF_SAMPLES_PER_READ (64) per channel.  LCONFIG will collect the\n"\
-"  number of packets required to collect at least this many samples.\n"\
+"  Specifies the minimum integer number of samples per channel to be \n"\
+"  included in the statistics on each channel.  \n"\
 "\n"\
 "  For example, the following is true\n"\
 "    $ lcburst -n 32   # collects 64 samples per channel\n"\
@@ -87,6 +81,12 @@ const char help_text[] = \
 "  If both the test duration and the number of samples are specified,\n"\
 "  which ever results in the longest test will be used.  If neither is\n"\
 "  specified, then LCBURST will collect one packet worth of data.\n"\
+"\n"\
+"-p\n"\
+"  Display peak-to-peak values in the results table.\n"\
+"\n"\
+"-s\n"\
+"  Display standard deviation of the signal in the results table.\n"\
 "\n"\
 "-t DURATION\n"\
 "  Specifies the test duration with an integer.  By default, DURATION\n"\
@@ -124,9 +124,10 @@ int main(int argc, char *argv[]){
     char    optchar;
     // Configuration results
     char    config_file[MAXSTR] = DEF_CONFIGFILE,
-            data_file[MAXSTR] = DEF_DATAFILE;
+            data_file[MAXSTR] = "\0";
     int     samples = 0, 
             duration = 0;
+    time_t  start;
 
     // Finally, the essentials; a data file and the device configuration
     FILE *dfile;
@@ -267,6 +268,11 @@ int main(int argc, char *argv[]){
         default:
             break;
         }
+    }
+    // If the data file was not configured, use the timestamp to create a name
+    if(data_file[0] == '\0'){
+        time(&start);
+        strftime(data_file, MAXSTR, "%Y%m%d%H%M%S_lcburst.dat", localtime(&start));
     }
 
     // Calculate the number of samples to collect
