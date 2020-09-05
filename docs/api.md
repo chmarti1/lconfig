@@ -101,11 +101,11 @@ int lc_stream_stop(     lc_devconf_t* dconf,
                 const unsigned int devnum);
                 
 ```
-There are four steps to a data acquisition process; start, service, read, and stop.  Version 3 of LCONFIG uses an automatically configured ring buffer, so the application never needs to perform memory management.  The addition of a service function lets the back end deal with moving data into the ring buffer, testing for trigger events, and it allows the application to distinguish between moving data on to the local machine and retrieving it for use in the application.
+There are four steps to a data acquisition process; start, service, read, and stop.  As of version 3 of LCONFIG, the system includes an automatically configured ring buffer, so the application never needs to perform memory management.  The addition of a service function lets the back end deal with moving data into the ring buffer, testing for trigger events, and it allows the application to distinguish between moving data on to the local machine and retrieving it for use in the application.
 
-`lc_stream_start` configures the LCONFIG buffer and starts the device's data collection process on the device `devnum` in the `dconf` array.  For `lc_stream_start` to work correctly, the device should already be open and configured using the `lc_open_config` and `upload_config` functions.  The device will be configured to transfer packets with `samples_per_read` samples per channel.  If `samples_per_read` is negative, then the LCONF_SAMPLES_PER_READ constant will be used instead.  This information is recorded in the `RB` ringbuffer struct.  The buffer can be substantial since RAM checks are performed prior to allocating memory.
+`lc_stream_start` configures the LCONFIG buffer and starts the device's data collection process on the device `devnum` in the `dconf` array.  For `lc_stream_start` to work correctly, the device should already be open and configured using the `lc_open_config` and `upload_config` functions.  The device will be configured to transfer packets with `samples_per_read` samples per channel.  If `samples_per_read` is negative, then the LCONF_SAMPLES_PER_READ (64) constant will be used instead.  This information is recorded in the `RB` ringbuffer struct.  The buffer can be substantial since RAM checks are performed prior to allocating memory.
 
-All data transfers are done in *blocks*.  A *block* of data is `samples_per_read` x `channels` of individual measurements.
+All data transfers are done in *blocks*.  A *block* of data is `samples_per_read` x `channels` of individual measurements.  The `nsample` configuration parameter determines the total number of samples per channel that should be contained in the buffer.  Since the buffer must be an integer multiple of the block size, the buffer size is rounded up, so that even if `nsample` is set to 0, the buffer will always be able to contain at least one block of data.
 
 The `lc_stream_service` function retrieves a single new block of data into the ring buffer.  If pre-triggering is configured, trigger events will be ignored until enough samples have built up in the buffer to meet the pre-trigger requirements.  Once a trigger event occurs (or if no trigger is configured), blocks of data will become available for reading.  
 
@@ -148,7 +148,7 @@ These are tools for automatically writing data files from the stream data.  They
 
 `lc_datafile_write` calls `lc_stream_read` and prints an ascii formatted data array into the open file provided.  
 
-Note that the applicaiton still needs to call `lc_stream_start` to begin the data acquisition process, and `lc_stream_service`.  Only `lc_stream_read` is replaced from the typical streaming process with `lc_datafile_write`.
+Note that the applicaiton still needs to call `lc_stream_start` to begin the data acquisition process and `lc_stream_service` to stream in data, but in this mode of operation, `lc_datafile_write` takes the place of the `lc_stream_read` function.
 
 
 ```C

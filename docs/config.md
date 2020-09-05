@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 3.06<br>
-June 2019<br>
+Version 4.03<br>
+September 2020<br>
 Chris Martin<br>
 
 ## <a name="config"></a> Writing configuration files
@@ -45,7 +45,7 @@ connection eth
 
 This example configures two devices to be connected over ethernet.  All of the entries that follow a connection entry apply to that device connection.  Entries that come before a connection entry do not belong to a device and will cause an error, so configuration files *need* at least one configuration entry.
 
-What the application decides to do with the entries is up to the application.  For example, `dburst` ignores all but the first entry, but `drun` can accept up to three device connections.  Each is treated as a separate data acquisition job to be done in order.
+What the application decides to do with the entries is up to the application.  For example, `lcburst` ignores all but the first entry, but `lcrun` can accept up to three device connections.  Each is treated as a separate data acquisition job to be done in order.
 
 The `connection` parameter accepts three values: `any`, `usb`, or `eth`.  They have precisely the result one would expect; a connection will be enforced over either usb, ethernet, or either.
 
@@ -70,7 +70,7 @@ When a word begins with a single `#` character, the rest of the line is ignored 
 
 When a word begins with `##`, LConfig stops processing.  When configuration settings are written to the header of a data file (for example), this allows the parser to re-load the configuration while ignoring the data that follow.
 
-Prior to processing all parameters or values, the text is forced to lower-case.  This means that all entries are case-insensitive, but there can be trouble when users try to specify a device name with upper-case letters or spaces.
+Prior to processing all parameters or values, the text outside of quotes is forced to lower-case.  This means that all entries are case-insensitive, but there can be trouble when users try to specify a device name with upper-case letters or spaces.  Enclosing text in quotes allows users to specify string configuration parameters that contain caps and white space.
 
 ```bash
 # LConfig will interpret the name parameter to be "this", and will
@@ -96,7 +96,7 @@ So far, all of the parameters we have been discussing are applied to the device 
 
 In addition to the parameters used to identify the device, there are several important parameters that define the behavior of the device.  Perhaps the most important is `samplehz`, which indicates the number of times per second each channel will be sampled in a stream.  
 
-`nsample` is an integer sample count whose behavior depends on the application.  Nominally, `nsample` tells the  `iscomplete_data_stream()` function when to declare that the data acquisition process is complete, but it's entirely up to the application whether or not to keep going.  For example, `drun` utterly ignores `nsample` and just waits for a user keystroke.  However, `dburst` uses `nsample` to determine the duration of the entire measurement.
+`nsample` is an integer sample count whose behavior depends on the application.  Nominally, `nsample` tells the  `iscomplete_data_stream()` function when to declare that the data acquisition process is complete, but it's entirely up to the application whether or not to keep going.  For example, `lcrun` utterly ignores `nsample` and just waits for a user keystroke.  However, `lcburst` uses `nsample` to determine the duration of the entire measurement when none is specified at the command line.
 
 Especially for high-output-impedance sensors like thermocouples, the `settleus` parameter can be extremely useful in achieving clean measurements.  This specifies the time (in microseconds) for each signal to "settle" before a measurement occures.  Each time a device switches channels in a stream operation, there is some time required for the internal circuitry to settle in to the new value.  Read about [multiplexers](https://en.wikipedia.org/wiki/Multiplexer) or [ghosting](https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z0000019KzzSAE) for more information.
 

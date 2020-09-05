@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 4.00<br>
-September 2019<br>
+Version 4.03<br>
+September 2020<br>
 Chris Martin<br>
 
 This is a handy quick-reference for functions and configuration options, but the authoritative and up-to-date documentation on the api and configuration interface is always in the `lconfig.h` and `lctools.h` headers themselves.
@@ -27,7 +27,7 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | subnet      | XXX.XXX.XXX.XXX                         | Global       | Used to set the T7's TCP/IP subnet mask
 | samplehz    | floating point                          | Global       | The sample rate per channel in Hz
 | settleus    | floating point                          | Global       | The settling time per sample in microseconds. If less than 5, the T7 will choose automatically.
-| nsample     | integer                                 | Global       | How many samples per channel should be included in each stream packet?
+| nsample     | integer                                 | Global       | How many samples should the ring buffer contain?  How many samples should the application collect?
 | aichannel   | integer [0-13]                          | Analog Input | The physical analog input channel number
 | ainegative  | [0-13], 199, ground, differential       | Analog Input | The physical channel to use as the negative side of the measurement.  199 and ground both indicate a single-ended measurement.  The T7 requires that negative channels be the odd channel one greater than the even positive counterpart (e.g. 0+ 1- or 8+ 9-).  Specify differential to make that selection automatic.
 | ailabel       | string                                              | Analog Input | This is a text label that can be used to identify the channel.
