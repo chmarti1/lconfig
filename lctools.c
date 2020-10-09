@@ -333,6 +333,7 @@ void lct_cal_inplace(lc_devconf_t *dconf,
     return;
 }
 
+
 /* LCT_CAL
 .   Apply the channel calibration from AI channel AINUM to a raw voltage 
 .	measurement.  Returns the calibrated measurement in engineering units.
@@ -349,41 +350,75 @@ int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data){
 }
 
 
-int lct_stream_mean(lc_devconf_t *dconf, double values[], unsigned int maxchannels){
-	lct_diter_t diter;
-	double *block, *samples;
-	int ii, N, nistream;
-	unsigned int channels, samples_per_read;
-	
-	nistream = lc_nistream(dconf);
-	if(maxchannels < nistream){
-		fprintf(stderr, "LCT_MEAN: The device is configured for %d channels, but memory for only %d was provided\n", nistream, maxchannels);
-		return LCONF_ERROR;
-	}
-	
-	// Initialize the sample count
-	N = 0;
-	// Initialize the values
-	memset(values, 0, maxchannels*sizeof(double));
-	// 
-	lc_stream_read(dconf, &block, &channels, &samples_per_read);
-	if(!block)
-		return LCONF_NOERR;
-	while(block){
-		lct_diter_init(dconf, &diter, block, channels*samples_per_read, 0);
-		N += samples_per_read;
-		while(samples = lct_diter_next(&diter)){
-			for(ii=0; ii<nistream; ii++){
-				values[ii] += samples[ii];
-				//printf("%f  ", samples[ii]);
-			}
-			//printf("\n");
-		}
-		lc_stream_read(dconf, &block, &channels, &samples_per_read);
-	}
-	//printf("...\n");
-	// Finally, divide by the number of samples
-	for(ii=0;ii<nistream;ii++)
-		values[ii] /= N;
-	return LCONF_NOERR;
+/* LCT_STAT_INIT
+.   Initialize an LCT_STAT_T struct.  This sets most parameters to zero,
+.   but the max -> -infty, min -> +infty.  The STAT input argument is taken
+.   to be an array of lct_stat_t structs, each representing a channel.  
+.   The CHANNELS int is interpreted as the length of that array.
+*/
+void lct_stat_init(lct_stat_t stat[], unsigned int channels){
+    unsigned int ii;
+    for(ii=0; ii<channels; ii++){
+        stat[ii].n = 0;
+        stat[ii].mean = 0.;
+        stat[ii].max = -INFINITY;
+        stat[ii].min = INFINITY;
+        stat[ii].std = 0.;
+    }
+}
+
+/* LCT_STREAM_STAT
+.   Read in a single block of data from the buffer and aggregate statistics
+.   on the data.  
+*/
+int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxchannels){
+    double *data = NULL, *this = NULL;
+    unsigned int channels, samples_per_read, err, ii;
+    lct_diter_t diter;
+    lct_stat_t working;
+    
+    // Get data.  Are there any?
+    // If not, return with an error.
+    if(err = lc_stream_read(dconf, &data, &channels, &samples_per_read)
+        return err;
+    else if(!data)
+        return LCONF_ERROR;
+        
+    // First apply the calibration to the channels
+    lct_cal_inplace(dconf, data, channels*samples_per_read);
+    
+    // Are the number of channels legal?
+    if(channels > maxchannels){
+        fprintf(stderr, "LCT_STREAM_STAT: The device is configured with more channels than the application allows.\n");
+        channels = maxchannels;
+    }
+    
+    // Loop through the channels
+    for(ii=0; ii<channels; ii++){
+        // initialize an iterator for this channel
+        if(lct_diter_init(dconf, &diter, data, channels*samples_per_read, ii)){
+            fprintf(stderr, "LCT_STREAM_STAT: Failed to initialize the channel iterator for channel %d\n", ii);
+            return LCONF_ERROR;
+        }
+        // Initialize the working stat struct
+        lct_stat_init(&working, 1);
+        while(this = lct_diter_next(diter)){
+            working.n ++;
+            working.mean += *this;
+            working.std += (*this) * (*this);
+            working.max = (*this) > working.max ? (*this) : working.max;
+            working.max = (*this) < working.min ? (*this) : working.min;
+        }
+        // Clean up the working struct
+        working.mean /= working.n
+        working.std /= working.n
+        working.std = sqrt(working.std - working.mean*working.mean);
+        // Fold it into the output struct
+        values[ii].mean = values[ii].n*values[ii].mean + working.n*working.mean;
+        values[ii].std = sqrt(values[ii].n*values[ii].std*values[ii].std + working.n*working.std*working.std);
+        values[ii].max = values[ii].max > working.max ? values[ii].max : working.max;
+        values[ii].min = values[ii].min < working.min ? values[ii].min : working.min;
+        values[ii].n += working.n;
+    }
+    return LCONF_NOERR;
 }

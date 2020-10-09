@@ -303,11 +303,34 @@ void lct_cal_inplace(lc_devconf_t *dconf,
 */
 int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data);
 
-
-/* LCT_STREAM_MEAN
-.	Retrieve the averages for all data currently in the buffer.  
-.	STREAM_MEAN calls LC_DATA_READ until the buffer is empty.
+/* LCT_STAT_T
+.   Contains aggregated statistics on data
+.       n : number of samples aggregated into the stat struct
+.       mean : the mean value
+.       max : the highest value
+.       min : the lowest value
+.       std : the standard deviation of the data
 */
-int lct_stream_mean(lc_devconf_t *dconf, double values[], unsigned int maxchannels);
+typedef struct _lct_stat_t_ {
+    unsigned int n;
+    double mean;
+    double max;
+    double min;
+    double std;
+} lct_stat_t;
+
+/* LCT_STAT_INIT
+.   Initialize an LCT_STAT_T struct.  This sets most parameters to zero,
+.   but the max -> -infty, min -> +infty.  The STAT input argument is taken
+.   to be an array of lct_stat_t structs, each representing a channel.  
+.   The CHANNELS int is interpreted as the length of that array.
+*/
+void lct_stat_init(lct_stat_t stat[], unsigned int channels);
+
+/* LCT_STREAM_STAT
+.   Read in a single block of data from the buffer and aggregate statistics
+.   on the data.  
+*/
+int lct_stream_stat(lc_devconf_t *dconf, double values[], unsigned int maxchannels);
 
 #endif

@@ -78,31 +78,11 @@ const char help_text[] = \
 "  are recognized.\n"\
 "    $ lcburst -n 12k   # requests 12000 samples per channel\n"\
 "\n"\
-"  If both the test duration and the number of samples are specified,\n"\
-"  which ever results in the longest test will be used.  If neither is\n"\
-"  specified, then LCBURST will collect one packet worth of data.\n"\
-"\n"\
 "-p\n"\
 "  Display peak-to-peak values in the results table.\n"\
 "\n"\
 "-s\n"\
 "  Display standard deviation of the signal in the results table.\n"\
-"\n"\
-"-t DURATION\n"\
-"  Specifies the test duration with an integer.  By default, DURATION\n"\
-"  should be in seconds.\n"\
-"    $ lcburst -t 10   # configures a 10 second test\n"\
-"\n"\
-"  Short or long test durations can be specified by a unit suffix: m for\n"\
-"  milliseconds, M for minutes, and H for hours.  s for seconds is also\n"\
-"  recognized.\n"\
-"    $ lcburst -t 500m  # configures a 0.5 second test\n"\
-"    $ lcburst -t 1M    # configures a 60 second test\n"\
-"    $ lcburst -t 1H    # configures a 3600 second test\n"\
-"\n"\
-"  If both the test duration and the number of samples are specified,\n"\
-"  which ever results in the longest test will be used.  If neither is\n"\
-"  specified, then LCBURST will collect one packet worth of data.\n"\
 "\n"\
 "GPLv3\n"\
 "(c)2017-2019 C.Martin\n";
@@ -136,7 +116,7 @@ int main(int argc, char *argv[]){
     // Parse the command-line options
     // use an outer foor loop as a catch-all safety
     for(count=0; count<argc; count++){
-        switch(getopt(argc, argv, "hc:n:t:d:f:i:s:")){
+        switch(getopt(argc, argv, "hpsc:n:")){
         // Help text
         case 'h':
             printf(help_text);
@@ -144,30 +124,6 @@ int main(int argc, char *argv[]){
         // Config file
         case 'c':
             strcpy(config_file, optarg);
-            break;
-        // Duration
-        case 't':
-            optchar = 0;
-            if(sscanf(optarg, "%d%c", &duration, &optchar) < 1){
-                fprintf(stderr,
-                        "The duration was not a number: %s\n", optarg);
-                return -1;
-            }
-            switch(optchar){
-                case 'H':
-                    duration *= 60;
-                case 'M':
-                    duration *= 60;
-                case 's':
-                case 0:
-                    duration *= 1000;
-                case 'm':
-                    break;
-                default:
-                    fprintf(stderr,
-                            "Unexpected sample duration unit %c\n", optchar);
-                    return -1;
-            }
             break;
         // Sample count
         case 'n':
@@ -179,7 +135,7 @@ int main(int argc, char *argv[]){
             }
             switch(optchar){
                 case 'M':
-                    duration *= 1000;
+                    samples *= 1000;
                 case 'k':
                 case 'K':
                     samples *= 1000;
@@ -191,22 +147,12 @@ int main(int argc, char *argv[]){
                     return -1;
             }
             break;
-        // Data file
-        case 'd':
-            strcpy(data_file, optarg);
-            break;
-        // Process meta parameters later
-        case 'f':
-        case 'i':
-        case 's':
-            break;
         case '?':
             fprintf(stderr, "Unexpected option %s\n", argv[optind]);
             return -1;
         case -1:    // Deliberately combine -1 and default
         default:
-            count = argc;
-            break;
+            fprintf(stderr, "Unhandled command line argument %s\n", argv[optind]);
         }
     }
 
@@ -227,82 +173,10 @@ int main(int argc, char *argv[]){
     // Detect the number of input columns
     nich = lc_nistream(&dconf);
 
-    // Process the staged command-line meta parameters
-    // use an outer for loop as a catch-all safety
-    optind = 1;
-    for(count=0; count<argc; count++){
-        switch(getopt(argc, argv, "hc:n:t:d:f:i:s:")){
-        // Process meta parameters later
-        case 'f':
-            if(sscanf(optarg,"%[^=]=%lf",(char*) param, &ftemp) != 2){
-                fprintf(stderr, "LCBURST expected param=float format, but found %s\n", optarg);
-                return -1;
-            }
-            printf("flt:%s = %lf\n",param,ftemp);
-            if (lc_put_meta_flt(&dconf, param, ftemp))
-                fprintf(stderr, "LCBURST failed to set parameter %s to %lf\n", param, ftemp);            
-            break;
-        case 'i':
-            if(sscanf(optarg,"%[^=]=%d",(char*) param, &itemp) != 2){
-                fprintf(stderr, "LCBURST expected param=integer format, but found %s\n", optarg);
-                return -1;
-            }
-            printf("int:%s = %d\n",param,itemp);
-            if (lc_put_meta_int(&dconf, param, itemp))
-                fprintf(stderr, "LCBURST failed to set parameter %s to %d\n", param, itemp);
-            break;
-        case 's':
-            if(sscanf(optarg,"%[^=]=%s",(char*) param, (char*) stemp) != 2){
-                fprintf(stderr, "LCBURST expected param=string format, but found %s\n", optarg);
-                return -1;
-            }
-            printf("str:%s = %s\n",param,stemp);
-            if (lc_put_meta_str(&dconf, param, stemp))
-                fprintf(stderr, "LCBURST failed to set parameter %s to %s\n", param, stemp);
-            break;
-        // Escape condition
-        case -1:
-            count = argc;
-            break;
-        // We've already done error handling
-        default:
-            break;
-        }
-    }
-    // If the data file was not configured, use the timestamp to create a name
-    if(data_file[0] == '\0'){
-        time(&start);
-        strftime(data_file, MAXSTR, "%Y%m%d%H%M%S_lcburst.dat", localtime(&start));
-    }
-
-    // Calculate the number of samples to collect
-    // If neither the sample nor duration option is configured, leave 
-    // configuration alone
-    if(samples > 0 || duration > 0){
-        // Calculate the number of samples to collect
-        // Use which ever is larger: samples or duration
-        nsample = (duration * dconf.samplehz) / 1000;  // duration is in ms
-        nsample = nsample > samples ? nsample : samples;
-        dconf.nsample = nsample;
-    }
-
-    // Print some information
-    printf("  Stream channels : %d\n", nich);
-    printf("      Sample rate : %.1fHz\n", dconf.samplehz);
-    printf(" Samples per chan : %d (%d requested)\n", dconf.nsample, samples);
-    ftemp = dconf.nsample/dconf.samplehz;
-    if(ftemp>60){
-        ftemp /= 60;
-        if(ftemp>60){
-            ftemp /= 60;
-            printf("    Test duration : %fhr (%d requested)\n", (float)(ftemp), duration/3600000);
-        }else{
-            printf("    Test duration : %fmin (%d requested)\n", (float)(ftemp), duration/60000);
-        }
-    }else if(ftemp<1)
-        printf("    Test duration : %fms (%d requested)\n", (float)(ftemp*1000), duration);
-    else
-        printf("    Test duration : %fs (%d requested)\n", (float)(ftemp), duration/1000);
+    // Check to see if nsample was specified
+    if(samples)
+        dconf.nsample = samples;
+    nsample = dconf.nsample;
 
 
     printf("Setting up measurement...");
@@ -326,10 +200,9 @@ int main(int argc, char *argv[]){
     }
 
     // Stream data
-    printf("Streaming data");
-    fflush(stdout);
+    printf("Streaming data\n");
     if(dconf.trigstate == LC_TRIG_PRE)
-        printf("\nWaiting for trigger\n");
+        printf("Waiting for trigger\n");
 
     while(!lc_stream_iscomplete(&dconf)){
         if(lc_stream_service(&dconf)){

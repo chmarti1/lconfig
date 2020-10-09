@@ -1080,8 +1080,8 @@ unsigned int channels, samples_per_read, index;
 double my_buffer[2048];
 double *pointer;
 ... setup code ... 
-err = service_data_stream(dconf, 0);
-err = read_data_stream(dconf, 0, &data, &channels, &samples_per_read);
+err = service_data_stream(dconf);
+err = read_data_stream(dconf, &data, &channels, &samples_per_read);
 if(data){
     for(index=0; index<samples_per_read*channels; index++)
         my_buffer[index] = data[index];
