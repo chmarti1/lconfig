@@ -302,11 +302,22 @@ as a data file instead of just a configuration file.  Additionally, the
 the data.
     LC = LConf( 'path/to/drun.dat', data=True, cal=True)
     
+If digital input streaming is active, there is an additional optional keyword
+'dibits' that signals whether the digital input stream should be treated as 
+sixteen individual one-bit channels or a single 16-bit channel.
+    LC = LConf( 'path/to/data.dat', data=True, dbits=True ) # 16 1-bit channels
+    LC = LConf( 'path/to/data.dat', data=True, dbits=False) # 1 16-bit channel
+    
 Once loaded, the data can be accessed individually by channel index or
 by channel label.  The corresponding time vector is also available.
     LC.get_channel(1)
     LC.get_channel('T3')
+    LC.get_dichannel(0)
     LC.get_time()
+
+There are also method for plotting the data
+    LC.show_channel(0)
+    LC.show_dichannel(0)
 
 There are methods to determine some information on what was configured
     LC.ndev()           Number of configured devices
@@ -322,6 +333,7 @@ The labels of all configured channels can also be retrieved
 There are a number of static members that contain useful information:
     LC.cal      Were the channel calibrations applied during load? T/F
     LC.data         An array of data loaded from the data file or None
+    LC.didata       A separate array of the digital input stream data
     LC.filename     The global path to the source file
     LC.time         The array returned by get_time() or None
     LC.timestamp    The timestamp string loaded from the data file
@@ -329,12 +341,13 @@ There are a number of static members that contain useful information:
 The above members are intended for public access, but the _devconf list
 is not intended for direct access.  Instead, use the get() function.
 """
-    def __init__(self, filename, data=False, cal=True):
+    def __init__(self, filename, data=False, dibits=False, cal=True):
         self._devconf = []
         self.time = None
         # Externals
         self.timestamp = ''
         self.data = None
+        self.didata = None
         self.cal = cal
         self.filename = os.path.abspath(filename)
 
@@ -447,6 +460,20 @@ is not intended for direct access.  Instead, use the get() function.
                 thisline = ff.readline()
             self.data = np.array(self.data)
             
+            # Was digital input streaming active?
+            if self.get(0,'distream'):
+                # Convert the data to an integer and remove the distream from data
+                temp = np.asarray(self.data[:,-1], dtype=int)
+                self.data = self.data[:,:-1]
+                # If the load is configured to isolate bits
+                if dibits:
+                    self.didata = np.ndarray((self.data.shape[0],16), dtype=bool)
+                    for index in range(0,16):
+                        self.didata[:,index] = temp & (1<<index)
+                else:
+                    self.didata = temp.reshape(self.data.shape[0],1)
+                    
+            
             # Apply the calibrations?
             if cal:
                 # Calculate the calibrated data
@@ -510,6 +537,14 @@ is not intended for direct access.  Instead, use the get() function.
     def ndev(self):
         """Return the number of device configurations loaded"""
         return len(self._devconf)
+
+
+    def nistream(self, devnum):
+        """Return the number of input stream channels.  This is usually equal to the
+number of analog input channels unless digital input streaming is also enabled."""
+        if 'distream' in self._devconf[devnum]:
+            return self.naich(self.devnum) + (1 if self._devconf[devnum] else 0)
+        return self.naich(self.devnum)
         
     def naich(self, devnum):
         """Return the number of analog input channels in device devnum"""
@@ -536,7 +571,7 @@ data are available, ndata() raises an exception"""
 
     def get_labels(self, devnum, source='aich'):
         """Return an ordered list of channel labels
-    [...] = get_labels(devnum, source='aich')
+    [...] = get_labels(devnum, source='aistream')
 
 The default source is 'aich', but the labels for 'aoch' and 'efch' can
 also be retrieved.
@@ -640,13 +675,26 @@ The same rules apply for the analog output, com, and ef channels.
             raise Exception('Unrecognized parameter: %s'%param)
 
 
+    def get_meta(self, devnum, param):
+        """Retrieve a meta parameter by its name
+    value = get_meta(param)
+
+If param is a list or tuple, then the result will be returned as a tuple.
+"""
+        if isinstance(param, (tuple, list)):
+            return tuple([self.get_meta(devnum, this) for this in param])
+        return self._devconf[devnum]['meta'][param]
+
+
     def get_channel(self, aich, downsample=None, start=None, stop=None):
         """Retrieve data from channel aich
     x = get_channel(aich)
 
 AICH can be the integer index for the channel in the first device's 
 analog input channels, or it can be the string channel label.  The first
-channel with a matching label will be returned.
+channel with a matching label will be returned.  If the digital input stream is
+configured, then AICH may be set to -1 or NAICH() to recover the  raw 16-bit
+EIO/FIO values.
 
 X is the numpy array containing data for the requested channel.
 
@@ -674,7 +722,6 @@ neither, one, or both of these parameters.
             aich = self._get_label(0, 'aich', aich)
         
         if downsample or start or stop:
-            fs = self.get(0,'samplehz')
             # Initialize slice indices
             I0 = 0
             I1 = -1
@@ -688,6 +735,55 @@ neither, one, or both of these parameters.
             return self.data[I0:I1:I2, aich]
             
         return self.data[:,aich]
+        
+    def get_dichannel(self, dich=None, downsample=None, start=None, stop=None):
+        """Retrieve data from a digital input stream
+    x = get_dichannel()
+    x = get_dichannel(dich)
+
+When the data were loaded with the DIBITS keyword set, DICH is the integer index
+for the digital input stream bit to return.  Otherwise, DICH is ignored, and the
+raw digital input stream values are returned as an integer array.
+
+X is the numpy array containing a boolean array of the bit in question.
+
+Optional keyword parameters are
+
+DOWNSAMPLE
+The downsample key indicates an integer number of samples to reject per
+sample returned.  The first example below returns every other sample.  
+The second example returns every third sample.
+    x = get_channel(aich, downsample=1)
+    x = get_channel(aich, downsample=2)
+    
+START, STOP
+If they are not left as None, these specify alternate time values at 
+which to start and stop the data.  get_channel() can be executed with 
+neither, one, or both of these parameters.
+    x = get_channel(aich, start=1.5)    # From 1.5 seconds to end-of-test
+    x = get_channel(aich, stop=2)       # From 0 to 2 seconds
+    x = get_channel(aich, start=1.5, stop=2) # Between 1.5 and 2 seconds
+"""
+        if not self.get(0,'distream'):
+            raise Exception('GET_DICHANNEL: The data does not seem to include a digital input stream.')
+        if self.didata.shape[1]==1:
+            dich = 0
+        elif dich is None:
+            raise Exception('GET_DICHANNEL: The DICH channel number is mandatory when data are loaded bit-wise.')
+            
+        if downsample or start or stop:
+            # Initialize slice indices
+            I0 = 0
+            I1 = -1
+            I2 = 1
+            if start is not None:
+                I0 = self._get_index(start)
+            if stop is not None:
+                I1 = self._get_index(stop)
+            if downsample is not None:
+                I2 = int(downsample+1)
+            return self.didata[I0:I1:I2, dich]
+        return self.didata[:,dich]
 
     def get_time(self, downsample=None, start=None, stop=None):
         """Retrieve a time vector corresponding to the channel data
@@ -701,7 +797,6 @@ an exception
             raise Exception('GET_TIME: This LConf object does not have channel data.')
             
         if downsample or start or stop:
-            fs = self.get(0,'samplehz')
             # Initialize slice indices
             I0 = 0
             I1 = -1
@@ -806,6 +901,93 @@ command to configure the line object.
             plt.show(block=False)
 
         return ll
+        
+    def show_dichannel(self, dich=None, ax=None, fig=None, downsample=None, 
+            show=True, ylabel=None, xlabel=None, fs=16,
+            start=None, stop=None,
+            plot_param={}):
+        """Plot the data from a digital input channel
+    mpll = show_dichannel(dich)
+    
+Returns the handle to the matplotlib line object created by the plot
+command.  The dich is the same index used by the get_dichannel method.  
+Optional parameters are:
+
+AX
+An optional matplotlib axes object pointing to an existing axes to which
+the line should be added.  This method can be used to show multiple data
+sets on a single plot.
+
+FIG
+The figure can be specified either with a matplotlib figure object or an
+integer figure number.  If it exists, the figure will be cleared and a
+new axes will be created for the plot.  If it does not exist, a new one
+will be created.
+
+DOWNSAMPLE
+This parameter is passed to get_time() and get_channel() to reduce the 
+size of the dataset shown.
+
+SHOW
+If True, then a non-blocking show() command will be called after 
+plotting to prompt matplotlib to display the plot.  In some interfaces,
+this step is not necessary.
+
+XLABEL, YLABEL
+If either is supplied, it will be passed to the set_xlabel and 
+set_ylabel functions instead of the automatic values generated from the
+channel labels and units
+
+FS
+Short for "fontsize" indicates the label font size in points.
+
+PLOT_PARAM
+A dictionar of keyword, value pairs that will be passed to the plot 
+command to configure the line object.
+"""
+
+        # Initialize the figure and the axes
+        if ax is not None:
+            fig = ax.get_figure()
+        elif fig is not None:
+            if isinstance(fig, int):
+                fig = plt.figure(fig)
+            fig.clf()
+            ax = fig.add_subplot(111)
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            
+        # Build the y-label
+        # If the data were loaded as "raw" instead of bits
+        if self.didata.shape[1] == 1:
+            dilabel = "DI Stream"
+            dicalunits = 'uint16'
+        elif dich is not None:
+            dilabel = "DI%d"%dich
+            dicalunits = 'bit'
+        else:
+            raise Exception('SHOW_DICHANNEL: The DICH input channel is required when data were loaded with the DIBITS set')
+            
+        # Get data and time
+        t = self.get_time(downsample=downsample, start=start, stop=stop)
+        y = self.get_dichannel(dich, downsample=downsample, start=start, stop=stop)
+        
+        ll = ax.plot(t, y, label=dilabel, **plot_param)
+        
+        if xlabel:
+            ax.set_xlabel(xlabel, fontsize=fs)
+        else:
+            ax.set_xlabel('Time (s)', fontsize=fs)
+        if ylabel:
+            ax.set_ylabel(ylabel, fontsize=fs)
+        else:
+            ax.set_ylabel('%s (%s)'%(dilabel, dicalunits), fontsize=fs)
+        ax.grid('on')
+        if show:
+            plt.show(block=False)
+
+        return ll
 
     def get_events(self, aich, level=0., edge='any', start=None, 
             stop=None, count=None, debounce=1, diff=0):
@@ -905,6 +1087,112 @@ This is done by y.
                     rising_index = index
                     if falling_index and edge_mode <= 0:
                         indices.append(falling_index+diff)
+                        falling_index = None
+                
+            if count and len(indices) >= count:
+                break
+                
+            test_last = test
+        return indices
+        
+
+    def get_dievents(self, dich=None, level=0., edge='any', start=None, 
+            stop=None, count=None, debounce=1):
+        """Detect edges on the digital input stream.  When the data were loaded with the DIBITS
+keyword set, the LEVEL is ignored, and DICH indicates which bit should be tested.
+When the data were loaded with the DIBITS keyword clear, an edge is detected by
+the comparison operation:
+    LC.get_dichannel() >= level
+
+DICH
+The digital input bit to search for edge crossings
+
+LEVEL
+The level of the crossing
+
+EDGE
+can be rising, falling, or any.  Defaults to any
+
+START
+The time (in seconds) to start looking for events.  Starts at t=0 if 
+unspecified.
+
+STOP
+The time to stop looking for events.  Defaults to the end of data.
+
+COUNT
+The integer maximum number of events to return.  If unspecified, there 
+is no limit to the number of events.
+
+DEBOUNCE
+The debounce filter requires that DEBOUNCE (integer) samples before and
+after a transition remain high/low.  Redundant transitions within that
+range are ignored.  For example, if debounce=3, let "l" indicate a 
+sample less than the level, and "g" indicate greater than: 
+The following would indicate a single rising edge
+    lllggg
+    lllglggg
+    lllggllggllggg
+The following would not be identified as any kind of edge
+    lllgglll
+    lllgllgllglll
+    
+In this way, a rapid series of transitions are all grouped as a single 
+edge event.  The window in which these transitions are conflated is 
+determined by the debounce integer.  If none is specified, then debounce
+is 1 (no filter).
+"""
+
+        edge = edge.lower()
+        edge_mode = 0
+        if edge == 'rising':
+            edge_mode = 1
+        elif edge == 'falling':
+            edge_mode = -1
+        
+        i0 = 0
+        i1 = self.ndata()-1
+        if start:
+            i0 = self._get_index(start)
+        if stop:
+            i1 = self._get_index(stop)
+            
+        indices = []
+        
+        # Get the channel data
+        y = self.get_dichannel(dich)
+        
+        # State machine variables
+        rising_index = None
+        falling_index = None
+        series_count = 1
+        test_last = (y[i0] > level)
+        
+        for index in range(i0+1, i1):
+            if self.didata.shape[1] == 1:
+                test = (y[index] >= level)
+            else:
+                test = y[index]
+            
+            if test == test_last:
+                series_count += 1
+            # If there has been a value change
+            else:
+                series_count = 1
+            
+            # Check the sample count
+            if series_count >= debounce:
+                # If the sample is greater than
+                if test:
+                    falling_index = index
+                    if rising_index and edge_mode >= 0:
+                        indices.append(rising_index)
+                        rising_index = None
+                # If the sample is less than
+                else:
+                    rising_index = index
+                    if falling_index and edge_mode <= 0:
+                        indices.append(falling_index)
                         falling_index = None
                 
             if count and len(indices) >= count:
