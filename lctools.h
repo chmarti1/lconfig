@@ -51,7 +51,7 @@ v1.0	9/2019		ORIGINAL RELEASE
  *                          *
  ****************************/
 
-#define LCT_VERSION 1.0
+#define LCT_VERSION 1.1
 
 
 

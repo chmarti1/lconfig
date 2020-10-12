@@ -1014,7 +1014,7 @@ void lc_stream_status(lc_devconf_t* dconf,
         unsigned int *samples_waiting);
 
 /* LC_STREAM_ISCOMPLETE
-Returns 1 to indicate that at least dconf[devnum].nsample samples per channel
+Returns 1 to indicate that at least dconf->nsample samples per channel
 have been streamed from the T7.  Returns a 0 otherwise.
 */
 int lc_stream_iscomplete(lc_devconf_t* dconf);

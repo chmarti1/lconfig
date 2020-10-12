@@ -49,7 +49,7 @@ int parse_options(int argc, char*argv[]);
 . Help text
 .....................*/
 const char help_text[] = \
-"lcstat [-hps] [-c CONFIGFILE] [-n SAMPLES]\n"\
+"lcstat [-hprd] [-c CONFIGFILE] [-n SAMPLES] [-f|i|s param=value]\n"\
 "  LCSTAT is a utility that shows the status of the configured channels\n"\
 "  in real time.  The intent is that it be used to aid with debugging and\n"\
 "  setup of experiments from the command line.\n"
@@ -78,6 +78,10 @@ const char help_text[] = \
 "  are recognized.\n"\
 "    $ lcburst -n 12k   # requests 12000 samples per channel\n"\
 "\n"\
+"  If both the test duration and the number of samples are specified,\n"\
+"  which ever results in the longest test will be used.  If neither is\n"\
+"  specified, then LCSTAT will collect one packet worth of data.\n"\
+"\n"\
 "-p\n"\
 "  Display peak-to-peak values in the results table.\n"\
 "\n"\
@@ -103,11 +107,8 @@ int main(int argc, char *argv[]){
             param[MAXSTR];  // Parameter
     char    optchar;
     // Configuration results
-    char    config_file[MAXSTR] = DEF_CONFIGFILE,
-            data_file[MAXSTR] = "\0";
-    int     samples = 0, 
-            duration = 0;
-    time_t  start;
+    char    config_file[MAXSTR] = DEF_CONFIGFILE;
+    int     samples = 0;
 
     // Finally, the essentials; a data file and the device configuration
     FILE *dfile;
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]){
     // Parse the command-line options
     // use an outer foor loop as a catch-all safety
     for(count=0; count<argc; count++){
-        switch(getopt(argc, argv, "hpsc:n:")){
+        switch(getopt(argc, argv, "hprdc:n:f:i:s:")){
         // Help text
         case 'h':
             printf(help_text);
@@ -124,6 +125,30 @@ int main(int argc, char *argv[]){
         // Config file
         case 'c':
             strcpy(config_file, optarg);
+            break;
+        // Duration
+        case 't':
+            optchar = 0;
+            if(sscanf(optarg, "%d%c", &duration, &optchar) < 1){
+                fprintf(stderr,
+                        "The duration was not a number: %s\n", optarg);
+                return -1;
+            }
+            switch(optchar){
+                case 'H':
+                    duration *= 60;
+                case 'M':
+                    duration *= 60;
+                case 's':
+                case 0:
+                    duration *= 1000;
+                case 'm':
+                    break;
+                default:
+                    fprintf(stderr,
+                            "Unexpected sample duration unit %c\n", optchar);
+                    return -1;
+            }
             break;
         // Sample count
         case 'n':
@@ -135,7 +160,7 @@ int main(int argc, char *argv[]){
             }
             switch(optchar){
                 case 'M':
-                    samples *= 1000;
+                    duration *= 1000;
                 case 'k':
                 case 'K':
                     samples *= 1000;
@@ -147,36 +172,108 @@ int main(int argc, char *argv[]){
                     return -1;
             }
             break;
+        // Process meta parameters later
+        case 'f':
+        case 'i':
+        case 's':
+            break;
         case '?':
             fprintf(stderr, "Unexpected option %s\n", argv[optind]);
             return -1;
         case -1:    // Deliberately combine -1 and default
         default:
-            fprintf(stderr, "Unhandled command line argument %s\n", argv[optind]);
+            count = argc;
+            break;
         }
     }
 
     // Load the configuration
-    printf("Loading configuration file...");
-    fflush(stdout);
+    printf("Loading configuration file...\n");
     if(lc_load_config(&dconf, 1, config_file)){
-        fprintf(stderr, "LCBURST failed while loading the configuration file \"%s\"\n", config_file);
+        fprintf(stderr, "LCSTAT failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
     }else
         printf("DONE\n");
 
     // Detect the number of configured device connections
     if(lc_ndev(&dconf,1)<=0){
-        fprintf(stderr,"LCBURST did not detect any valid devices for data acquisition.\n");
+        fprintf(stderr,"LCSTAT did not detect any valid devices for data acquisition.\n");
         return -1;
     }
     // Detect the number of input columns
     nich = lc_nistream(&dconf);
 
-    // Check to see if nsample was specified
-    if(samples)
-        dconf.nsample = samples;
-    nsample = dconf.nsample;
+    // Process the staged command-line meta parameters
+    // use an outer for loop as a catch-all safety
+    optind = 1;
+    for(count=0; count<argc; count++){
+        switch(getopt(argc, argv, "hprdc:n:f:i:s:")){
+        // Process meta parameters later
+        case 'f':
+            if(sscanf(optarg,"%[^=]=%lf",(char*) param, &ftemp) != 2){
+                fprintf(stderr, "LCBURST expected param=float format, but found %s\n", optarg);
+                return -1;
+            }
+            printf("flt:%s = %lf\n",param,ftemp);
+            if (lc_put_meta_flt(&dconf, param, ftemp))
+                fprintf(stderr, "LCBURST failed to set parameter %s to %lf\n", param, ftemp);            
+            break;
+        case 'i':
+            if(sscanf(optarg,"%[^=]=%d",(char*) param, &itemp) != 2){
+                fprintf(stderr, "LCBURST expected param=integer format, but found %s\n", optarg);
+                return -1;
+            }
+            printf("int:%s = %d\n",param,itemp);
+            if (lc_put_meta_int(&dconf, param, itemp))
+                fprintf(stderr, "LCBURST failed to set parameter %s to %d\n", param, itemp);
+            break;
+        case 's':
+            if(sscanf(optarg,"%[^=]=%s",(char*) param, (char*) stemp) != 2){
+                fprintf(stderr, "LCBURST expected param=string format, but found %s\n", optarg);
+                return -1;
+            }
+            printf("str:%s = %s\n",param,stemp);
+            if (lc_put_meta_str(&dconf, param, stemp))
+                fprintf(stderr, "LCBURST failed to set parameter %s to %s\n", param, stemp);
+            break;
+        // Escape condition
+        case -1:
+            count = argc;
+            break;
+        // We've already done error handling
+        default:
+            break;
+        }
+    }
+
+    // Calculate the number of samples to collect
+    // If neither the sample nor duration option is configured, leave 
+    // configuration alone
+    if(samples > 0 || duration > 0){
+        // Calculate the number of samples to collect
+        // Use which ever is larger: samples or duration
+        nsample = (duration * dconf.samplehz) / 1000;  // duration is in ms
+        nsample = nsample > samples ? nsample : samples;
+        dconf.nsample = nsample;
+    }
+
+    // Print some information
+    printf("  Stream channels : %d\n", nich);
+    printf("      Sample rate : %.1fHz\n", dconf.samplehz);
+    printf(" Samples per chan : %d (%d requested)\n", dconf.nsample, samples);
+    ftemp = dconf.nsample/dconf.samplehz;
+    if(ftemp>60){
+        ftemp /= 60;
+        if(ftemp>60){
+            ftemp /= 60;
+            printf("    Test duration : %fhr (%d requested)\n", (float)(ftemp), duration/3600000);
+        }else{
+            printf("    Test duration : %fmin (%d requested)\n", (float)(ftemp), duration/60000);
+        }
+    }else if(ftemp<1)
+        printf("    Test duration : %fms (%d requested)\n", (float)(ftemp*1000), duration);
+    else
+        printf("    Test duration : %fs (%d requested)\n", (float)(ftemp), duration/1000);
 
 
     printf("Setting up measurement...");
@@ -200,16 +297,17 @@ int main(int argc, char *argv[]){
     }
 
     // Stream data
-    printf("Streaming data\n");
+    printf("Streaming data");
+    fflush(stdout);
     if(dconf.trigstate == LC_TRIG_PRE)
-        printf("Waiting for trigger\n");
+        printf("\nWaiting for trigger\n");
 
     while(!lc_stream_iscomplete(&dconf)){
         if(lc_stream_service(&dconf)){
             fprintf(stderr, "\nLCBURST failed while servicing the T7 connection!\n");
             lc_stream_stop(&dconf);
             lc_close(&dconf);
-            return -1;            
+            return -1;
         }
 
         if(dconf.trigstate == LC_TRIG_IDLE || dconf.trigstate == LC_TRIG_ACTIVE){
