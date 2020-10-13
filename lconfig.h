@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+    along with LCONFIG.  If not, see <https://www.gnu.org/licenses/>.
 
     Authored by C.Martin crm28@psu.edu
 */
@@ -215,7 +215,7 @@ with init_data_file() and write_data_file() utilities.
 
 // Analog input configuration
 // This includes everyting the DAQ needs to configure and AI channel
-typedef struct {
+typedef struct __lc_aiconf_t__ {
     unsigned int    channel;     // channel number (0-13)
     unsigned int    nchannel;    // negative channel number (0-13 or 199)
     double          range;       // bipolar input range (0.01, 0.1, 1.0, or 10.)
@@ -229,7 +229,7 @@ typedef struct {
 
 // Analog output configuration
 // This includes everything we need to know to construct a signal for output
-typedef struct {
+typedef struct __lc_aoconf_t__ {
     unsigned int    channel;      // Channel number (0 or 1)
     // What function type is being generated?
     enum {LC_AO_CONSTANT, LC_AO_SINE, LC_AO_SQUARE, LC_AO_TRIANGLE, LC_AO_NOISE} signal;
@@ -245,7 +245,7 @@ typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
 
 // Flexible Input/Output configuration struct
 // This includes everything needed to configure an extended feature EF channel
-typedef struct {
+typedef struct __lc_efconf_t__ {
     // Flexible IO mode enumerated type
     enum {  LC_EF_NONE,   // No extended features
             LC_EF_PWM,    // Pulse width modulation (input/output)
@@ -274,7 +274,7 @@ typedef struct {
 
 // Digital Communications Configuration Structure
 //
-typedef struct {
+typedef struct __lc_comconf_t__ {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
     char label[LCONF_MAX_STR];
     double rate;                // Data rate in bits/sec
@@ -297,7 +297,7 @@ typedef struct {
 // relevant to the measurement.  They may be needed by the parent program
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
-typedef struct {
+typedef struct __lc_meta_t__ {
     char param[LCONF_MAX_STR];      // parameter name
     union {
         char svalue[LCONF_MAX_STR];
@@ -310,7 +310,7 @@ typedef struct {
 // Ring Buffer structure
 // The LCONF ring buffer supports reading and writing in R/W blocks that mimic
 // the T7 stream read block.  
-typedef struct {
+typedef struct __lc_ringbuf_t__ {
     unsigned int size_samples;      // length of the buffer array (NOT per channel)
     unsigned int blocksize_samples; // size of each read/write block
     unsigned int samples_per_read;  // samples per channel in each block
@@ -323,7 +323,7 @@ typedef struct {
 } lc_ringbuf_t;
 
 
-typedef enum {
+typedef enum __lc_con_t__ {
     LC_CON_NONE=-1,
     LC_CON_USB=LJM_ctUSB, 
     LC_CON_ANY=LJM_ctANY, 
@@ -337,7 +337,7 @@ typedef enum {
 } lc_con_t;
 
 
-typedef enum {
+typedef enum __lc_dev_t__ {
     LC_DEV_NONE=-1,
     LC_DEV_ANY=LJM_dtANY, 
     LC_DEV_T4=LJM_dtT4,
@@ -346,7 +346,7 @@ typedef enum {
     LC_DEV_DIGIT=LJM_dtDIGIT
 } lc_dev_t;
 
-typedef struct devconf {
+typedef struct __lc_devconf_t__ {
     // Global configuration
     lc_con_t connection;                 // requested connection type index
     lc_con_t connection_act;             // actual connection type index

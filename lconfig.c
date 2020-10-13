@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+    along with LCONFIG.  If not, see <https://www.gnu.org/licenses/>.
 
     Authored by C.Martin crm28@psu.edu
 */
@@ -879,7 +879,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
                 loadfail();
             }
-            if(lcm_get_value(lcm_aosignal, value, &dconf[devnum].aoch[aonum].signal)){
+            if(lcm_get_value(lcm_aosignal, value, (int*) &dconf[devnum].aoch[aonum].signal)){
                 print_error("LOAD: Illegal AOsignal type: %s\n",value);
                 loadfail();
             }
@@ -985,7 +985,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // TRIGEDGE parameter
         //
         }else if(streq(param,"trigedge")){
-            if(lcm_get_value(lcm_edge, value, &dconf[devnum].trigedge)){
+            if(lcm_get_value(lcm_edge, value, (int*) &dconf[devnum].trigedge)){
                 print_error("LOAD: Unrecognized TRIGedge parameter: %s\n", value);
                 loadfail();
             }
@@ -1050,7 +1050,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // EFSIGNAL parameter
         //
         }else if(streq(param,"efsignal")){
-            if(lcm_get_value(lcm_ef_signal, value, &dconf[devnum].efch[efnum].signal)){
+            if(lcm_get_value(lcm_ef_signal, value, (int*) &dconf[devnum].efch[efnum].signal)){
                 print_error("LOAD: Illegal EF signal: %s\n",value);
                 loadfail(); 
             }
@@ -1147,7 +1147,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Too many COMchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NCOMCH);
                 loadfail();
             }
-            if(lcm_get_value(lcm_com_channel, value, &dconf[devnum].comch[comnum].type)){
+            if(lcm_get_value(lcm_com_channel, value, (int*) &dconf[devnum].comch[comnum].type)){
                 print_error( "LOAD: Unsupported COMchannel mode: %s\n", value);
                 loadfail();
             }
@@ -1247,7 +1247,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 // Modify value to form a string for lcm_get_value
                 value[0] = ctemp;
                 value[1] = '\0';
-                if(lcm_get_value(lcm_com_parity, value, &dconf->comch[comnum].options.uart.parity)){
+                if(lcm_get_value(lcm_com_parity, value, (int*) &dconf->comch[comnum].options.uart.parity)){
                     print_error( "LOAD: UART COMOPTIONS parity character must be N, E, or O.  Received: %c\n", ctemp);
                     loadfail();
                 }
@@ -1428,6 +1428,8 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
                     dconf->comch[comnum].options.uart.bits,
                     lcm_get_config(lcm_com_parity, dconf->comch[comnum].options.uart.parity),
                     dconf->comch[comnum].options.uart.stop);
+            break;
+        default:
             break;
         }
         

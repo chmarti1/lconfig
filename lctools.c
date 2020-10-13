@@ -1,5 +1,8 @@
 #include "lctools.h"
 #include "lconfig.h"
+#include "lcmap.h"
+
+#include <math.h>
 
 
 /*
@@ -244,6 +247,8 @@ int lct_ef_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
     return -1;
 }
 
+
+
 /************************************
  *                                  *
  *      Interacting with Data       *
@@ -349,6 +354,29 @@ int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data){
 	return LCONF_NOERR;
 }
 
+/* LCT_CAL_UNITS
+.   Copy the channel AINUM units string into UNITS.  Returns LCONF_ERROR
+.   if ainum is out of range.  If the channel does not have a calibration
+.   "V" is written.  If the channel has a calibration, but no units 
+.   string is specified, an empty string will be written.
+*/
+int lct_cal_units(lc_devconf_t *dconf, unsigned int ainum, char *units){
+    if(ainum >= dconf->naich){
+        fprintf(stderr, "LCT_CAL_UNITS: Analog input channel %d is out of range.  Only %d are configured.\n", ainum, dconf->naich);
+        return LCONF_ERROR;
+    }
+    // If there is no calibration (slope == 1, zero == 0)
+    // and no units string is specified, default to "V" for the units 
+    // string.
+    if(     dconf->aich[ainum].calslope == 1. && 
+            dconf->aich[ainum].calzero == 0. &&
+            dconf->aich[ainum].calunits[0] == '\0' )
+        strcpy(units, "V");
+    else
+        strcpy(units, dconf->aich[ainum].calunits);
+    return LCONF_NOERR;
+}
+
 
 /* LCT_STAT_INIT
 .   Initialize an LCT_STAT_T struct.  This sets most parameters to zero,
@@ -363,7 +391,7 @@ void lct_stat_init(lct_stat_t stat[], unsigned int channels){
         stat[ii].mean = 0.;
         stat[ii].max = -INFINITY;
         stat[ii].min = INFINITY;
-        stat[ii].std = 0.;
+        stat[ii].var = 0.;
     }
 }
 
@@ -375,23 +403,22 @@ int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxch
     double *data = NULL, *this = NULL;
     unsigned int channels, samples_per_read, err, ii;
     lct_diter_t diter;
-    lct_stat_t working;
     
     // Get data.  Are there any?
     // If not, return with an error.
-    if(err = lc_stream_read(dconf, &data, &channels, &samples_per_read)
+    if(err = lc_stream_read(dconf, &data, &channels, &samples_per_read))
         return err;
     else if(!data)
         return LCONF_ERROR;
         
-    // First apply the calibration to the channels
-    lct_cal_inplace(dconf, data, channels*samples_per_read);
-    
     // Are the number of channels legal?
-    if(channels > maxchannels){
+    if(maxchannels > 0 && channels > maxchannels){
         fprintf(stderr, "LCT_STREAM_STAT: The device is configured with more channels than the application allows.\n");
         channels = maxchannels;
     }
+        
+    // First apply the calibration to the channels
+    lct_cal_inplace(dconf, data, channels*samples_per_read);
     
     // Loop through the channels
     for(ii=0; ii<channels; ii++){
@@ -400,25 +427,25 @@ int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxch
             fprintf(stderr, "LCT_STREAM_STAT: Failed to initialize the channel iterator for channel %d\n", ii);
             return LCONF_ERROR;
         }
-        // Initialize the working stat struct
-        lct_stat_init(&working, 1);
-        while(this = lct_diter_next(diter)){
-            working.n ++;
-            working.mean += *this;
-            working.std += (*this) * (*this);
-            working.max = (*this) > working.max ? (*this) : working.max;
-            working.max = (*this) < working.min ? (*this) : working.min;
+        // Modify the prior statistics to receive in-place calculation
+        // Adjust the variance to be mean squre
+        values[ii].var += values[ii].mean*values[ii].mean;
+        // Re-scale by the number of samples so new samples can simply be added
+        values[ii].var *= values[ii].n;
+        values[ii].mean *= values[ii].n;
+
+        while(this = lct_diter_next(&diter)){
+            values[ii].n ++;
+            values[ii].mean += *this;
+            values[ii].var += (*this) * (*this);
+            values[ii].max = (*this) > values[ii].max ? (*this) : values[ii].max;
+            values[ii].min = (*this) < values[ii].min ? (*this) : values[ii].min;
         }
-        // Clean up the working struct
-        working.mean /= working.n
-        working.std /= working.n
-        working.std = sqrt(working.std - working.mean*working.mean);
-        // Fold it into the output struct
-        values[ii].mean = values[ii].n*values[ii].mean + working.n*working.mean;
-        values[ii].std = sqrt(values[ii].n*values[ii].std*values[ii].std + working.n*working.std*working.std);
-        values[ii].max = values[ii].max > working.max ? values[ii].max : working.max;
-        values[ii].min = values[ii].min < working.min ? values[ii].min : working.min;
-        values[ii].n += working.n;
+        // Clean up the intermediate values struct
+        values[ii].mean /= values[ii].n;
+        values[ii].var /= values[ii].n;
+        values[ii].var = values[ii].var - values[ii].mean*values[ii].mean;
+
     }
     return LCONF_NOERR;
 }

@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+    along with LCONFIG.  If not, see <https://www.gnu.org/licenses/>.
 
     Authored by C.Martin crm28@psu.edu
 */
@@ -211,6 +211,7 @@ int lct_ao_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
 int lct_fio_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
 
 
+
 /************************************
  *                                  *
  *      Interacting with Data       *
@@ -303,6 +304,14 @@ void lct_cal_inplace(lc_devconf_t *dconf,
 */
 int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data);
 
+/* LCT_CAL_UNITS
+.   Copy the channel AINUM units string into UNITS.  Returns LCONF_ERROR
+.   if ainum is out of range.  If the channel does not have a calibration
+.   "V" is written.  If the channel has a calibration, but no units 
+.   string is specified, an empty string will be written.
+*/
+int lct_cal_units(lc_devconf_t *dconf, unsigned int ainum, char *units);
+
 /* LCT_STAT_T
 .   Contains aggregated statistics on data
 .       n : number of samples aggregated into the stat struct
@@ -311,12 +320,12 @@ int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data);
 .       min : the lowest value
 .       std : the standard deviation of the data
 */
-typedef struct _lct_stat_t_ {
+typedef struct __lct_stat_t__ {
     unsigned int n;
     double mean;
     double max;
     double min;
-    double std;
+    double var;
 } lct_stat_t;
 
 /* LCT_STAT_INIT
@@ -329,8 +338,29 @@ void lct_stat_init(lct_stat_t stat[], unsigned int channels);
 
 /* LCT_STREAM_STAT
 .   Read in a single block of data from the buffer and aggregate statistics
-.   on the data.  
+.   on the data.  LCT_STREAM_STAT() should be called in place of the 
+.   LC_STREAM_READ() function.  LCT_STREAM_STAT calls LC_STREAM_READ()
+.   to access data in the buffer directly.  If data are ready, they are
+.   calibrated in place using the LCT_CAL_INPLACE() function before
+.   statistics are aggregated.
+.
+.   The LCT_STAT_T VALUES struct contains the aggregated mean, maximum,
+.   minimum, and standard deviation.  Each element of the VALUES array
+.   corresponds to one of the stream channels in the order they are
+.   configured.  From the four basic statistics, others can be constructed.
+.   variance = std*std
+.   root-mean-square amplitude = sqrt(mean*mean + var)
+.   peak-to-peak amplitude = max - min
+.
+.   If MAXCHANNELS is greater than 0, it is interpreted as the maximum 
+.   length of the VALUES array.  If the number of configured analog stream
+.   channels is longer than MAXCHANNELS, LCT_STREAM_STAT will print a 
+.   warning to stderr and return with LCONF_ERROR.  If MAXCHANNELS is 0,
+.   it is assumed that adequate measures have already been taken to protect
+.   against a memory overrun.
+.
+.   
 */
-int lct_stream_stat(lc_devconf_t *dconf, double values[], unsigned int maxchannels);
+int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxchannels);
 
 #endif
