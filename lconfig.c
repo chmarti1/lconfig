@@ -297,7 +297,7 @@ void init_config(lc_devconf_t* dconf){
         dconf->aich[ainum].calslope = 1.;
         dconf->aich[ainum].calzero = 0.;
         dconf->aich[ainum].label[0] = '\0';
-        dconf->aich[ainum].calunits[0] = '\0';
+        strcpy(dconf->aich[ainum].calunits, "V");
     }
     // Digital input streaming
     dconf->distream = 0;

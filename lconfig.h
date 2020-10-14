@@ -159,6 +159,10 @@ with init_data_file() and write_data_file() utilities.
 10/2019
 - No changes to the core LCONFIG system; updated lconfig.py for post-processing
     consistent with the 4.00 changes.
+
+** 4.04
+10/2020
+- Changed analog input channel units to default to "V"
 */
 
 #define TWOPI 6.283185307179586

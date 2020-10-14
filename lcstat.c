@@ -65,7 +65,8 @@ const char help_text[] = \
 "  setup of experiments from the command line.\n"
 "\n"\
 "  Measurement results are displayed in a table with a row for each\n"\
-"  channel configured and a column for various statistics on the signal.\n"\
+"  analog input and DIO extended feature channel configured and columns for\n"\
+"  signal statistics, specified with switches at the command line.\n"\
 "  Measurements are streamed for at least the number of samples specified\n"\
 "  by the NSAMPLE configuration parameter or by the number specified by\n"\
 "  the -n option.\n"\

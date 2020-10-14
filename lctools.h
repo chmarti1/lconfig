@@ -305,12 +305,10 @@ void lct_cal_inplace(lc_devconf_t *dconf,
 int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data);
 
 /* LCT_CAL_UNITS
-.   Copy the channel AINUM units string into UNITS.  Returns LCONF_ERROR
-.   if ainum is out of range.  If the channel does not have a calibration
-.   "V" is written.  If the channel has a calibration, but no units 
-.   string is specified, an empty string will be written.
+.   Return a pointer to the analog input channel units.  Returns NULL if
+.   the analog input channel index is out of range.
 */
-int lct_cal_units(lc_devconf_t *dconf, unsigned int ainum, char *units);
+char * lct_cal_units(lc_devconf_t *dconf, unsigned int ainum);
 
 /* LCT_STAT_T
 .   Contains aggregated statistics on data

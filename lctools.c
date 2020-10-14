@@ -355,26 +355,15 @@ int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data){
 }
 
 /* LCT_CAL_UNITS
-.   Copy the channel AINUM units string into UNITS.  Returns LCONF_ERROR
-.   if ainum is out of range.  If the channel does not have a calibration
-.   "V" is written.  If the channel has a calibration, but no units 
-.   string is specified, an empty string will be written.
+.   Return a pointer to the analog input channel units.  Returns NULL if
+.   the analog input channel index is out of range.
 */
-int lct_cal_units(lc_devconf_t *dconf, unsigned int ainum, char *units){
+char * lct_cal_units(lc_devconf_t *dconf, unsigned int ainum){
     if(ainum >= dconf->naich){
         fprintf(stderr, "LCT_CAL_UNITS: Analog input channel %d is out of range.  Only %d are configured.\n", ainum, dconf->naich);
-        return LCONF_ERROR;
+        return NULL;
     }
-    // If there is no calibration (slope == 1, zero == 0)
-    // and no units string is specified, default to "V" for the units 
-    // string.
-    if(     dconf->aich[ainum].calslope == 1. && 
-            dconf->aich[ainum].calzero == 0. &&
-            dconf->aich[ainum].calunits[0] == '\0' )
-        strcpy(units, "V");
-    else
-        strcpy(units, dconf->aich[ainum].calunits);
-    return LCONF_NOERR;
+    return dconf->aich[ainum].calunits;
 }
 
 
