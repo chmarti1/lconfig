@@ -163,6 +163,7 @@ with init_data_file() and write_data_file() utilities.
 ** 4.04
 10/2020
 - Changed analog input channel units to default to "V"
+- Added DOMASK and DOVALUE
 */
 
 #define TWOPI 6.283185307179586
@@ -370,6 +371,9 @@ typedef struct __lc_devconf_t__ {
     unsigned int naich;             // number of configured analog input channels
     // Digital input streaming
     unsigned int distream;          // input stream mask
+    // digital output masks
+    unsigned int domask;            // output tristate mask
+    unsigned int dovalue;           // output value mask
     // Analog output
     lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
     unsigned int naoch;             // number of configured analog output channels
@@ -451,10 +455,14 @@ valid channel number.  Valid channel numbers are presumed to be sequential.
 */
 void lc_efchannels(const lc_devconf_t* dconf, int *min, int *max);
 
-/* DIOCHAN_CONFIG
+/* LC_DIOCHANNELS
 Determine the range of valid digital IO channels for the current device
 configuration.  MIN is the lowest valid channel number.  MAX is the highest 
 valid channel number.  Valid channel numbers are presumed to be sequential.
+These channels are reported based on the ACTUAL connected device, and not 
+the device type configured.  If a connection is not yet established, or if
+the device type is not recognized, LC_DIOCHANNELS returns the widest range
+of any recognized devices.
 */
 void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max);
 
@@ -590,17 +598,6 @@ The following parameters are recognized:
 -AICALUNITS
 .   This optional string can be used to specify the units for the 
 .   calibrated measurement specified by AICALZERO and AICALSLOPE.
--DISTREAM
-.   When enabled, the lowest 16 DIO bits (EF and EIO registers) are streamed
-.   as an additional input stream as if the integer value were an extra analog 
-.   input.  To enable DIstreaming, the DISTREAM parameter should be a non-zero
-.   integer mask for which of the channels should be treated as inputs.  For 
-.   example, to set DIO0 and DIO4 as streaming inputs, DISTREAM should be set
-.   to 2^0 + 2^4 = 17.
-.
-.   When EF settings contradict DISTREAM settings, the EF settings are given
-.   precedence.  Be careful, because LCONFIG does not currently check for this
-.   type of contradiction.
 -AOCHANNEL
 .   This parameter indicates the channel number to be configured for cyclic 
 .   dynamic output (function generator).  This will be used to generate a 
@@ -639,38 +636,66 @@ The following parameters are recognized:
 .   period.  For a triangle wave, the duty cycle indicates the percentage of
 .   the period that will be spent rising, so a sawtooth wave can be created
 .   with AODUTY values of 0.0 and 1.0.
--TRIGCHANNEL
-.   Which analog input should be monitored to generate the software trigger?
-.   This non-negative integer does NOT specify the physical analog channel. It
-.   specifies which of the analog measurements should be monitored for a 
-.   trigger.
+-COMCHANNEL
+.   Like the AICHANNEL, AOCHANNEL, and EFCHANNEL parameter, the COMCHANNEL 
+.   signals the creation of a new communications channel, but unlike the other
+.   scopes, COMCHANNELS do not specify a channel number, but a channel type.
+.   Valid values are:
+. * UART - Universal Asynchronous Receive-Transmit
+. * 1WIRE - 1 Wire communication (NOT YET SUPPORTED)
+. * SPI - Serial-periferal interface (NOT YET SUPPORTED)
+. * I2C - Inter Integrated Circuit (pronounced "eye-squared-see") (NOT YET SUPPORTED)
+. * SBUS - Sensiron Bus I2C derivative (NOT YET SUPPORTED)
+.   
+.   The interpretation of the COM parameters depends on which protocol is being
+.   used.  For example, 1-wire and I2C do not require separate RX and TX lines
+.   and the UART does not require a clock.
+-COMRATE
+.   The requested data rate in bits per second.  The available bit rates vary 
+.   with the different COM interfaces.
+.   * UART: 9600 is default, but LJ recommends < 38,400
+-COMLABEL
+.   This is a string label to apply to the COM channel.
+-COMOUT
+.   The data output line expects an integer DIO pin number.
+.   * UART: This will be the TX pin.
+-COMIN
+.   The data input line expects an integer DIO pin number.
+.   * UART: This will be the RX pin.
+-COMCLOCK
+.   The data clock line expects an integer DIO pin number.
+.   * UART: This parameter is unusued.
+-COMOPTIONS
+.   The communication options is a coded string that defines the mode of the 
+.   selected protocol.
+.   * UART: "8N1" BITS PARITY STOP
+.       The UART options string must be three characters long
+.       BITS:   8 or fewer.  (no 9-bit codes)
+.       PARITY: (N)one, (P)ositive, (O)dd, others are not supported.
+.       STOP:   Number of stop bits 0, 1, or 2.
+-DISTREAM
+.   When enabled, the lowest 16 DIO bits (EF and EIO registers) are streamed
+.   as an additional input stream as if the integer value were an extra analog 
+.   input.  To enable DIstreaming, the DISTREAM parameter should be a non-zero
+.   integer mask for which of the channels should be treated as inputs.  For 
+.   example, to set DIO0 and DIO4 as streaming inputs, DISTREAM should be set
+.   to 2^0 + 2^4 = 17.
 .
-.   For fast digital pulses, LCONFIG can be configured to watch the high speed
-.   counter 2 by passing "HSC" instead of a trigger channel.  If the value in 
-.   the counter increases, then a trigger event will be registered.
+.   When EF settings contradict DISTREAM settings, the EF settings are given
+.   precedence.  Be careful, because LCONFIG does not currently check for this
+.   type of contradiction.
+-DOMASK
+-DOVALUE
+.   Together, the DOMASK and DOVALUE integers specify the state of the lowest
+.   16 bits of the digital outputs.  DOMASK is the integer representation of
+.   a 16-bit bit mask indicating which of the 16 supported digital IO channels 
+.   will be configured as an output.  Just like DISTREAM, to configure DIO0 
+.   and DIO4 as outputs, DOMASK should be set to 2^0 + 2^4 = 17.  An error 
+.   will be raised if any DIO pin is committed for both input streaming AND
+.   output.
 .
-.   The read_data_stream() function is responsible for monitoring the number of
-.   samples and looking for a trigger.  There are four trigger states indicated
-.   by the TRIGSTATE member of the lc_devconf_t structure.
-.       TRIG_IDLE - the trigger is inactive and data will be collected as 
-.                   normal.
-.       TRIG_PRE - data collection has begun recently, and TRIGPRE samples have 
-.                   not yet been collected.  No trigger is allowed yet.
-.       TRIG_ARMED - The pre-trigger buffer has been satisfied and 
-.                   read_data_stream() is actively looking for a trigger. Data
-.                   should continue streaming to a pre-trigger buffer.
-.       TRIG_ACTIVE - A trigger event has been found, and normal data collection
-.                   has begun.
-.   read_data_stream() is responsible for maintaining this state variable, but
-.   it does NOT deal with pre-trigger buffers automatically. read_file_stream()
-.   does.
--TRIGLEVEL
-.   The voltage threshold on which to trigger.  Accepts a floating point.
--TRIGEDGE
-.   Accepts "rising", "falling", or "all" to describe which
--TRIGPRE
-.   Pretrigger sample count.  This non-negative integer indicates how many 
-.   samples should be collected on each channel before a trigger is allowed.
+.   The DOVALUE then indicates bit-wise values to assert to the 16 channels. 
+.   
 -EFFREQUENCY
 .   Sets the frequency scale for all EF extended features.  This parameter
 .   determines how often the EF clock updates.  Pulse and PWM outputs will
@@ -752,43 +777,38 @@ The following parameters are recognized:
 .   Accepts a floating value from zero to one indicating a PWM duty cycle.
 -EFCOUNT
 .   An unsigned integer counter value.
--COMCHANNEL
-.   Like the AICHANNEL, AOCHANNEL, and EFCHANNEL parameter, the COMCHANNEL 
-.   signals the creation of a new communications channel, but unlike the other
-.   scopes, COMCHANNELS do not specify a channel number, but a channel type.
-.   Valid values are:
-. * UART - Universal Asynchronous Receive-Transmit
-. * 1WIRE - 1 Wire communication (NOT YET SUPPORTED)
-. * SPI - Serial-periferal interface (NOT YET SUPPORTED)
-. * I2C - Inter Integrated Circuit (pronounced "eye-squared-see") (NOT YET SUPPORTED)
-. * SBUS - Sensiron Bus I2C derivative (NOT YET SUPPORTED)
-.   
-.   The interpretation of the COM parameters depends on which protocol is being
-.   used.  For example, 1-wire and I2C do not require separate RX and TX lines
-.   and the UART does not require a clock.
--COMRATE
-.   The requested data rate in bits per second.  The available bit rates vary 
-.   with the different COM interfaces.
-.   * UART: 9600 is default, but LJ recommends < 38,400
--COMLABEL
-.   This is a string label to apply to the COM channel.
--COMOUT
-.   The data output line expects an integer DIO pin number.
-.   * UART: This will be the TX pin.
--COMIN
-.   The data input line expects an integer DIO pin number.
-.   * UART: This will be the RX pin.
--COMCLOCK
-.   The data clock line expects an integer DIO pin number.
-.   * UART: This parameter is unusued.
--COMOPTIONS
-.   The communication options is a coded string that defines the mode of the 
-.   selected protocol.
-.   * UART: "8N1" BITS PARITY STOP
-.       The UART options string must be three characters long
-.       BITS:   8 or fewer.  (no 9-bit codes)
-.       PARITY: (N)one, (P)ositive, (O)dd, others are not supported.
-.       STOP:   Number of stop bits 0, 1, or 2.
+-TRIGCHANNEL
+.   Which analog input should be monitored to generate the software trigger?
+.   This non-negative integer does NOT specify the physical analog channel. It
+.   specifies which of the analog measurements should be monitored for a 
+.   trigger.
+.
+.   For fast digital pulses, LCONFIG can be configured to watch the high speed
+.   counter 2 by passing "HSC" instead of a trigger channel.  If the value in 
+.   the counter increases, then a trigger event will be registered.
+.
+.   The read_data_stream() function is responsible for monitoring the number of
+.   samples and looking for a trigger.  There are four trigger states indicated
+.   by the TRIGSTATE member of the lc_devconf_t structure.
+.       TRIG_IDLE - the trigger is inactive and data will be collected as 
+.                   normal.
+.       TRIG_PRE - data collection has begun recently, and TRIGPRE samples have 
+.                   not yet been collected.  No trigger is allowed yet.
+.       TRIG_ARMED - The pre-trigger buffer has been satisfied and 
+.                   read_data_stream() is actively looking for a trigger. Data
+.                   should continue streaming to a pre-trigger buffer.
+.       TRIG_ACTIVE - A trigger event has been found, and normal data collection
+.                   has begun.
+.   read_data_stream() is responsible for maintaining this state variable, but
+.   it does NOT deal with pre-trigger buffers automatically. read_file_stream()
+.   does.
+-TRIGLEVEL
+.   The voltage threshold on which to trigger.  Accepts a floating point.
+-TRIGEDGE
+.   Accepts "rising", "falling", or "all" to describe which
+-TRIGPRE
+.   Pretrigger sample count.  This non-negative integer indicates how many 
+.   samples should be collected on each channel before a trigger is allowed.
 -META
 .   The META keyword begins or ends a stanza in which meta parameters can be 
 .   defined without a type prefix (see below).  Meta parameters are free entry

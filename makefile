@@ -40,8 +40,10 @@ clean:
 	rm -f *.o
 	rm -f *.bin
 
-install: lcburst.bin lcrun.bin
+install: lcburst.bin lcrun.bin lcstat.bin
 	cp -f lcrun.bin $(LCRUN)
 	chmod 755 $(LCRUN)
 	cp -f lcburst.bin $(LCBURST)
 	chmod 755 $(LCBURST)
+	cp -f lcstat.bin $(LCSTAT)
+	chmod 755 $(LCSTAT)
