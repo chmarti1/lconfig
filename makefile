@@ -19,14 +19,9 @@ lcrun.bin: lconfig.o lctools.o lcrun.c
 	gcc lconfig.o lctools.o lcrun.c $(LINK) -o lcrun.bin
 	chmod +x lcrun.bin
 
-lcburst.bin: lconfig.o lcburst.c
+lcburst.bin: lctools.o lconfig.o lcburst.c
 	gcc lconfig.o lctools.o lcburst.c $(LINK) -o lcburst.bin
 	chmod +x lcburst.bin
-
-test: lconfig.o test.c
-	gcc lconfig.o test.c $(LINK) -o test
-	chmod +x test
-
 clean:
 	rm -f *.o
 	rm -f *.bin

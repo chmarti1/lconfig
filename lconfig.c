@@ -1710,6 +1710,9 @@ int lc_upload_config(lc_devconf_t* dconf){
     // Get the max/min ai channel numbers for later
     lc_aichannels(dconf, &minch, &maxch);
     
+    // No matter what, disable the hardware trigger for now
+    LJM_eWriteName(dconf->handle, "STREAM_TRIGGER_INDEX", 0);
+    
     // Loop through the analog input channels.
     for(ainum=0;ainum<naich;ainum++){
         channel = dconf->aich[ainum].channel;
@@ -2177,6 +2180,7 @@ int lc_upload_config(lc_devconf_t* dconf){
                 uploadfail();
             }
         break;
+        case LC_EF_TRIGGER:
         case LC_EF_FREQUENCY:
             // Check for valid channels
             if(channel > 1){
@@ -2954,7 +2958,7 @@ int lc_stream_isfull(lc_devconf_t* dconf){
 
 
 int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
-    int ainum,aonum,index,err=0;
+    int ainum,aonum,efnum,index,err=0;
     int stlist[LCONF_MAX_STCH];
     int resindex, reg_temp, dummy;
     unsigned int blocks;
@@ -3042,6 +3046,15 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     if(dconf->trigchannel >= 0)
         dconf->trigstate = LC_TRIG_PRE;
 
+    // If the hardware trigger is configured, initialize it as well
+    for(efnum=0; efnum<dconf->nefch; efnum++){
+        //If this channel is configured for a trigger
+        if(dconf->efch[efnum].signal == LC_EF_TRIGGER){
+            LJM_eWriteName(dconf->handle, "STREAM_TRIGGER_INDEX", 2000 + dconf->efch[efnum].channel);
+            break;
+        }
+    }
+    
     // Start the stream.
     err=LJM_eStreamStart(dconf->handle, 
             samples_per_read,

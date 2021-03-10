@@ -93,6 +93,7 @@ static const lcm_map_t lcm_ef_signal[] = {
     {.value=LC_EF_FREQUENCY, .message="Pulse Frequency", .config="frequency"},
     {.value=LC_EF_PHASE, .message="Relative Phase", .config="phase"},
     {.value=LC_EF_QUADRATURE, .message="Encoder Quadrature", .config="quadrature"},
+    {.value=LC_EF_TRIGGER, .message="Hardware Trigger", .config="trigger"},
     {.value=-1}
 };
 

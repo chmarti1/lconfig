@@ -259,7 +259,8 @@ typedef struct {
             LC_EF_COUNT,  // Counter (input/output)
             LC_EF_FREQUENCY,  // Frequency (input)
             LC_EF_PHASE,  // Line-to-line phase (input)
-            LC_EF_QUADRATURE  // Encoder quadrature (input)
+            LC_EF_QUADRATURE, // Encoder quadrature (input)
+            LC_EF_TRIGGER     // Hardware trigger channel
         } signal;
 
     lc_edge_t edge;
@@ -649,10 +650,6 @@ The following parameters are recognized:
 .   specifies which of the analog measurements should be monitored for a 
 .   trigger.
 .
-.   For fast digital pulses, LCONFIG can be configured to watch the high speed
-.   counter 2 by passing "HSC" instead of a trigger channel.  If the value in 
-.   the counter increases, then a trigger event will be registered.
-.
 .   The read_data_stream() function is responsible for monitoring the number of
 .   samples and looking for a trigger.  There are four trigger states indicated
 .   by the TRIGSTATE member of the lc_devconf_t structure.
@@ -725,6 +722,10 @@ The following parameters are recognized:
 .       Input: valid channels are in pairs 0/1, 2/3, 6/7
 .       (only one needs to be specified)
 .           EFCOUNT - Holds the measured encoder count
+.       Output: Not supported
+. * TRIGGER - Configure a hardware trigger
+.       Input: Same as FREQUENCY
+.           EFEDGE - trigger on rising or falling edge?
 .       Output: Not supported
 -EFEDGE
 .   Used by the frequency and phase signals, this parameter determines whether
