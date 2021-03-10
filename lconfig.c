@@ -2948,6 +2948,10 @@ int lc_stream_isempty(lc_devconf_t* dconf){
     return isempty_buffer(&dconf->RB);
 }
 
+int lc_stream_isfull(lc_devconf_t* dconf){
+    return isfull_buffer(&dconf->RB);
+}
+
 
 int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     int ainum,aonum,index,err=0;

@@ -77,6 +77,15 @@ LCONFIG allows automatic configuration and control of most of the T4/T7's advanc
 - Automatic generation of data files
     - The active configuratino is embedded in the data
     - Stream directly to a file
+- Tools for real time applications in `lctools.h`
+    - Tools for formatted printing to a POSIX terminal
+    - Tools for handling keyboard interrupts without external libraries
+    - Tools for real-time signal statistics like
+        - mean
+        - peak-to-peak amplitude
+        - max and min
+        - root-mean-square (RMS) value
+        - standard deviation
 - Post processing in Python
     - `lconfig' package loads configurations and data automatically
     - Applies calibrations

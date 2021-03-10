@@ -1,12 +1,12 @@
 [back](documentation.md)
 
-Version 4.00<br>
-September 2019<br>
+Version 4.03<br>
+September 2020<br>
 Chris Martin<br>
 
 ## Binaries
 
-There are two binaries included with LConfig: `lcrun` and `lcburst`.  These are inteded to be sufficiently generic to do most data acquisition tasks.  `lcrun` is intended for long slow sample-rate tests where the test duration may not be known in advance.  `lcburst` is intended for short high-speed tests.
+There are three binaries included with LConfig: `lcrun`, `lcburst`, and `lcstat`.  These are inteded to be sufficiently generic to do most data acquisition tasks.  `lcrun` is intended for long slow sample-rate tests where the test duration may not be known in advance.  `lcburst` is intended for short high-speed tests.  `lcstat` is intended for monitoring and debugging an experiment.
 
 On a Linux system, following the steps in [Compiling](compiling.bin), the binaries will be installed in `/usr/local/bin`.  For help text, use
 
@@ -15,16 +15,19 @@ $ lcrun -h
 ... prints help text ...
 $ lcburst -h
 ... prints help text ...
+$ lcstat -h
+... prints help text ...
 ```
 If you're using a terminal window and want to be able to scoll comfortably, use
 ```bash
 $ lcrun -h | less
 $ lcburst -h | less
+$ lcstat -h | less
 ```
 
 ### lcrun
 
-The **D**ata **RUN** utility, `lcrun`, streams data directly to a [data file](data.md).  This means it is well suited to long tests that involve big data sets, but the maximum data rate will be limited by the write speed to the hard drive.  For high-speed applications, look at `lcburst`.
+The **L**aboratory **C**onfiguration **RUN** utility, `lcrun`, streams data directly to a [data file](data.md).  This means it is well suited to long tests that involve big data sets, but the maximum data rate will be limited by the write speed to the hard drive.  For high-speed applications, look at `lcburst`.
 
 `lcrun` ignores the `nsample` parameter.
 
@@ -96,7 +99,7 @@ GPLv3
 
 ### lcburst
 
-The **D**ata **BURST** utility is intended for high speed streaming for a known duration.  The command-line options can be used to override the configured `nsample`, and otherwise, `nsample` determines the number of samples per channel that should be collected.
+The **L**aboratory **C**onfiguration **BURST** utility is intended for high speed streaming for a known duration.  The command-line options can be used to override the configured `nsample`, and otherwise, `nsample` determines the number of samples per channel that should be collected.
 
 ```bash
 $ lcburst -h
@@ -163,3 +166,8 @@ GPLv3
 (c)2017-2019 C.Martin
 ```
 
+### lcstat
+
+The **L**aboratory **C**onfiguration **STAT**us utility is intended to provide a quick and convenient real time display of signal statistics for the configured device.  This can be handy for monitoring an experiment or just for debugging.
+
+`lcstat` uses the `nsample` parameter to determine the number of samples used for averaging.

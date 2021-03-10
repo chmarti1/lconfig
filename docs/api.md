@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 4.00<br>
-September 2019<br>
+Version 4.03<br>
+September 2020<br>
 Chris Martin<br>
 
 ##  <a name='top'></a> The LConfig API
@@ -46,38 +46,49 @@ Rather than accept file names, `lc_write_config` accepts an open file pointer so
 ### <a name='dev'></a> Interacting with devices
 
 ```C
-int lc_open( lc_devconf_t* dconf )
+int lc_open( lc_devconf_t* dconf );
 ```
 `lc_open_config` opens a connection to the device pointed to by `dconf`.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 ```C
-int lc_close( lc_devconf_t* dconf )
+int lc_close( lc_devconf_t* dconf );
 ```
 `lc_close_config` closes a connection to the device pointed to by `dconf`.  If a ringbuffer is still allocated to the device, it is freed, so it is important NOT to call `lc_close_config` before data is read from the buffer.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 ```C
-int lc_upload_config( lc_devconf_t* dconf )
+int lc_upload_config( lc_devconf_t* dconf );
 ```
 `lc_upload_config` writes to the relevant modbus registers to assert the parameters in the `dconf` configuration struct.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 [top](#top)
 
-### <a name='diag'></a> Performing diagnostics
+### <a name='diag'></a> Performing diagnostics on a device
 
 ```C
 int lc_ndev(          lc_devconf_t* dconf, 
-                const unsigned int devmax)
+                const unsigned int devmax);
                 
-int lc_nistream( lc_devconf_t* dconf )
+int lc_nistream( lc_devconf_t* dconf );
                 
-int lc_nostream( lc_devconf_t* dconf )
+int lc_nostream( lc_devconf_t* dconf );
 ```
 The `lc_ndev` returns the number of devices configured in the `dconf` array, returning a number no greater than `devmax`.  `lc_nistream` and `lc_nostream` return the number of input and ouptut stream channels configured.  The input stream count is especially helpful since it includes non-analog input streams (like digital input streams).
 
 ```C
-void lc_show_config( lc_devconf_t* dconf )
+void lc_show_config( lc_devconf_t* dconf );
 ```
 The `lc_show_config` function prints a detailed list of parameters specified by the `dconf` configuraiton struct.  The format of the printout is varied based on what is configured so that unconfigured features are not summarized.
+
+```C
+void lc_aichannels(const lc_devconf_t* dconf, int *min, int *max);
+
+void lc_aochannels(const lc_devconf_t* dconf, int *min, int *max);
+
+void lc_efchannels(const lc_devconf_t* dconf, int *min, int *max);
+
+void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max);
+```
+The `lc_XXchannels()` functions return the legal physical channel range of the actual open device.  This is especially useful for applications that are configured with device type "any" so they may detect which physical channels of each type is available.  These numbers are returned based on the actual (not configured) device found in `dconf.device_act`, which is not set until the connection is opened.
 
 [top](#top)
 
@@ -107,7 +118,7 @@ There are four steps to a data acquisition process; start, service, read, and st
 
 All data transfers are done in *blocks*.  A *block* of data is `samples_per_read` x `channels` of individual measurements.  The `nsample` configuration parameter determines the total number of samples per channel that should be contained in the buffer.  Since the buffer must be an integer multiple of the block size, the buffer size is rounded up, so that even if `nsample` is set to 0, the buffer will always be able to contain at least one block of data.
 
-The `lc_stream_service` function retrieves a single new block of data into the ring buffer.  If pre-triggering is configured, trigger events will be ignored until enough samples have built up in the buffer to meet the pre-trigger requirements.  Once a trigger event occurs (or if no trigger is configured), blocks of data will become available for reading.  
+The `lc_stream_service` is a "blocking" function that waits until a new block of data is available and reads it into the ring buffer.  If pre-triggering is configured, trigger events will be ignored until enough samples have built up in the buffer to meet the pre-trigger requirements.  Once a trigger event occurs (or if no trigger is configured), blocks of data will become available for reading.  
 
 The `lc_stream_read` function returns a double precision array, `data` representing a 2D array with  a single block of data `samples_per_read` x `channels` long.  The `s` sample of `c` channel can be retrieved by `data[s*channels + c]`.  If there are no data available, then `data` will be `NULL`.
 
@@ -115,22 +126,23 @@ The data acquisition process is halted by the `lc_stream_stop` function, but the
 
 ```C
 void lc_stream_status( lc_devconf_t* dconf, 
-               const unsigned int devnum,
                      unsigned int *samples_streamed, 
                      unsigned int *samples_read,
                      unsigned int *samples_waiting);
                      
-int lc_stream_iscomplete(lc_devconf_t* dconf, 
-                 const unsigned int devnum);
+int lc_stream_iscomplete(lc_devconf_t* dconf);
                  
-int lc_stream_isempty( lc_devconf_t* dconf, 
-               const unsigned int devnum);
+int lc_stream_isempty(lc_devconf_t* dconf);
+               
+int lc_stream_isfull(lc_devconf_t* dconf);
 ```
 These functions are handy tools for monitoring the progress of a data collection process.  The `lc_stream_status` function returns the per-channel stream counts streamed into, read out of, and waiting in the ring buffer.  Authors should keep in mind that the `lc_stream_service` function adjusts the `samples_streamed` value to exclude data that was thrown away in the triggering process.
 
 `lc_stream_iscomplete` returns a 1 or 0 to indicate whether the total number of `samples_streamed` per channel has exceeded the `nsample` parameter found in the configuration file.
 
-`lc_stream_isempty` returns a 1 or 0 to indicate whether the ring buffer has been exhausted by read operations.
+`lc_stream_isempty` returns a 1 or 0 to indicate whether the ring buffer has been emptied by read operations.  Even after the buffer has been emptied, `lc_stream_isempty()` will return 1 as soon as `lc_stream_service` has added more data to the buffer.
+
+`lc_stream_isfull` returns a 1 or 0 to indicate whether the ring buffer memory is completely full.  When this is true, further data streamed into the buffer will overwrite the oldest data.
 
 ```C
 int lc_datafile_init(    lc_devconf_t* dconf, 

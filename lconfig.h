@@ -159,6 +159,13 @@ with init_data_file() and write_data_file() utilities.
 10/2019
 - No changes to the core LCONFIG system; updated lconfig.py for post-processing
     consistent with the 4.00 changes.
+    
+** 4.03
+9/2020
+- Added LC_STREAM_ISEMPTY() to compliment LC_STREAM_ISFULL() and 
+    LC_STREAM_ISCOMPLETE().
+- Added the LCT_STAT_T struct for collecting signal statistics and supporting
+    functions, LCT_STREAM_STAT() and LCT_STAT_JOIN().
 */
 
 #define TWOPI 6.283185307179586
@@ -425,6 +432,7 @@ Returns the number of output stream channels configured. These will be the numbe
 of columns of data discovered in the data when streaming.
 */
 int lc_nostream(lc_devconf_t* dconf);
+
 
 /* LC_AICHANNELS
 Determine the range of valid analog input channels for the current device 
@@ -1025,6 +1033,12 @@ otherwise.
 */
 int lc_stream_isempty(lc_devconf_t* dconf);
 
+/* LC_STREAM_ISFULL
+Returns 1 to indicate that the buffer is full and that further calls to 
+lc_stream_service will overwrite the oldest data.  Returns a 0 otherwise.
+*/
+int lc_stream_isfull(lc_devconf_t* dconf);
+
 /* LC_STREAM_START
 Start a stream operation based on the device configuration for device devnum.
 samples_per_read can be used to override the NSAMPLE parameter in the device
@@ -1036,10 +1050,17 @@ int lc_stream_start(lc_devconf_t* dconf,   // Device array and number
 
 
 /*LC_STREAM_SERVICE
-Read data from an active stream on the device devnum.  The SERVICE_DATA_STREAM
-function also services the software trigger state.
+Service an active data stream by reading another block of data an checking for
+trigger events (if a software trigger has been configured).  This is a blocking
+algorithm in the sense that it will only return once a new block of data is 
+available.  The block size is tunable by setting the SAMPLES_PER_READ parameter
+when calling the LC_STREAM_START() function.
 
 Data are read directly from the T7 into a ring buffer in the lc_devconf_t struct.  
+If a software trigger has been configured, these are then checked for trigger
+events, and the data will not become "available" to the LC_STREAM_READ function
+until the trigger is detected.
+
 Until data become available, READ_DATA_STREAM will return NULL data arrays,
 but once valid data are ready, READ_DATA_STREAM returns pointers into this
 ring buffer.
@@ -1047,11 +1068,10 @@ ring buffer.
 int lc_stream_service(lc_devconf_t* dconf);
 
 /*LC_STREAM_READ
-If data are available on the data stream on device number DEVNUM, then 
-READ_DATA_STREAM will return a DATA pointer into a buffer that contains data
-ready for use.  The amount of data available is indicated by the CHANNELS
-and SAMPLES_PER_READ integers.  The total length of the data array will be 
-CHANNELS * SAMPLES_PER_READ.
+If data are available on the data stream, then READ_DATA_STREAM will return a 
+DATA pointer into a buffer that contains data ready for use.  The amount of data
+available is indicated by the CHANNELS and SAMPLES_PER_READ integers.  The total
+length of the data array will be CHANNELS * SAMPLES_PER_READ.
 
 The measurements of each scan are arranged in data[] by channel number.  When 
 three channels are included in each measurement, the data array would appear 
@@ -1080,8 +1100,8 @@ unsigned int channels, samples_per_read, index;
 double my_buffer[2048];
 double *pointer;
 ... setup code ... 
-err = service_data_stream(dconf, 0);
-err = read_data_stream(dconf, 0, &data, &channels, &samples_per_read);
+err = lc_stream_service(&dconf, 0);
+err = lc_stream_read(&dconf, 0, &data, &channels, &samples_per_read);
 if(data){
     for(index=0; index<samples_per_read*channels; index++)
         my_buffer[index] = data[index];
@@ -1094,6 +1114,11 @@ int lc_stream_read(lc_devconf_t* dconf, double **data,
 Halt an active stream on device devnum.
 */
 int lc_stream_stop(lc_devconf_t* dconf);
+
+/*STREAM_CLEAR
+Empty the buffer without deallocating any memory.  This doesn't reset any
+of the buffer status registers, but it 
+*/
 
 /*STREAM_CLEAN
 De-allocates the memory assigned to the internal ring-buffer.  This is 
