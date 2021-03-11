@@ -1,0 +1,45 @@
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0m[31mOPEN: Failed to open the device: ANY.
+[0m[31mOPEN: IP: , Serial: , Name: ""
+[0m[31mLJM Error Code: LJME_DEVICE_NOT_FOUND
+[0m[31mLCONFIG: Error closing device.
+[0m[31mLJME_DEVICE_NOT_OPEN
+[0mLCSTAT failed to open the device 0 in configuration file lcstat.conf
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0m[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0m[31mSTREAM_START: Failed to set setting and resolution settings.
+[0m[31mSTART_DATA_STREAM: IP: , Serial: 470014042, Name: "LJ2"
+[0m[31mSTREAM_IS_ACTIVE
+[0mLCSTAT failed to start data collection on device 0 in configuration file lcstat.conf
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0m[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)
+[36mOPEN::WARNING:: Device was requested without a device identifier.
+Results may be inconsistent; IP, SERIAL, or NAME should be set.
+[0mfree(): invalid next size (fast)

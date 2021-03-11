@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+    along with LCONFIG.  If not, see <https://www.gnu.org/licenses/>.
 
     Authored by C.Martin crm28@psu.edu
 */
@@ -26,8 +26,7 @@ sequences for the Linux console environment.
 CHANGELOG
 
 v1.2    9/2020
-- Replaced lct_stream_mean() with lct_stream_stat()
-- Added lct_stat_t type
+- Added stream statistics tools
 
 v1.1	10/2019		
 - Debugged the diter utility functions.
@@ -57,22 +56,6 @@ v1.0	9/2019		ORIGINAL RELEASE
 
 #define LCT_VERSION 1.2
 
-
-/****************************
- *                          *
- *      Prototypes          *
- *                          *
- ****************************/
- 
-typedef struct _lct_stat_t {
-    double mean;
-    double max;
-    double min;
-    double std;
-    double rms;
-    double pkpk;
-    unsigned int N;
-} lct_stat_t;
 
 
 /****************************************
@@ -231,6 +214,7 @@ int lct_ao_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
 int lct_fio_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
 
 
+
 /************************************
  *                                  *
  *      Interacting with Data       *
@@ -289,28 +273,18 @@ int lct_diter_init(lc_devconf_t *dconf, lct_diter_t *diter,
 double* lct_diter_next(lct_diter_t *diter);
 
 /* LCT_DATA
-.   A utility for indexing a data array in an application.  This function 
-.   returns a pointer to a data element corresponding to the specified channel
-.   and sample number.  LCT_DATA() may be used directly on the buffer data array
-.   returned by the LC_STREAM_READ() funciton or on a secondary data buffer into
-.   which buffer data have already been copied.  
-.
-.   DCONF is the device configuration that was used to read in the data.
-.   The DATA array contains the samples read in the same order they were read.
-.   The DATA_SIZE integer indicates the length of the DATA array, and it is used
-.   as a safety check to prevent accidental overrun errors.
-.   CHANNEL specifies from which input stream channel the data should be read.
-.   SAMPLE specifies which measurement should be returned.
-.
-.   LCT_DATA() returns NULL when 
-.       CHANNEL is larger than the number of channels configured for streaming
-if(channel >= lc_nistream(dconf)) ...
-.       or when the requested sample is beyond the end of the data array
-if(lc_nistream(&dconf)*sample + channel >= data_size) ...
+.   A utility for indexing a data array in an application.  Presuming that an 
+.   applicaiton has defined a double array and has streamed data into it using
+.   the READ_DATA_STREAM function, the LCT_DATA function provides a pointer to
+.   an element in the array corresponding to a given channel number and sample
+.   number.  DCONF and DEVNUM are used to determine the number of channels being
+.   streamed.  DATA is the data array being indexed, and DATA_SIZE is its total
+.   length.  CHANNEL and SAMPLE determine which data point is to be returned.
 .   
-.   Except for the error checking above, LTC_DATA() is roughly equivalent to
-return &data[lc_nistream(&dconf)*sample + channel];
+.   LTC_DATA is roughly equivalent to
+.       &data[nistream_config(dconf,devnum)*sample + channel]
 .
+.   When CHANNEL or SAMPLE are out of range, LTC_DATA returns a NULL pointer.
 */
 double * lct_data(lc_devconf_t *dconf,  
                 double data[], unsigned int data_size,
@@ -322,22 +296,6 @@ double * lct_data(lc_devconf_t *dconf,
 .   READ_DATA_STREAM function.  DCONF and DEVNUM are used to determine the 
 .   calibration parameters, DATA is the array on which to operate, and DATA_SIZE
 .   is its length.  
-.
-.   LCT_CAL_INPLACE is intended to be used on entire data arrays that have been
-.   read using lc_stream_read or it can be used directly on data in the buffer.
-.   For example, 
-
-int err;
-unsigned int channels, samples_per_read, index;
-double *data;
-lc_devconf_t dconf;
-// ... setup code ... 
-err = lc_stream_service(&dconf);
-err = lc_stream_read(&dconf, &data, &channels, &samples_per_read);
-if(data){
-    lct_cal_inplace(&dconf, data, channels*samples_per_read);
-    // ... do things with data[] ...
-}
 */
 void lct_cal_inplace(lc_devconf_t *dconf, 
                 double data[], unsigned int data_size);
@@ -345,92 +303,65 @@ void lct_cal_inplace(lc_devconf_t *dconf,
 
 /* LCT_CAL
 .   Apply the channel calibration from AI channel AINUM to a raw voltage 
-.   measurement.  Returns the calibrated measurement in engineering units.
+.	measurement.  Returns the calibrated measurement in engineering units.
 */
 int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data);
 
+/* LCT_CAL_UNITS
+.   Return a pointer to the analog input channel units.  Returns NULL if
+.   the analog input channel index is out of range.
+*/
+char * lct_cal_units(lc_devconf_t *dconf, unsigned int ainum);
+
+/* LCT_STAT_T
+.   Contains aggregated statistics on data
+.       n : number of samples aggregated into the stat struct
+.       mean : the mean value
+.       max : the highest value
+.       min : the lowest value
+.       std : the standard deviation of the data
+*/
+typedef struct __lct_stat_t__ {
+    unsigned int n;
+    double mean;
+    double max;
+    double min;
+    double var;
+} lct_stat_t;
+
+/* LCT_STAT_INIT
+.   Initialize an LCT_STAT_T struct.  This sets most parameters to zero,
+.   but the max -> -infty, min -> +infty.  The STAT input argument is taken
+.   to be an array of lct_stat_t structs, each representing a channel.  
+.   The CHANNELS int is interpreted as the length of that array.
+*/
+void lct_stat_init(lct_stat_t stat[], unsigned int channels);
+
 /* LCT_STREAM_STAT
-.   Calculate statistics on the data[] array with a total length data_size.
-.   The results are accumulated in the result[] struct array, which is no longer
-.   than maxchannels.  Just like LCT_CAL_INPLACE() and LCT_DATA(), 
-.   LCT_STREAM_STAT() can be used directly on data in the ring buffer returned
-.   by LC_STREAM_READ() or it can be used on data that have already been copied
-.   into the application's memory.
+.   Read in a single block of data from the buffer and aggregate statistics
+.   on the data.  LCT_STREAM_STAT() should be called in place of the 
+.   LC_STREAM_READ() function.  LCT_STREAM_STAT calls LC_STREAM_READ()
+.   to access data in the buffer directly.  If data are ready, they are
+.   calibrated in place using the LCT_CAL_INPLACE() function before
+.   statistics are aggregated.
 .
-.   DCONF is the device configuration struct that was used to read the data.
-.   The DATA array contains the data in the order read, and is total length
-.   specified by DATA_SIZE.
-.   RESULT is an array of LCT_STAT_T structs that will contain the analysis
-.   results when LCT_STREAM_STAT is done.  The length of the RESULT array is
-.   passed through MAXCHANNELS.
+.   The LCT_STAT_T VALUES struct contains the aggregated mean, maximum,
+.   minimum, and standard deviation.  Each element of the VALUES array
+.   corresponds to one of the stream channels in the order they are
+.   configured.  From the four basic statistics, others can be constructed.
+.   variance = std*std
+.   root-mean-square amplitude = sqrt(mean*mean + var)
+.   peak-to-peak amplitude = max - min
 .
-.   When DATA is NULL, the RESULT structs are initialized and the function 
-.   exits.  This can be a useful mode of operation for initializing total and
-.   working stat structs (see the example in the LCT_STAT_JOIN() documentation).
+.   If MAXCHANNELS is greater than 0, it is interpreted as the maximum 
+.   length of the VALUES array.  If the number of configured analog stream
+.   channels is longer than MAXCHANNELS, LCT_STREAM_STAT will print a 
+.   warning to stderr and return with LCONF_ERROR.  If MAXCHANNELS is 0,
+.   it is assumed that adequate measures have already been taken to protect
+.   against a memory overrun.
 .
-.   An error condition can occur if the number of configured device channels
-.   (see LC_NISTREAM()) exceeds the length of the RESULT array specified by 
-.   MAXCHANNELS.  In this case, the statistics will still be correctly 
-.   calculated on all channels up to (MAXCHANNELS-1).
-.
-.   LCT_STREAM_STAT() returns LC_ERROR in this case, and LC_NOERR otherwise.
-.
-.   In the example below, LCT_CAL_INPLACE() is used on the buffer memory prior 
-.   to calling LCT_STREAM_STAT().  Note that 16 is passed to MAXCHANNELS since
-.   that was the size of the STAT array.
-
-int err;
-unsigned int channels, samples_per_read, index;
-double *data;
-lc_devconf_t dconf;
-lct_stat_t stat[16];
-// ... setup code ... 
-err = lc_stream_service(&dconf);
-err = lc_stream_read(&dconf, &data, &channels, &samples_per_read);
-if(data){
-    lct_cal_inplace(&dconf, data, channels*samples_per_read);
-    lct_stream_stat(&dconf, data, channels*samples_per_read, stat, 16);
-    // ... do stuff with stat ...
-    // ... see LCT_STAT_JOIN ...
-}
+.   
 */
-int lct_stream_stat(lc_devconf_t *dconf, 
-                double data[], unsigned int data_size,
-                lct_stat_t result[], unsigned int maxchannels);
-                
-/* LCT_STAT_JOIN
-.   Join an array of LCT_STAT_T structs representing the statistics of two 
-.   segments of a single data set.  LCT_STAT_JOIN() is intended for applications
-.   where data are streamed and discarded while signal statistics are maintained.
-.   When NEXT is an array of LCT_STAT_T structs returned by a call to
-.   LCT_STREAM_STAT() on the most recently streamed data, and TARGET is an array
-.   of LCT_STAT_T structs representing the signal statistics of all previous
-.   data.
-.
-.   The example below declares WORKING and TOTAL LCT_STAT_T struct arrays.  The
-.   former is used to contain statistics from the most recent segement of data
-.   streamed from the experiment.  The latter is a running total of all data
-.   streamed.  Note that TOTAL must be initialized using a call to 
-.   LCT_STREAM_STAT() with a NULL pointer instead of genuine data.
-
-int err;
-unsigned int channels, samples_per_read, index;
-double *data;
-lc_devconf_t dconf;
-lct_stat_t working[16], total[16];
-// Initialize the total stat structs
-lct_stream_stat(&dconf, NULL, 0, total, 16);
-// ... setup code ... 
-err = lc_stream_service(&dconf);
-err = lc_stream_read(&dconf, &data, &channels, &samples_per_read);
-if(data){
-    lct_cal_inplace(&dconf, data, channels*samples_per_read);
-    lct_stream_stat(&dconf, data, channels*samples_per_read, working, 16);
-    lct_stream_join(total, working, 16);
-    // the "total" array now contains running statistics that includes the most
-    // recent results returned in "working."
-}
-*/
-void lct_stat_join(lct_stat_t *target, lct_stat_t *next);
+int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxchannels);
 
 #endif

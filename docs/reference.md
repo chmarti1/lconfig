@@ -44,10 +44,12 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | aooffset    | floating point                          | Analog Output | Offset (DC) voltage to add to the oscillating (AC) signal.
 | aoduty      | floating point [0-1]                    | Analog Output | The duty cycle of triangle and square waves. This skews the signal to spend more time on one part of the wave than the other.
 | aofrequency | floating point                          | Analog Output | Specifies the rate the wave will repeat in Hz.
-| trigchannel | integer [0-13]                          | Global        | The analog input to use for a software trigger.  This is NOT the physical channel, but the index of the ordered list of configured inputs.
-| triglevel   | floating point [-10. - 10.]             | Global        | Software trigger threshold voltage.
-| trigedge    | rising, falling, all                    | Global        | Software trigger edge type.
-| trigpre     | non-negative integer [>=0]              | Global        | The "pretrigger" is the minimum number of samples per channel PRIOR to the triger event that will be included in the streamed data.
+| comchannel | uart, spi, i2c, 1wire, sbus             | COM           | The digital communications channel type.
+| comin      | integer                                 | COM           | The digital communications input DIO pin number.
+| comout     | integer                                 | COM           | The digital communications output DIO pin number.
+| comclock   | integer                                 | COM           | The digital communications clock DIO pin number.
+| comrate    | floating point > 0                      | COM           | The digital communications data rate in bits per second.
+| comoptions | string                                  | COM           | The digital communications channel options; a specialized string that depends on the channel type.  (e.g. UART: 8N1 bits parity stop)
 | effrequency | floating point                         | Global        | Specifies the CLOCK0 rollover frequency.
 | efchannel  | integer [0-7]                           | Flexible IO   | The physical channel to use for a digital IO operation.
 | eflabel | string | Flexible IO | A string used to name the EF channel.
@@ -58,16 +60,14 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | efusec     | floating point [>0]                     | Flexible IO   | A generic time parameter for configuring EF channels.
 | efdegrees  | floating point                          | Flexible IO   | A generic phase parameter for configuring EF channels.
 | efduty     | floating point [0-1]                    | Flexible IO   | Duty cycle for a PWM output.
-| comchannel | uart, spi, i2c, 1wire, sbus             | COM           | The digital communications channel type.
-| comin      | integer                                 | COM           | The digital communications input DIO pin number.
-| comout     | integer                                 | COM           | The digital communications output DIO pin number.
-| comclock   | integer                                 | COM           | The digital communications clock DIO pin number.
-| comrate    | floating point > 0                      | COM           | The digital communications data rate in bits per second.
-| comoptions | string                                  | COM           | The digital communications channel options; a specialized string that depends on the channel type.  (e.g. UART: 8N1 bits parity stop)
 | meta        | flt/float, int/integer, str/string, stop/end/none | Meta | Starts a meta parameter stanza.  Any unrecognized parameter name after this directive will be treated as a new meta parameter of the specified type.  If stop, end, or none is specified, the meta stanza is ended, and unrecognized parameters will cause errors again.
 | flt:param   | floating point                          | Meta | Specifies a single floating point meta parameter.
 | int:param   | integer                                 | Meta | Specifies a single integer parameter
 | str:param   | string                                  | Meta | Specifies a single string parameter
+| trigchannel | integer [0-13]                          | Global        | The analog input to use for a software trigger.  This is NOT the physical channel, but the index of the ordered list of configured inputs.
+| triglevel   | floating point [-10. - 10.]             | Global        | Software trigger threshold voltage.
+| trigedge    | rising, falling, all                    | Global        | Software trigger edge type.
+| trigpre     | non-negative integer [>=0]              | Global        | The "pretrigger" is the minimum number of samples per channel PRIOR to the triger event that will be included in the streamed data.
 
 [top](#ref:top)
 

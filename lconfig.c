@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+    along with LCONFIG.  If not, see <https://www.gnu.org/licenses/>.
 
     Authored by C.Martin crm28@psu.edu
 */
@@ -297,10 +297,13 @@ void init_config(lc_devconf_t* dconf){
         dconf->aich[ainum].calslope = 1.;
         dconf->aich[ainum].calzero = 0.;
         dconf->aich[ainum].label[0] = '\0';
-        dconf->aich[ainum].calunits[0] = '\0';
+        strcpy(dconf->aich[ainum].calunits, "V");
     }
     // Digital input streaming
     dconf->distream = 0;
+    // Digital outputs
+    dconf->domask = 0x0000;
+    dconf->dovalue = 0x0000;
     // Analog Outputs
     dconf->naoch = 0;
     for(aonum=0; aonum<LCONF_MAX_NAOCH; aonum++){
@@ -542,8 +545,8 @@ void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max){
         *max = 22;
     break;
     default:
-        *min = -1;
-        *max = -1;
+        *min = 0;
+        *max = 22;
     }
 }
 
@@ -558,7 +561,7 @@ void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max){
 
 int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* filename){
     int devnum=-1, ainum=-1, aonum=-1, efnum=-1, comnum=-1;
-    int itemp, itemp2;
+    int itemp, itemp2, itemp3, itemp4;
     float ftemp;
     char param[LCONF_MAX_STR], value[LCONF_MAX_STR];
     char metatype;
@@ -842,8 +845,41 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error(
                         "LOAD: DISTREAM must be a positive 16-bit mask. Found %d\n",
                         itemp);
+                loadfail();
+            }else if(itemp & dconf[devnum].domask){
+                print_error(
+                        "LOAD: The DISTREAM mask collides with one of the configured digital outputs.\n");
+                loadfail();
             }
             dconf[devnum].distream = itemp;
+        //
+        // The DOX
+        //
+        }else if(sscanf(param, "do%d", &itemp) == 1){
+            if(itemp & dconf[devnum].distream){
+                print_error(
+                    "LOAD: Setting DO%d collides with the DISTREAM configuration.\n",
+                    itemp);
+                loadfail();
+            }else if(sscanf(value, "%d", &itemp2)!=1 || itemp2<0 || itemp2>1){
+                print_error(
+                    "LOAD: DO%d received unexpected value: %s\n",
+                    itemp, value);
+                loadfail();
+            }
+            lc_diochannels(&dconf[devnum], &itemp3, &itemp4);
+            if(itemp < itemp3 || itemp > itemp4){
+                print_error(
+                    "LOAD: DO%d is not between DO%d and DO%d\n",
+                    itemp, itemp3, itemp4);
+                loadfail();
+            }
+            itemp = 1<<itemp;
+            dconf[devnum].domask |= itemp;
+            if(itemp2)
+                dconf[devnum].dovalue |= itemp;
+            else
+                dconf[devnum].dovalue &= ~itemp;
         //
         // The AOCHANNEL parameter
         //
@@ -879,7 +915,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
                 loadfail();
             }
-            if(lcm_get_value(lcm_aosignal, value, &dconf[devnum].aoch[aonum].signal)){
+            if(lcm_get_value(lcm_aosignal, value, (int*) &dconf[devnum].aoch[aonum].signal)){
                 print_error("LOAD: Illegal AOsignal type: %s\n",value);
                 loadfail();
             }
@@ -960,9 +996,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // TRIGCHANNEL parameter
         //
         }else if(streq(param,"trigchannel")){
-            if(streq(value,"hsc")){
-                itemp = LCONF_TRIG_HSC;
-            }else if(sscanf(value,"%d",&itemp)!=1){
+            if(sscanf(value,"%d",&itemp)!=1){
                 print_error("LOAD: TRIGchannel expected an integer channel number but found: %s\n", 
                     value);
                 loadfail();
@@ -985,7 +1019,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // TRIGEDGE parameter
         //
         }else if(streq(param,"trigedge")){
-            if(lcm_get_value(lcm_edge, value, &dconf[devnum].trigedge)){
+            if(lcm_get_value(lcm_edge, value, (int*) &dconf[devnum].trigedge)){
                 print_error("LOAD: Unrecognized TRIGedge parameter: %s\n", value);
                 loadfail();
             }
@@ -1050,9 +1084,19 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // EFSIGNAL parameter
         //
         }else if(streq(param,"efsignal")){
-            if(lcm_get_value(lcm_ef_signal, value, &dconf[devnum].efch[efnum].signal)){
+            if(lcm_get_value(lcm_ef_signal, value, (int*) &dconf[devnum].efch[efnum].signal)){
                 print_error("LOAD: Illegal EF signal: %s\n",value);
                 loadfail(); 
+            // If this is a trigger, we need to take some special steps
+            }else if(dconf[devnum].efch[efnum].signal == LC_EF_TRIGGER){
+                // If there is already channel selected
+                if(dconf[devnum].trigchannel >= 0){
+                    print_error("LOAD: Cannot simultaneously specify a software and a hardware (EF) trigger.\n");
+                    loadfail();
+                }
+                // Set the trigger to point to the EF channel and copy its edge setting
+                dconf[devnum].trigchannel = dconf[devnum].efch[efnum].channel + LCONF_TRIG_EFOFFSET;
+                dconf[devnum].trigedge = dconf[devnum].efch[efnum].edge;
             }
         //
         // EFEDGE
@@ -1068,6 +1112,9 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Illegal EF edge: %s\n",value);
                 loadfail(); 
             }
+            // If this is a hardware trigger, keep the edge information.
+            if(dconf[devnum].efch[efnum].signal == LC_EF_TRIGGER)
+                dconf[devnum].trigedge = dconf[devnum].efch[efnum].edge;
         //
         // EFDEBOUNCE
         //
@@ -1147,7 +1194,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Too many COMchannel definitions.  Only %d are allowed.\n",LCONF_MAX_NCOMCH);
                 loadfail();
             }
-            if(lcm_get_value(lcm_com_channel, value, &dconf[devnum].comch[comnum].type)){
+            if(lcm_get_value(lcm_com_channel, value, (int*) &dconf[devnum].comch[comnum].type)){
                 print_error( "LOAD: Unsupported COMchannel mode: %s\n", value);
                 loadfail();
             }
@@ -1247,7 +1294,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 // Modify value to form a string for lcm_get_value
                 value[0] = ctemp;
                 value[1] = '\0';
-                if(lcm_get_value(lcm_com_parity, value, &dconf->comch[comnum].options.uart.parity)){
+                if(lcm_get_value(lcm_com_parity, value, (int*) &dconf->comch[comnum].options.uart.parity)){
                     print_error( "LOAD: UART COMOPTIONS parity character must be N, E, or O.  Received: %c\n", ctemp);
                     loadfail();
                 }
@@ -1317,6 +1364,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
 
 void lc_write_config(lc_devconf_t* dconf, FILE* ff){
     int ainum,aonum, efnum, comnum, metanum;
+    unsigned int ii, itemp;
     char mflt, mint, mstr;
 
     fprintf(ff,"# Configuration automatically generated by WRITE_CONFIG()\n");
@@ -1358,6 +1406,19 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
     // Digital Input streaming
     if(dconf->distream)
         write_int(distream,distream);
+        
+    // Digital Output streaming
+
+    if(dconf->domask){
+        itemp = dconf->domask;
+        fprintf(ff,"# Digital output\n");
+        for(ii=0; itemp; ii++){
+            if(itemp & 0x0001)
+                fprintf(ff, "do%d %d\n", ii, (dconf->dovalue >> ii) & 0x0001);
+            itemp >>= 1;
+        }
+        fprintf(ff,"\n");
+    }
 
     // Analog outputs
     if(dconf->naoch)
@@ -1374,12 +1435,10 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
         fprintf(ff,"\n");
     }
     // Trigger settings
-    if(dconf->trigchannel >= 0){
+    // If the trigger is hardware, let the EF channels configure it instead.
+    if(dconf->trigchannel >= 0 && dconf->trigchannel < LCONF_TRIG_EFOFFSET){
         fprintf(ff,"# Trigger Settings\n");
-        if(dconf->trigchannel == LCONF_TRIG_HSC)
-            fprintf(ff,"trigchannel hsc\n");
-        else
-            write_int(trigchannel,trigchannel);
+        write_int(trigchannel,trigchannel);
         write_flt(triglevel,triglevel);
         fprintf(ff, "trigedge %s\n",
                 lcm_get_config(lcm_edge, dconf->trigedge));
@@ -1428,6 +1487,8 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
                     dconf->comch[comnum].options.uart.bits,
                     lcm_get_config(lcm_com_parity, dconf->comch[comnum].options.uart.parity),
                     dconf->comch[comnum].options.uart.stop);
+            break;
+        default:
             break;
         }
         
@@ -1654,6 +1715,7 @@ int lc_upload_config(lc_devconf_t* dconf){
     unsigned int itemp, itemp1, itemp2;
     char stemp[LCONF_MAX_STR];   // temporary string
 
+    err = 0;
 
     naich = dconf->naich;
     naoch = dconf->naoch;
@@ -1672,7 +1734,6 @@ int lc_upload_config(lc_devconf_t* dconf){
     // If the requested conneciton was USB, assert the IP parameters
     if(dconf->connection == LC_CON_USB){
         flag=0;
-        err = 0;
         if(dconf->ip[0] != '\0'){
             printf("IP: %s\n", dconf->ip);
             err = LJM_IPToNumber(dconf->ip, &itemp);
@@ -1777,22 +1838,29 @@ int lc_upload_config(lc_devconf_t* dconf){
 
     }
 
-    // Set the digital direction based on the DISTREAM register
-    if(dconf->distream){
+    // Set the digital direction based on the DISTREAM and DOSTREAM settings
+    if(dconf->distream || dconf->domask){
+        // Test for a collision
+        if(dconf->distream & dconf->domask){
+            print_error(
+                    "UPLOAD: DISTREAM = 0x%x, DOMASK = 0x%x collide.\n",
+                    dconf->distream, dconf->domask);
+            uploadfail();
+        }
         err = LJM_eWriteName(dconf->handle,
-                "DIO_INHIBIT", 0xFFFF0000);
-        err = err ? err : LJM_eWriteName(dconf->handle,
-                "DIO_DIRECTION", ~dconf->distream);
-        err = err ? err : LJM_eWriteName(dconf->handle,
                 "DIO_INHIBIT", 0x00000000);
+        err = err ? err : LJM_eWriteName(dconf->handle,
+                "DIO_DIRECTION", dconf->domask);
+        err = err ? err : LJM_eWriteName(dconf->handle,
+                "DIO_STATE", dconf->dovalue);
         if(err){
             print_error( 
-                    "UPLOAD: Failed to set DIO direction from DISTREAM: %d\n",
-                    dconf->distream);
+                    "UPLOAD: Failed to set DIO registers DISTREAM: 0x%x, DOMASK: 0x%x, DOVALUE: 0x%x\n",
+                    dconf->distream, dconf->domask, dconf->dovalue);
             uploadfail();
         }
     }
-
+    
     // Set up all analog outputs
     for(aonum=0;aonum<naoch;aonum++){
         /*
@@ -1974,17 +2042,6 @@ int lc_upload_config(lc_devconf_t* dconf){
         }
     }
 
-    // Check for an HSC trigger setting
-    if(dconf->trigchannel == LCONF_TRIG_HSC){
-        err = LJM_eWriteName( handle, "DIO18_EF_ENABLE", 0);
-        err = err ? err : LJM_eWriteName( handle, "DIO18_EF_INDEX", 7);
-        err = err ? err : LJM_eWriteName( handle, "DIO18_EF_ENABLE", 1);
-        if(err){
-            print_error("UPLOAD: Failed to configure high speed counter 2 for the HSC trigger.\n");
-            uploadfail();
-        }
-    }
-
     //
     // Upload the EF parameters
     // First, deactivate all of the extended features
@@ -2042,17 +2099,24 @@ int lc_upload_config(lc_devconf_t* dconf){
     // Configure the EF channels
     for(efnum=0; efnum<nefch; efnum++){
         channel = dconf->efch[efnum].channel;
+
+        // Disable the EF channel
+        sprintf(stemp, "DIO%d_EF_ENABLE", channel);
+        err = err ? err : LJM_eWriteName(handle, stemp, 0);
+        
         switch(dconf->efch[efnum].signal){
         // Pulse-width modulation
         case LC_EF_PWM:
             // PWM input
             if(dconf->efch[efnum].direction==LC_EF_INPUT){
+                /*
                 // Permitted channels are 0 and 1
                 if(channel > 1){
                     print_error("UPLOAD: Pulse width input only permitted on channels 0 and 1. Found ch %d.\n",
                         dconf->efch[efnum].channel);
                     uploadfail();
                 }
+                */
                 // Measurement index 5
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 5);
@@ -2067,11 +2131,13 @@ int lc_upload_config(lc_devconf_t* dconf){
                 err = err ? err : LJM_eWriteName(handle, stemp, 1);
             // PWM output
             }else{
+                /*
                 if(channel > 5 || channel == 1){
                     print_error("UPLOAD: Pulse width output only permitted on channels 0, 2, 3, 4, and 5. Found ch %d.\n",
                         dconf->efch[efnum].channel);
                     uploadfail();
                 }
+                */
                 // Calculate the start index
                 // Unwrap the phase first (lazy method)
                 while(dconf->efch[efnum].phase<0.)
@@ -2110,12 +2176,14 @@ int lc_upload_config(lc_devconf_t* dconf){
         case LC_EF_COUNT:
             // counter input
             if(dconf->efch[efnum].direction == LC_EF_INPUT){
+                /*
                 // check for valid channels
                 if(channel > 7 || channel == 4 || channel ==5){
                     print_error( "UPLOAD: EF Counter input on channel %d is not supported.\n Use EF channel 0,1,2,3,6,or 7.",
                         channel);
                     uploadfail();
                 }
+                */
                 switch(dconf->efch[efnum].debounce){
                     case LC_EF_DEBOUNCE_NONE:
                         // Use a counter with no debounce algorithm
@@ -2181,13 +2249,37 @@ int lc_upload_config(lc_devconf_t* dconf){
             }
         break;
         case LC_EF_TRIGGER:
+            if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
+                print_error( "UPLOAD: EF Trigger output is not supported.\n");
+                uploadfail();
+            }
+            // Use rising/falling edge frequency
+            if(dconf->efch[efnum].edge == LC_EDGE_FALLING){
+                sprintf(stemp, "DIO%d_EF_INDEX", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, 4);
+            }else if(dconf->efch[efnum].edge == LC_EDGE_RISING){
+                sprintf(stemp, "DIO%d_EF_INDEX", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, 3);
+            // PWM accepts any edge
+            }else{
+                sprintf(stemp, "DIO%d_EF_INDEX", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, 5);
+            }
+            // Enable the EF channel
+            sprintf(stemp, "DIO%d_EF_ENABLE", channel);
+            err = err ? err : LJM_eWriteName(handle, stemp, 1);
+            printf("TRIGGER\n");
+        break;
         case LC_EF_FREQUENCY:
+            /*
             // Check for valid channels
             if(channel > 1){
                 print_error( "UPLOAD: EF Frequency on channel %d is not supported. 0 and 1 are allowed.\n",
                     channel);
                 uploadfail();
-            }else if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
+            }
+            */
+            if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
                 print_error( "UPLOAD: EF Frequency output is not supported. Use PWM.\n");
                 uploadfail();
             }
@@ -2207,10 +2299,12 @@ int lc_upload_config(lc_devconf_t* dconf){
         break;
         case LC_EF_PHASE:
             channel = (channel / 2) * 2;
+            /*
             if(channel != 0){
                 print_error( "UPLOAD: Digital phase input is only supported on channels 0 and 1.\n");
                 uploadfail();
             }
+            */
             if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
                 print_error( "UPLOAD: Phase output is not supported\n");
                 uploadfail();
@@ -2242,12 +2336,15 @@ int lc_upload_config(lc_devconf_t* dconf){
         break;
         case LC_EF_QUADRATURE:
             channel = (channel/2) * 2;  // force channel to be even
+            /*
             // Check for valid channels
             if(channel > 6 || channel == 4){
                 print_error( "UPLOAD: EF Quadrature channels %d/%d not supported. 0/1, 2/3, 6/7 are allowed.\n",
                     channel, channel+1);
                 uploadfail();
-            }else if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
+            }
+            */
+            if(dconf->efch[efnum].direction == LC_EF_OUTPUT){
                 print_error( "UPLOAD: EF Quadrature output is not allowed.\n");
                 uploadfail();
             }
@@ -2276,7 +2373,6 @@ int lc_upload_config(lc_devconf_t* dconf){
             uploadfail();
         }
     }
-
     return LCONF_NOERR;
 }
 
@@ -2359,6 +2455,15 @@ void lc_show_config(lc_devconf_t* dconf){
         value1[18] = '\0';
         printf( SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL,
                 "DI Stream Mask", value1);
+    }
+    
+    // Digital Outputs
+    if(dconf->domask){
+        printf(LC_FONT_YELLOW LC_FONT_BOLD "* Digital Output *\n" LC_FONT_NULL);
+        printf(SHOW_PARAM LC_FONT_BOLD "%x\n" LC_FONT_NULL,
+                "Output Mask", dconf->domask);
+        printf(SHOW_PARAM LC_FONT_BOLD "%x\n" LC_FONT_NULL,
+                "Output Values", dconf->dovalue);
     }
     
     // Trigger
@@ -2973,6 +3078,11 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
         startfail();
     }
 
+    // Configure the LJM library for safe timeout mode
+    // In this mode, the eStreamRead function will not hang.
+    LJM_WriteLibraryConfigS(LJM_STREAM_SCANS_RETURN, LJM_STREAM_SCANS_RETURN_ALL_OR_NONE);
+    LJM_WriteLibraryConfigS(LJM_STREAM_RECEIVE_TIMEOUT_MS, 100);
+
     // Initialize the resolution index
     resindex = dconf->aich[0].resolution;
     flag = 1;   // use the flag to remember if we have already issued a warning.
@@ -3043,17 +3153,14 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
 
     // Initialize the trigger
     dconf->trigmem = 0;
-    if(dconf->trigchannel >= 0)
-        dconf->trigstate = LC_TRIG_PRE;
-
-    // If the hardware trigger is configured, initialize it as well
-    for(efnum=0; efnum<dconf->nefch; efnum++){
-        //If this channel is configured for a trigger
-        if(dconf->efch[efnum].signal == LC_EF_TRIGGER){
-            LJM_eWriteName(dconf->handle, "STREAM_TRIGGER_INDEX", 2000 + dconf->efch[efnum].channel);
-            break;
+    if(dconf->trigchannel >= LCONF_TRIG_EFOFFSET){
+        err = LJM_eWriteName(dconf->handle, "STREAM_TRIGGER_INDEX", dconf->trigchannel);
+        if(err){
+            print_error("STREAM_START: Failed to initialize the hardware trigger\n");
+            return LCONF_ERROR;
         }
-    }
+    }else if(dconf->trigchannel >= 0)
+        dconf->trigstate = LC_TRIG_PRE;
     
     // Start the stream.
     err=LJM_eStreamStart(dconf->handle, 
@@ -3082,103 +3189,108 @@ int lc_stream_service(lc_devconf_t* dconf){
     err = LJM_eStreamRead(dconf->handle, 
             write_data,
             &dev_backlog, &ljm_backlog);
-    // Do some error checking
-    if(dev_backlog > LCONF_BACKLOG_THRESHOLD)
-        print_error("READ_STREAM: Device backlog! %d\n",dev_backlog);
-    else if(ljm_backlog > LCONF_BACKLOG_THRESHOLD)
-        print_error("READ_STREAM: Software backlog! %d\n",ljm_backlog);
     
-    if(err){
-        print_error("LCONFIG: Error reading from data stream.\n");
+    if(err == LJME_NO_SCANS_RETURNED){
+        // Do nothing
+    }else if(err){
+        print_error("STREAM_SERVICE: Error reading from data stream.\n");
         LJM_ErrorToString(err, err_str);
-        print_error("%s\n",err_str);
+        print_error("%s\n", err_str);
         return LCONF_ERROR;
-    }
-    // If there was no error, update the ringbuffer registers
-    service_write_buffer(&dconf->RB);
-
-    // Tend to the software trigger
-    if(dconf->trigstate == LC_TRIG_PRE){
-        if(dconf->RB.samples_streamed >= dconf->trigpre){
+    }else
+        service_write_buffer(&dconf->RB);
+    
+/*
+    if(dev_backlog > LCONF_BACKLOG_THRESHOLD)
+        print_warning("STREAM_SERVICE: Device backlog! %d\n",dev_backlog);
+    if(ljm_backlog > LCONF_BACKLOG_THRESHOLD)
+        print_warning("STREAM_SERVICE: Software backlog! %d\n",ljm_backlog);
+*/
+    // What happens next depends on the trigger mode
+    // In software triggering, we need to maintain the trigger state so we
+    //  can build the appropriate pretrigger buffer, detect an edge, and 
+    //  return data when the collection is complete.
+    // In hardware triggering mode, the trigger state is just a way to know
+    //  what's going on from the outside.  PRE is immediately promoted to 
+    //  ARMED no matter what.  ARMED is promoted to ACTIVE as soon as the daq
+    //  starts returning data.
+    
+    // If the trigger is in hardware mode
+    if(dconf->trigchannel >= LCONF_TRIG_EFOFFSET){
+        if(dconf->trigstate == LC_TRIG_PRE)
             dconf->trigstate = LC_TRIG_ARMED;
-            if(dconf->trigchannel == LCONF_TRIG_HSC){
-                err = LJM_eReadName(dconf->handle, "DIO18_EF_READ_A", &ftemp);
-                if(err){
-                    print_error("SERVICE DATA STREAM: Failed to test the high speed counter.\n");
-                    dconf->trigmem = 0x00;
-                    return LCONF_ERROR;
+        else if(dconf->trigstate == LC_TRIG_ARMED && !err)
+            dconf->trigstate = LC_TRIG_ACTIVE;
+    // Is the software trigger active?
+    }else if(dconf->trigchannel >= 0){
+        // Tend to the software trigger
+        if(err){
+            // If no data were received, do not tend the trigger
+        }else if(dconf->trigstate == LC_TRIG_PRE){
+            if(dconf->RB.samples_streamed >= dconf->trigpre)
+                dconf->trigstate = LC_TRIG_ARMED;
+        }else if(dconf->trigstate == LC_TRIG_ARMED){
+            // Test for a trigger event
+            size = dconf->RB.blocksize_samples;
+            // Case out the edge types in advance for speed
+            // Test for a rising edge
+            if(dconf->trigedge == LC_EDGE_RISING){
+                for(index = dconf->trigchannel;
+                        index < size; index += dconf->RB.channels){
+                    if(write_data[index] > dconf->triglevel)
+                        this = 0b01;
+                    else
+                        this = 0b10;
+                    if(dconf->trigmem == this){
+                        dconf->trigstate = LC_TRIG_ACTIVE;
+                        dconf->trigmem = 0x00;
+                        break;
+                    }else
+                        dconf->trigmem = this>>1;
                 }
-                dconf->trigmem = (unsigned int) ftemp;
+            // Falling edge
+            }else if(dconf->trigedge == LC_EDGE_FALLING){
+                for(index = dconf->trigchannel;
+                        index < size; index += dconf->RB.channels){
+                    if(write_data[index] <= dconf->triglevel)
+                        this = 0b01;
+                    else
+                        this = 0b10;
+                    if(dconf->trigmem == this){
+                        dconf->trigstate = LC_TRIG_ACTIVE;
+                        dconf->trigmem = 0x00;
+                        break;
+                    }else
+                        dconf->trigmem = this>>1;
+                }
+            // Any edge
+            }else{
+                for(index = dconf->trigchannel;
+                        index < size; index += dconf->RB.channels){
+                    if(write_data[index] > dconf->triglevel)
+                        this = 0b01;
+                    else
+                        this = ~((unsigned int)0b01);
+                    if(dconf->trigmem == this){
+                        dconf->trigstate = LC_TRIG_ACTIVE;
+                        dconf->trigmem = 0x00;
+                        break;
+                    }else
+                        dconf->trigmem = ~this;
+                }
+            }
+            // If data were read in, but no trigger was detected, throw away 
+            // a sample block and reduce the record of samples streamed
+            if(!err && dconf->trigstate == LC_TRIG_ARMED){
+                service_read_buffer(&dconf->RB);
+                dconf->RB.samples_streamed = dconf->RB.samples_per_read > dconf->RB.samples_streamed ? \
+                        dconf->RB.samples_streamed - dconf->RB.samples_per_read : 0;
             }
         }
-    }else if(dconf->trigstate == LC_TRIG_ARMED){
-        // Test for a trigger event
-        size = dconf->RB.blocksize_samples;
-        // Case out the edge types in advance for speed
-        // test for a counter event
-        if(dconf->trigchannel == LCONF_TRIG_HSC){
-            err = LJM_eReadName(dconf->handle, "DIO18_EF_READ_A", &ftemp);
-            if(err){
-                print_error("SERVICE DATA STREAM: Failed to test the high speed counter.\n");
-                dconf->trigmem = 0x00;
-                return LCONF_ERROR;
-            }else if(ftemp > dconf->trigmem){
-                dconf->trigstate = LC_TRIG_ACTIVE;
-                dconf->trigmem = 0x00;
-            }
-        // Test for a rising edge
-        }else if(dconf->trigedge == LC_EDGE_RISING){
-            for(index = dconf->trigchannel;
-                    index < size; index += dconf->RB.channels){
-                if(write_data[index] > dconf->triglevel)
-                    this = 0b01;
-                else
-                    this = 0b10;
-                if(dconf->trigmem == this){
-                    dconf->trigstate = LC_TRIG_ACTIVE;
-                    dconf->trigmem = 0x00;
-                    break;
-                }else
-                    dconf->trigmem = this>>1;
-            }
-        // Falling edge
-        }else if(dconf->trigedge == LC_EDGE_FALLING){
-            for(index = dconf->trigchannel;
-                    index < size; index += dconf->RB.channels){
-                if(write_data[index] <= dconf->triglevel)
-                    this = 0b01;
-                else
-                    this = 0b10;
-                if(dconf->trigmem == this){
-                    dconf->trigstate = LC_TRIG_ACTIVE;
-                    dconf->trigmem = 0x00;
-                    break;
-                }else
-                    dconf->trigmem = this>>1;
-            }
-        // Any edge
-        }else{
-            for(index = dconf->trigchannel;
-                    index < size; index += dconf->RB.channels){
-                if(write_data[index] > dconf->triglevel)
-                    this = 0b01;
-                else
-                    this = ~((unsigned int)0b01);
-                if(dconf->trigmem == this){
-                    dconf->trigstate = LC_TRIG_ACTIVE;
-                    dconf->trigmem = 0x00;
-                    break;
-                }else
-                    dconf->trigmem = ~this;
-            }
-        }
-        // Unless a trigger was detected, throw away a sample block and reduce
-        // the record of samples streamed
-        if(dconf->trigstate == LC_TRIG_ARMED){
-            service_read_buffer(&dconf->RB);
-            dconf->RB.samples_streamed -= dconf->RB.samples_per_read;
-        }
-    }
+    // If there is no trigger, then we can jump straight to streaming
+    }else
+        dconf->trigstate = LC_TRIG_ACTIVE;
+        
     return LCONF_NOERR;
 }
 
@@ -3200,6 +3312,8 @@ int lc_stream_stop(lc_devconf_t* dconf){
     int err;
     err = LJM_eStreamStop(dconf->handle);
     
+    // Deactivate the stream trigger (if it was active)
+    LJM_eWriteName(dconf->handle, "STREAM_TRIGGER_INDEX", 0);
     //clean_buffer(&dconf->RB);
     
     if(err){

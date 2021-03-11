@@ -109,7 +109,7 @@ const char help_text[] = \
 "  specified, then LCBURST will collect one packet worth of data.\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017-2019 C.Martin\n";
+"(c)2017-2020 C.Martin\n";
 
 
 /*....................
@@ -315,7 +315,7 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "LCBURST failed to open the device.\n");
         return -1;
     }
-    if(lc_open(&dconf)){
+    if(lc_upload_config(&dconf)){
         fprintf(stderr, "LCBURST failed while configuring the device.\n");
         lc_close(&dconf);
         return -1;
@@ -330,22 +330,21 @@ int main(int argc, char *argv[]){
     }
 
     // Stream data
-    printf("Streaming data");
     fflush(stdout);
-    if(dconf.trigstate == LC_TRIG_PRE)
+    if(dconf.trigchannel >= 0)
         printf("\nWaiting for trigger\n");
 
     while(!lc_stream_iscomplete(&dconf)){
+        itemp = dconf.trigstate;
         if(lc_stream_service(&dconf)){
             fprintf(stderr, "\nLCBURST failed while servicing the T7 connection!\n");
             lc_stream_stop(&dconf);
             lc_close(&dconf);
             return -1;            
         }
-
-        if(dconf.trigstate == LC_TRIG_IDLE || dconf.trigstate == LC_TRIG_ACTIVE){
-            printf(".");
-            fflush(stdout);
+        
+        if(itemp != LC_TRIG_ACTIVE && dconf.trigstate == LC_TRIG_ACTIVE){
+            printf("Streaming data.\n");
         }
     }
     // Halt data collection

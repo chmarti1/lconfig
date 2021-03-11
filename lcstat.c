@@ -13,98 +13,100 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+    along with LCONFIG.  If not, see <https://www.gnu.org/licenses/>.
 
     Authored by C.Martin crm28@psu.edu
 */
 
 #include "ldisplay.h"
 #include "lconfig.h"
+#include "lctools.h"
+#include "lcmap.h"
 #include <string.h>     // duh
 #include <unistd.h>     // for system calls
 #include <stdlib.h>     // for malloc and free
 #include <stdio.h>      // duh
+#include <math.h>
 #include <time.h>       // for file stream time stamps
 
 #define DEF_CONFIGFILE  "lcstat.conf"
-#define DEF_DATAFILE    "lcstat.dat"
-#define DEF_SAMPLES     "-1"
-#define DEF_DURATION    "-1"
 #define MAXSTR          128
-#define COLWIDTH        20
-#define HEADERROW       2
-#define FMT_NUMBER      "%20.6f"
-#define MAX_CHANNELS    (LCONF_MAX_AICH + 1)
+#define MAXDEV          16
+#define REFRESH_SEC     0.5
+// Column widths
+#define FMT_CHANNEL     "%18s"
+#define FMT_CHEAD       "\x1B[4m%18s\x1B[0m"
+#define FMT_NUMBER      "%18.6f"
+#define FMT_NHEAD       "\x1B[4m%18s\x1B[0m"
+#define FMT_UNITS       "%8s"
+#define FMT_UHEAD       "\x1B[4m%8s\x1B[0m"
 
 
+#define destruct(){\
+    for(ii=0;ii<ndev;ii++){lc_close(&dconf[ii]);}\
+    lct_finish_keypress();\
+    if(working){free(working); working=NULL;}\
+    if(values){free(values); values=NULL;}\
+}
 
-/*....................
-. Prototypes
-.....................*/
-struct args_t {
-    int:1 maxmin;
-    int:1 std;
-    int:1 pkpk;
-};
+/*...................
+.   Global Options
+...................*/
+
+
 
 /*....................
 . Help text
 .....................*/
 const char help_text[] = \
-"lcstat [-hmps] [-c CONFIGFILE] [-n SAMPLES]\n"\
+"lcstat [-dhmpr] [-c CONFIGFILE] [-n SAMPLES]\n"\
 "  LCSTAT is a utility that shows the status of the configured channels\n"\
 "  in real time.  The intent is that it be used to aid with debugging and\n"\
 "  setup of experiments from the command line.\n"
 "\n"\
 "  Measurement results are displayed in a table with a row for each\n"\
-"  channel configured and a column for various statistics on the signal.\n"\
+"  analog input and DIO extended feature channel configured and columns for\n"\
+"  signal statistics, specified with switches at the command line.\n"\
 "  Measurements are streamed for at least the number of samples specified\n"\
 "  by the NSAMPLE configuration parameter or by the number specified by\n"\
 "  the -n option.\n"\
-"\n"\
-"  If a trigger is configured, it will be ignored.  Instead, the acquisition\n"\
-"  starts as normal and streams directly to the display.\n"\
 "\n"\
 "-c CONFIGFILE\n"\
 "  Specifies the LCONFIG configuration file to be used to configure the\n"\
 "  LabJack.  By default, LCSTAT will look for lcstat.conf\n"\
 "\n"\
-"-m\n"\
-"  Display the maximum and minimum values in the results table.\n"\
-"\n"\
 "-n SAMPLES\n"\
 "  Specifies the minimum integer number of samples per channel to be \n"\
-"  included in the statistics on each channel.  Since samples are read in\n"\
-"  bursts of LCONF_SAMPLES_PER_READ (64) samples per channel, the actual \n"\
-"  samples read will be rounded up to the nearest multiple of 64.\n"\
+"  included in the statistics on each channel.  \n"\
+"\n"\
+"  For example, the following is true\n"\
+"    $ lcburst -n 32   # collects 64 samples per channel\n"\
+"    $ lcburst -n 64   # collects 64 samples per channel\n"\
+"    $ lcburst -n 65   # collects 128 samples per channel\n"\
+"    $ lcburst -n 190  # collects 192 samples per channel\n"\
+"\n"\
+"  Suffixes M (for mega or million) and K or k (for kilo or thousand)\n"\
+"  are recognized.\n"\
+"    $ lcburst -n 12k   # requests 12000 samples per channel\n"\
+"\n"\
+"  If both the test duration and the number of samples are specified,\n"\
+"  which ever results in the longest test will be used.  If neither is\n"\
+"  specified, then LCSTAT will collect one packet worth of data.\n"\
+"\n"\
+"-d\n"\
+"  Display standard deviation of the signal in the results table.\n"\
+"\n"\
+"-m\n"\
+"  Display the maximum and minimum of each signal in the results table.\n"\
 "\n"\
 "-p\n"\
 "  Display peak-to-peak values in the results table.\n"\
 "\n"\
-"-s\n"\
-"  Display standard deviation of the signal in the results table.\n"\
-"\n"\
-"-t DURATION\n"\
-"  Specifies the test duration with an integer.  By default, DURATION\n"\
-"  should be in seconds.\n"\
-"    $ lcburst -t 10   # configures a 10 second test\n"\
-"\n"\
-"  Short or long test durations can be specified by a unit suffix: m for\n"\
-"  milliseconds, M for minutes, and H for hours.  s for seconds is also\n"\
-"  recognized.\n"\
-"    $ lcburst -t 500m  # configures a 0.5 second test\n"\
-"    $ lcburst -t 1M    # configures a 60 second test\n"\
-"    $ lcburst -t 1H    # configures a 3600 second test\n"\
-"\n"\
-"  If both the test duration and the number of samples are specified,\n"\
-"  which ever results in the longest test will be used.  If neither is\n"\
-"  specified, then LCBURST will collect one packet worth of data.\n"\
+"-r\n"\
+"  Display rms values in the results table.\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017-2019 C.Martin\n";
-
-
-void print_ouptut(lct_stat_t results[], struct args_t *mode);
+"(c)2020 C.Martin\n";
 
 
 /*....................
@@ -112,9 +114,10 @@ void print_ouptut(lct_stat_t results[], struct args_t *mode);
 .....................*/
 int main(int argc, char *argv[]){
     // DCONF parameters
-    int     nich;           // number of channels in the operation
-    unsigned int channels, samples_per_read;
+    int     ndev;           // number of devices found in configuration
     // Temporary variables
+    int     ii, jj;         // counters for loops
+    unsigned int row, col;  // indices for the terminal display
     double  ftemp;          // Temporary float
     int     itemp;          // Temporary integer
     char    stemp[MAXSTR],  // Temporary string
@@ -122,133 +125,281 @@ int main(int argc, char *argv[]){
     char    optchar;
     // Configuration results
     char    config_file[MAXSTR] = DEF_CONFIGFILE;
-    int     nsample = 0;
-    struct args_t mode;
-    char    go_b = 1;
-    // Finally, the essentials; device configuration
-    lc_devconf_t dconf;
-    lct_stat_t working[MAX_CHANNELS], total[MAX_CHANNELS];
+    unsigned int     samples = 0;
+    // State struct used to define the operation of the state machine
+    // that prints to the screen
+    struct {
+        unsigned int peak:1;
+        unsigned int rms:1;
+        unsigned int std:1;
+        unsigned int maxmin:1;
+        unsigned int run:1;
+        unsigned int redraw:1;
+    } state;
+    time_t now, then;
 
+    // Finally, the essentials
+    lc_devconf_t dconf[MAXDEV];     // device configuration array
+    lct_stat_t  * values = NULL,    // Live arrays of channel statistics
+                * working = NULL;   // working arrays of channel statistics
+    
+
+    // Initialize the state
+    state.peak = 0;
+    state.rms = 0;
+    state.std = 0;
+    state.maxmin = 0;
+    state.run = 1;
+    
+    
+    
     // Parse the command-line options
     // use an outer foor loop as a catch-all safety
-    for(count=0; count<argc; count++){
-        switch(getopt(argc, argv, "hmpsc:n:")){
+    for(ii=0; ii<argc; ii++){
+        switch(getopt(argc, argv, "hprdmc:n:")){
         // Help text
         case 'h':
             printf(help_text);
             return 0;
+        case 'p':
+            state.peak = 1;
+            break;
+        case 'm':
+            state.maxmin = 1;
+            break;
+        case 'd':
+            state.std = 1;
+            break;
+        case 'r':
+            state.rms = 1;
+            break;
         // Config file
         case 'c':
             strcpy(config_file, optarg);
             break;
-        case 'm':
-            maxmin_b = 1;
-            break;
-        case 'p':
-            peak_b = 1;
-            break;
-        case 's':
-            std_b = 1;
-            break;
         // Sample count
         case 'n':
-            if(sscanf(optarg, "%d", &samples) < 1){
+            optchar = 0;
+            if(sscanf(optarg, "%d%c", &samples, &optchar) < 1){
                 fprintf(stderr,
                         "The sample count was not a number: %s\n", optarg);
                 return -1;
             }
+            switch(optchar){
+                case 'M':
+                    samples *= 1000;
+                case 'k':
+                case 'K':
+                    samples *= 1000;
+                case 0:
+                    break;
+                default:
+                    fprintf(stderr,
+                            "Unexpected sample count unit: %c\n", optchar);
+                    return -1;
+            }
             break;
-        // Data file
+        case -1:    // What if we're out of switch options?
+            // Force the loop to exit.
+            ii = argc;
+            break;
+        // Unrecognized characters
         case '?':
+        default:
             fprintf(stderr, "Unexpected option %s\n", argv[optind]);
             return -1;
-        case -1:    // Deliberately combine -1 and default
-        default:
-            count = argc;
-            break;
         }
     }
 
     // Load the configuration
-    printf("Loading configuration file...");
-    fflush(stdout);
-    if(lc_load_config(&dconf, 1, config_file)){
+    // This will also enforce that no more than MAXDEV devices are configured
+    printf("Loading configuration file...\n");
+    if(lc_load_config(dconf, MAXDEV, config_file)){
         fprintf(stderr, "LCSTAT failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
     }else
         printf("DONE\n");
 
     // Detect the number of configured device connections
-    if(lc_ndev(&dconf,1)<=0){
+    ndev = lc_ndev(dconf, MAXDEV);
+    if(!ndev){
         fprintf(stderr,"LCSTAT did not detect any valid devices for data acquisition.\n");
         return -1;
     }
-    // Detect the number of input columns
-    nich = lc_nistream(&dconf);
-    // Determine whether the sample count was set at the command line
-    if(nsample > 0) 
-        dconf.nsample = nsample;
-    else
-        nsample = dconf.nsample;
+    
+    // Declare memory for the working and active channel statistics
+    values = malloc(ndev * LCONF_MAX_NAICH * sizeof(lct_stat_t));
+    working = malloc(ndev * LCONF_MAX_NAICH * sizeof(lct_stat_t));
 
-    printf("Setting up measurement...");
-    fflush(stdout);
-    if(lc_open(&dconf)){
-        fprintf(stderr, "LCSTAT failed to open the device.\n");
-        return -1;
-    }
-    if(lc_open(&dconf)){
-        fprintf(stderr, "LCSTAT failed while configuring the device.\n");
-        lc_close(&dconf);
-        return -1;
-    }
-    printf("DONE\n");
-
-    // Setup the keypress interface
+    // Initialize the terminal
+    lct_clear_terminal();
     lct_setup_keypress();
 
-    // Start the data stream
-    if(lc_stream_start(&dconf, -1)){
-        fprintf(stderr, "\nLCSTAT failed to start data collection.\n");
-        lc_close(&dconf);
-        return -1;
+    // Open the device connections and upload the configuration
+    for(ii=0; ii<ndev; ii++){
+        // Override the nsample parameter?
+        if(samples) 
+            dconf[ii].nsample = samples;
+
+        // Open the device connection
+        if(lc_open(&dconf[ii])){
+            fprintf(stderr, "LCSTAT failed to open the device %d in configuration file %s\n", ii, config_file);
+            destruct();
+            return -1;
+        // Upload the configurations
+        }else if(lc_upload_config(&dconf[ii])){
+            fprintf(stderr, "LCSTAT failed to configure device %d in configuration file %s\n", ii, config_file);
+            destruct();
+            return -1;
+        // Start the data streams
+        }else if(lc_stream_start(&dconf[ii], -1)){
+            fprintf(stderr, "LCSTAT failed to start data collection on device %d in configuration file %s\n", ii, config_file);
+            destruct();
+            return -1;
+        }
+        // initialize the statistics
+        lct_stat_init(&values[ii*LCONF_MAX_NAICH], LCONF_MAX_NAICH);
+        lct_stat_init(&working[ii*LCONF_MAX_NAICH], LCONF_MAX_NAICH);
     }
+    
+    then = time(NULL);
+    while(state.run){
+        now = time(NULL);
+        // When it's time to redraw the screen
+        if(difftime(now,then) > REFRESH_SEC){
+            then = now;
+            // REFRESH CODE
+            // Start fresh
+            lct_clear_terminal();
+            // Loop through the devices
+            for(ii=0; ii<ndev; ii++){
+                // Print the device header
+                printf("Device %d: \x1B[1m%s\x1B[0m (%s)\n", 
+                        ii, dconf[ii].name, 
+                        lcm_get_message(lcm_connection, dconf[ii].connection_act));
+                // Print the header
+                // Start by printing a header
+                printf(FMT_CHEAD, "Channel");
+                printf(FMT_UHEAD, "Units");
+                printf(FMT_NHEAD, "Mean");
+                if(state.rms)
+                    printf(FMT_NHEAD, "RMS");
+                if(state.std)
+                    printf(FMT_NHEAD, "Std.Dev.");
+                if(state.peak)
+                    printf(FMT_NHEAD, "Pk-Pk");
+                if(state.maxmin){
+                    printf(FMT_NHEAD, "Max.");
+                    printf(FMT_NHEAD, "Min.");
+                }
+                printf("\n");
 
-    // Initialize the total struct array
-    lct_stream_stat(&dconf, NULL, 0, total, MAX_CHANNELS);
-
-    fprintf(stdout, "Waiting for data.\n");
-
-    // Go
-    go_b = 1;
-    while(go_b){
-        lc_stream_service(&dconf);
-        lc_stream_read(&dconf, &data, &channels, &samples_per_read);
-        // Process the stats
-        if(data){
-            lct_stream_stat(&dconf, data, samples_per_read*channels,\
-                    working, MAX_CHANNELS);
-            lct_stat_join(total, working, MAX_CHANNELS);
+                // Loop through the channels
+                for(jj=0; jj<dconf[ii].naich; jj++){
+                    // CHANNEL LABEL
+                    // If there is a channel label, print that
+                    if(dconf[ii].aich[jj].label[0])
+                        printf(FMT_CHANNEL, dconf[ii].aich[jj].label);
+                    // If the channel is not differential
+                    else if(dconf[ii].aich[jj].nchannel == LCONF_SE_NCH){
+                        sprintf(stemp, "+AI%02d -GND", dconf[ii].aich[jj].channel);
+                        printf(FMT_CHANNEL, stemp);
+                    }else{
+                        printf(stemp, "+AI%02d -AI%02d", dconf[ii].aich[jj].channel, dconf[ii].aich[jj].nchannel);
+                        printf(FMT_CHANNEL, stemp);
+                    }
+                    
+                    
+                    // CHANNEL UNITS
+                    // If a units string is defined, use that
+                    if(dconf[ii].aich[jj].calunits[0])
+                        printf(FMT_UNITS, dconf[ii].aich[jj].calunits);
+                    else 
+                        printf(FMT_UNITS, "V");
+                    
+                    // CHANNEL MEAN
+                    printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].mean);
+                    
+                    if(state.rms)
+                        printf(FMT_NUMBER, sqrt(values[ii*LCONF_MAX_NAICH+jj].mean*values[ii*LCONF_MAX_NAICH+jj].mean + values[ii*LCONF_MAX_NAICH+jj].var));   
+                    if(state.std)
+                        printf(FMT_NUMBER, sqrt(values[ii*LCONF_MAX_NAICH+jj].var));
+                    if(state.peak)
+                        printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].max - values[ii*LCONF_MAX_NAICH+jj].min);
+                    if(state.maxmin){
+                        printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].max);
+                        printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].min);   
+                    }
+                    printf("\n");
+                }
+                
+                // EXTENDED FEATURE DIO CHANNELS
+                // If there are any extended feature channels, update them
+                if(dconf[ii].nefch)
+                    lc_update_ef(&dconf[ii]);
+                // Then display them
+                for(jj=0; jj<dconf[ii].nefch; jj++){
+                    // CHANNEL LABEL
+                    // If the labe is defined, print it verbatim
+                    if(dconf[ii].efch[jj].label[0])
+                        printf(FMT_CHANNEL, dconf[ii].efch[jj].label);
+                    else{
+                        sprintf(stemp, "DIO%d", dconf[ii].efch[jj].channel);
+                        printf(FMT_CHANNEL, stemp);
+                    }
+                    
+                    switch(dconf[ii].efch[jj].signal){
+                    case LC_EF_PWM:
+                        printf(FMT_UNITS, "PWM");
+                        printf(FMT_NUMBER, dconf[ii].efch[jj].duty);
+                        break;
+                    case LC_EF_COUNT:
+                        printf(FMT_UNITS, "Count");
+                        printf(FMT_NUMBER, (double) dconf[ii].efch[jj].counts);
+                        break;
+                    case LC_EF_FREQUENCY:
+                        printf(FMT_UNITS, "Freq(kHz)");
+                        printf(FMT_NUMBER, 1000./dconf[ii].efch[jj].time);
+                        break;
+                    case LC_EF_PHASE:
+                        printf(FMT_UNITS, "Phase(deg)");
+                        printf(FMT_NUMBER, dconf[ii].efch[jj].phase);
+                        break;
+                    case LC_EF_QUADRATURE:
+                        printf(FMT_UNITS, "Quad.");
+                        printf(FMT_NUMBER, (double) dconf[ii].efch[jj].counts);
+                        break;
+                    default:
+                        printf(FMT_UNITS, "Uns.");
+                        break;
+                    }
+                    printf("\n");
+                }
+            }
+            printf("\nPress \"Q\" to exit.\n");
         }
         
-        // Detect a keypress
-        if(lct_is_keypress() && getchar() == 'Q')
-            go_b = 0;
-        // detect whether the sample is complete
-        else if(total[0].N >= nsample){
-            // Print the results to the screen
-            print_output(total, &mode);
-            // Reset the total values
-            lct_stream_stat(&dconf, NULL, 0, total, MAX_CHANNELS);
+        // Service the data connections
+        for(ii=0;ii<ndev;ii++){
+            lc_stream_service(&dconf[ii]);
+            lct_stream_stat(&dconf[ii], &working[ii*LCONF_MAX_NAICH], 0);
+            // If the working array has accumulated enough samples
+            if(working[ii*LCONF_MAX_NAICH].n >= dconf[ii].nsample){
+                // Copy the result and clear the worker
+                for(jj=0; jj<dconf[ii].naich; jj++) 
+                    values[ii*LCONF_MAX_NAICH + jj] = working[ii*LCONF_MAX_NAICH + jj];
+                lct_stat_init(&working[ii*LCONF_MAX_NAICH], dconf[ii].naich);
+            }
         }
+        
+        // Time for a little downtime
+        usleep(10000);
+        
+        // Check for the escape keypress
+        if(lct_is_keypress() && getchar()=='Q')
+            state.run = 0;
+            
     }
-    // Halt data collection
-    if(lc_stream_stop(&dconf)){
-        fprintf(stderr, "\nLCSTAT failed to halt data collection!?\n");
-        lc_close(&dconf);
-        return -1;
-    }
-    lc_close(&dconf);
-
+    destruct();
     return 0;
 }
