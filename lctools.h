@@ -25,6 +25,9 @@ sequences for the Linux console environment.
 
 CHANGELOG
 
+v1.3    3/2021
+- Added idle
+
 v1.2    9/2020
 - Added stream statistics tools
 
@@ -42,6 +45,7 @@ v1.0	9/2019		ORIGINAL RELEASE
 // Add some headers
 #include "lconfig.h"
 #include <unistd.h>
+#include <time.h>       // for idle functions
 #include <stdio.h>
 #include <string.h>
 #include <termios.h>
@@ -54,7 +58,7 @@ v1.0	9/2019		ORIGINAL RELEASE
  *                          *
  ****************************/
 
-#define LCT_VERSION 1.2
+#define LCT_VERSION 1.3
 
 
 
@@ -363,5 +367,41 @@ void lct_stat_init(lct_stat_t stat[], unsigned int channels);
 .   
 */
 int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxchannels);
+
+
+
+
+
+typedef struct __lct_idle_t__ {
+    struct timespec next;
+    unsigned int interval_us;
+    unsigned int resolution_us;
+} lct_idle_t;
+
+
+/* LCT_IDLE_INIT
+.  LCT_IDLE
+.   Initialize the idle struct to set up a recurring blocking function to 
+.   establish idle time.  This is intended to be used along with LCT_IDLE()
+.   to insert idle time so that a loop executes somewhat regularly.  The
+.   LCT_IDLE_INIT() function should be called immediately before the loop is
+.   started and the LCT_IDLE() function should be placed at the end of the 
+.   loop.
+.
+.   INTERVAL_US is the approximate target loop execution period in 
+.   microseconds.
+.
+.   RESOLUTION_US is the approximate duration for which the process should 
+.   sleep between checks for timer expiration.
+
+lct_idle_t myidle;
+lct_idle_init(&myidle, 1000);
+while(1){
+    ... Do something with variable execution time ...
+    lct_idle(&myidle);
+}
+*/
+int lct_idle_init(lct_idle_t *idle, unsigned int interval_us, unsigned int resolution_us);
+int lct_idle(lct_idle_t *idle);
 
 #endif

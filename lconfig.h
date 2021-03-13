@@ -1057,6 +1057,12 @@ have been streamed from the T7.  Returns a 0 otherwise.
 */
 int lc_stream_iscomplete(lc_devconf_t* dconf);
 
+/* LC_STREAM_ISACTIVE
+Returns 1 to indicate that a stream is currently active. A stream is "active"
+if it has been started by lc_stream_start() and the data collection process is
+underway.
+*/
+
 /* LC_STREAM_ISEMPTY
 Returns 1 to indicate that all data in the buffer has been read.  Returns a 0
 otherwise.

@@ -438,3 +438,54 @@ int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxch
     }
     return LCONF_NOERR;
 }
+
+
+
+int lct_idle_init(lct_idle_t *idle, unsigned int interval_us, unsigned int resolution_us){
+    if(clock_gettime(CLOCK_REALTIME, &idle->next))
+        return -1;
+    idle->interval_us = interval_us;
+    idle->resolution_us = resolution_us;
+    idle->next.tv_nsec += interval_us * 1000;
+    if(idle->next.tv_nsec > 1e9){
+        idle->next.tv_nsec -= 1e9;
+        idle->next.tv_sec += 1;
+    }
+    return 0;
+}
+    
+int lct_idle(lct_idle_t *idle){
+    struct timespec now;
+    int wait_us;
+
+    if(clock_gettime(CLOCK_REALTIME, &now))
+        return -1;
+    // Wait a nominal period
+    wait_us = idle->next.tv_sec - now.tv_sec;
+    wait_us *= 1e6;
+    wait_us += (idle->next.tv_nsec - now.tv_nsec)/1000 - 5*idle->resolution_us;
+    
+    if(wait_us > 0)
+        usleep(wait_us);
+    
+    while(1){
+        if(clock_gettime(CLOCK_REALTIME, &now))
+            return -1;
+        // If the timer has expired
+        if(now.tv_sec > idle->next.tv_sec || \
+                (now.tv_sec == idle->next.tv_sec && now.tv_nsec > idle->next.tv_nsec)){
+            // Increment the next expiration
+            idle->next.tv_nsec += idle->interval_us * 1000;
+            if(idle->next.tv_nsec > 1e9){
+                idle->next.tv_nsec -= 1e9;
+                idle->next.tv_sec += 1;
+            }
+            // All done
+            return 0;
+        }
+        // If the timer has not expired, wait
+        usleep(idle->resolution_us);
+    }
+    // This should never be executed!
+    return -1;
+}
