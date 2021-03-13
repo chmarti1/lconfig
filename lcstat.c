@@ -110,7 +110,7 @@ const char help_text[] = \
 "  display updates.\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2020 C.Martin\n";
+"(c)2020-2021 C.Martin\n";
 
 
 /*....................

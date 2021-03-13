@@ -705,7 +705,13 @@ The following parameters are recognized:
 .   read_data_stream() is responsible for maintaining this state variable, but
 .   it does NOT deal with pre-trigger buffers automatically. read_file_stream()
 .   does.
-.
+-DO_
+.   The digital output directive identifies a digital output channel number
+.   and a value; 1 or 0.  For example
+.       DO2 1
+.   sets digital output 2 to high.
+.       DO0 0
+.   sets digital output 0 to low.
 -EFFREQUENCY
 .   Sets the frequency scale for all EF extended features.  This parameter
 .   determines how often the EF clock updates.  Pulse and PWM outputs will

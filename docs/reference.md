@@ -21,7 +21,7 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 |:------------|:---------------------------------------:|:------------:|:--|
 | connection  | eth,usb,any                             | Global       | Starts configuration of a new device and specifies over what interface that device should be reached.
 | serial      | integer                                 | Global       | Specifies a device by its serial number (ignored over eth when ip is also specified)
-| name	| string					| Global		| Specifies a device y its name (or alias).
+| name	      | string                                  | Global       | Specifies a device y its name (or alias).
 | ip          | XXX.XXX.XXX.XXX                         | Global       | Over an ETH connection, specifies the devices to configure, but over a USB connection, IP is used to set the devices IP address.
 | gateway     | XXX.XXX.XXX.XXX                         | Global       | Used to set the T7's default TCP/IP gateway
 | subnet      | XXX.XXX.XXX.XXX                         | Global       | Used to set the T7's TCP/IP subnet mask
@@ -30,36 +30,37 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | nsample     | integer                                 | Global       | How many samples should the ring buffer contain?  How many samples should the application collect?
 | aichannel   | integer [0-13]                          | Analog Input | The physical analog input channel number
 | ainegative  | [0-13], 199, ground, differential       | Analog Input | The physical channel to use as the negative side of the measurement.  199 and ground both indicate a single-ended measurement.  The T7 requires that negative channels be the odd channel one greater than the even positive counterpart (e.g. 0+ 1- or 8+ 9-).  Specify differential to make that selection automatic.
-| ailabel       | string                                              | Analog Input | This is a text label that can be used to identify the channel.
-| aicalslope | float                                                                 | Analog Input | Used with `aicalzero` to form a linear calibration.
-| aicalzero | float | Analog Input | calibrated value = (AICALSLOPE)*(voltage - AICALZERO)
-| aicalunits | string | Analog Input | Used to name the calibrated nunits ("V" by default)
+| ailabel     | string                                  | Analog Input | This is a text label that can be used to identify the channel.
+| aicalslope  | float                                   | Analog Input | Used with `aicalzero` to form a linear calibration.
+| aicalzero   | float | Analog Input | calibrated value = (AICALSLOPE)*(voltage - AICALZERO)
+| aicalunits  | string | Analog Input | Used to name the calibrated nunits ("V" by default)
 | airange     | float [.01, .1, 1., 10.]                | Analog Input  | The bipolar (+/-) voltage range for the measurement.  The T7 can accept four values.
-| airesolution| integer 					| Analog Input | The resolution index to be used for the channel.  (See [Resolution Indexes](https://labjack.com/support/datasheets/t-series/ain#resolution))
-| diostream | integer					| Global | A 16-bit mask of DIO channels (FIO/EIO only) to include in a data stream. (1=include, 0=exclude).  If `diostream` is 0, then no digital streaming is included.
+| airesolution| integer                                 | Analog Input  | The resolution index to be used for the channel.  (See [Resolution Indexes](https://labjack.com/support/datasheets/t-series/ain#resolution))
+| distream    | integer                                 | Global        | A 16-bit mask of DIO channels (FIO/EIO only) to include in a data stream. (1=include, 0=exclude).  If `diostream` is 0, then no digital streaming is included.
+| doX         | 0 or 1                                  | Global        | X is the digital channel to which the output value will be applied
 | aochannel   | integer [0,1]                           | Analog Output | The physical analog output (DAC) channel to use for pseudo function generator output.
-| aolabel | string | Analog Output | A string used to name the analog output channel.
+| aolabel     | string                                  | Analog Output | A string used to name the analog output channel.
 | aosignal    | constant, sine, square, triangle, noise | Analog Output | The type of cyclic signal to generate
 | aoamplitude | floating point                          | Analog Output | Voltage amplitude of the AC component of the signal (ignored for constant signal).
 | aooffset    | floating point                          | Analog Output | Offset (DC) voltage to add to the oscillating (AC) signal.
 | aoduty      | floating point [0-1]                    | Analog Output | The duty cycle of triangle and square waves. This skews the signal to spend more time on one part of the wave than the other.
 | aofrequency | floating point                          | Analog Output | Specifies the rate the wave will repeat in Hz.
-| comchannel | uart, spi, i2c, 1wire, sbus             | COM           | The digital communications channel type.
-| comin      | integer                                 | COM           | The digital communications input DIO pin number.
-| comout     | integer                                 | COM           | The digital communications output DIO pin number.
-| comclock   | integer                                 | COM           | The digital communications clock DIO pin number.
-| comrate    | floating point > 0                      | COM           | The digital communications data rate in bits per second.
-| comoptions | string                                  | COM           | The digital communications channel options; a specialized string that depends on the channel type.  (e.g. UART: 8N1 bits parity stop)
-| effrequency | floating point                         | Global        | Specifies the CLOCK0 rollover frequency.
-| efchannel  | integer [0-7]                           | Flexible IO   | The physical channel to use for a digital IO operation.
-| eflabel | string | Flexible IO | A string used to name the EF channel.
-| efsignal   | pwm, count, frequency, phase, quadrature | Flexible IO  | The EF signal/feature to use on this EF channel.
+| comchannel  | uart, spi, i2c, 1wire, sbus             | COM           | The digital communications channel type.
+| comin       | integer                                 | COM           | The digital communications input DIO pin number.
+| comout      | integer                                 | COM           | The digital communications output DIO pin number.
+| comclock    | integer                                 | COM           | The digital communications clock DIO pin number.
+| comrate     | floating point > 0                      | COM           | The digital communications data rate in bits per second.
+| comoptions  | string                                  | COM           | The digital communications channel options; a specialized string that depends on the channel type.  (e.g. UART: 8N1 bits parity stop)
+| effrequency | floating point                          | Global        | Specifies the CLOCK0 rollover frequency.
+| efchannel   | integer [0-7]                           | Flexible IO   | The physical channel to use for a digital IO operation.
+| eflabel     | string                                  | Flexible IO   | A string used to name the EF channel.
+| efsignal    | pwm, count, frequency, phase, quadrature | Flexible IO  | The EF signal/feature to use on this EF channel.
 | efdirection | input, output                          | Flexible IO   | Is this channel an input or an output? (input is default)
-| efedge     | rising, falling, all                    | Flexible IO   | Specifies the behavior of EF features that depend on edge direction (count, phase, PWM).
-| efdebounce | none, fixed, reset, minimum             | Flexible IO   | The debounce filter to be used for a counter input.
-| efusec     | floating point [>0]                     | Flexible IO   | A generic time parameter for configuring EF channels.
-| efdegrees  | floating point                          | Flexible IO   | A generic phase parameter for configuring EF channels.
-| efduty     | floating point [0-1]                    | Flexible IO   | Duty cycle for a PWM output.
+| efedge      | rising, falling, all                    | Flexible IO   | Specifies the behavior of EF features that depend on edge direction (count, phase, PWM).
+| efdebounce  | none, fixed, reset, minimum             | Flexible IO   | The debounce filter to be used for a counter input.
+| efusec      | floating point [>0]                     | Flexible IO   | A generic time parameter for configuring EF channels.
+| efdegrees   | floating point                          | Flexible IO   | A generic phase parameter for configuring EF channels.
+| efduty      | floating point [0-1]                    | Flexible IO   | Duty cycle for a PWM output.
 | meta        | flt/float, int/integer, str/string, stop/end/none | Meta | Starts a meta parameter stanza.  Any unrecognized parameter name after this directive will be treated as a new meta parameter of the specified type.  If stop, end, or none is specified, the meta stanza is ended, and unrecognized parameters will cause errors again.
 | flt:param   | floating point                          | Meta | Specifies a single floating point meta parameter.
 | int:param   | integer                                 | Meta | Specifies a single integer parameter

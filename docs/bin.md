@@ -1,8 +1,8 @@
 [back](documentation.md)
 
-Version 4.03<br>
-September 2020<br>
-Chris Martin<br>
+Version 4.10  
+March 2021  
+Chris Martin<  
 
 ## Binaries
 
@@ -27,7 +27,7 @@ $ lcstat -h | less
 
 ### lcrun
 
-The **L**aboratory **C**onfiguration **RUN** utility, `lcrun`, streams data directly to a [data file](data.md).  This means it is well suited to long tests that involve big data sets, but the maximum data rate will be limited by the write speed to the hard drive.  For high-speed applications, look at `lcburst`.
+The **L**aboratory **C**onfiguration **RUN** utility, `lcrun`, streams data from up to 8 devices directly to [data files](data.md).  This means it is well suited to long tests that involve big data sets, but the maximum data rate will be limited by the write speed to the hard drive.  For high-speed applications, look at `lcburst`.
 
 `lcrun` ignores the `nsample` parameter.
 
@@ -36,25 +36,6 @@ $ lcrun -h
 lcrun [-h] [-r PREFILE] [-p POSTFILE] [-d DATAFILE] [-c CONFIGFILE] 
      [-f|i|s param=value]
   Runs a data acquisition job until the user exists with a keystroke.
-
-PRE and POST data collection
-  When LCRUN first starts, it loads the selected configuration file
-  (see -c option).  If only one device is found, it will be used for
-  the continuous DAQ job.  However, if multiple device configurations
-  are found, they will be used to take bursts of data before (pre-)
-  after (post-) the continuous DAQ job.
-
-  If two devices are found, the first device will be used for a single
-  burst of data acquisition prior to starting the continuous data 
-  collection with the second device.  The NSAMPLE parameter is useful
-  for setting the size of these bursts.
-
-  If three devices are found, the first and second devices will still
-  be used for the pre-continous and continuous data sets, and the third
-  will be used for a post-continuous data set.
-
-  In all cases, each data set will be written to its own file so that
-  LCRUN creates one to three files each time it is run.
 
 -c CONFIGFILE
   By default, LCRUN will look for "lcrun.conf" in the working
@@ -67,16 +48,6 @@ PRE and POST data collection
   This option overrides the default continuous data file name
   "YYYYMMDDHHmmSS_lcrun.dat"
      $ lcrun -d mydatafile.dat
-
--r PREFILE
-  This option overrides the default pre-continuous data file name
-  "YYYYMMDDHHmmSS_lcrun_pre.dat"
-     $ lcrun -r myprefile.dat
-
--p POSTFILE
-  This option overrides the default post-continuous data file name
-  "YYYYMMDDHHmmSS_lcrun_post.dat"
-     $ lcrun -p mypostfile.dat
 
 -n MAXREAD
   This option accepts an integer number of read operations after which
@@ -94,7 +65,7 @@ PRE and POST data collection
      $ lcrun -f height=5.25 -i temperature=22 -s day=Monday
 
 GPLv3
-(c)2017-2019 C.Martin
+(c)2017-2021 C.Martin
 ```
 
 ### lcburst
@@ -163,7 +134,8 @@ lcburst [-h] [-c CONFIGFILE] [-n SAMPLES] [-t DURATION] [-d DATAFILE]
   specified, then LCBURST will collect one packet worth of data.
 
 GPLv3
-(c)2017-2019 C.Martin
+(c)2017-2021 C.Martin
+
 ```
 
 ### lcstat
@@ -171,3 +143,60 @@ GPLv3
 The **L**aboratory **C**onfiguration **STAT**us utility is intended to provide a quick and convenient real time display of signal statistics for the configured device.  This can be handy for monitoring an experiment or just for debugging.
 
 `lcstat` uses the `nsample` parameter to determine the number of samples used for averaging.
+
+```bash
+$ lcstat -h
+lcstat [-dhmpr] [-c CONFIGFILE] [-n SAMPLES] [-u UPDATE_SEC]
+  LCSTAT is a utility that shows the status of the configured channels
+  in real time.  The intent is that it be used to aid with debugging and
+  setup of experiments from the command line.
+
+  Measurement results are displayed in a table with a row for each
+  analog input and DIO extended feature channel configured and columns for
+  signal statistics, specified with switches at the command line.
+  Measurements are streamed for at least the number of samples specified
+  by the NSAMPLE configuration parameter or by the number specified by
+  the -n option.
+
+-c CONFIGFILE
+  Specifies the LCONFIG configuration file to be used to configure the
+  LabJack.  By default, LCSTAT will look for lcstat.conf
+
+-n SAMPLES
+  Specifies the minimum integer number of samples per channel to be 
+  included in the statistics on each channel.  
+
+  For example, the following is true
+    $ lcburst -n 32   # collects 64 samples per channel
+    $ lcburst -n 64   # collects 64 samples per channel
+    $ lcburst -n 65   # collects 128 samples per channel
+    $ lcburst -n 190  # collects 192 samples per channel
+
+  Suffixes M (for mega or million) and K or k (for kilo or thousand)
+  are recognized.
+    $ lcburst -n 12k   # requests 12000 samples per channel
+
+  If both the test duration and the number of samples are specified,
+  which ever results in the longest test will be used.  If neither is
+  specified, then LCSTAT will collect one packet worth of data.
+
+-d
+  Display standard deviation of the signal in the results table.
+
+-m
+  Display the maximum and minimum of each signal in the results table.
+
+-p
+  Display peak-to-peak values in the results table.
+
+-r
+  Display rms values in the results table.
+
+-u UPDATE_SEC
+  Accepts a floating point indicating the approximate time in seconds between
+  display updates.
+
+GPLv3
+(c)2020-2021 C.Martin
+
+```

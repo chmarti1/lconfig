@@ -79,7 +79,7 @@ const char help_text[] = \
 "     $ lcrun -f height=5.25 -i temperature=22 -s day=Monday\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017-2019 C.Martin\n";
+"(c)2017-2021 C.Martin\n";
 
 
 /*....................
@@ -108,8 +108,6 @@ int main(int argc, char *argv[]){
     
     lct_idle_t idle;
 
-    printf("A\n");
-
 // TO DO:
 //  Rewrite option parsing to use optarg
 //  Move globals into main()
@@ -119,7 +117,7 @@ int main(int argc, char *argv[]){
     // optarg processing is split in two parts:
     // Save the meta parameters for after the configuration file has been 
     // parsed.  (see below)
-    while((go = getopt(argc, argv, "c:d:n:i:f:s:"))!=-1){
+    while((go = getopt(argc, argv, "hc:d:n:i:f:s:"))!=-1){
         switch(go){
         case 'c':
             strcpy(config_file, optarg);
@@ -132,6 +130,10 @@ int main(int argc, char *argv[]){
                 fprintf(stderr, "LCRUN: -c requires an integer, but got: %s\n", optarg);
                 return -1;
             }
+        break;
+        case 'h':
+            printf(help_text);
+            return 0;
         break;
         case 'f':
         case 'i':

@@ -343,6 +343,29 @@ void init_config(lc_devconf_t* dconf){
 }
 
 
+int test_digital(lc_devconf_t *dconf){
+    int efnum;
+    unsigned int mask;
+    // output/input conflicts
+    if(dconf->domask & dconf->distream){
+        fprintf(stderr, "DISTREAM and DOMASK collide.\n");
+        return -1;
+    }
+    // Check for 
+    for(efnum=0; efnum<dconf->nefch; efnum++){
+        mask = 1<<dconf->efch[efnum].channel;
+        if(dconf->efch[efnum].direction == LC_EF_INPUT && (mask & dconf->domask)){
+            fprintf(stderr, "The %d EF Channel claims channel %d, and collides with DOMASK\n", efnum, dconf->efch[efnum].channel);
+            return -1;
+        }else if(dconf->efch[efnum].direction == LC_EF_OUTPUT && (mask & dconf->distream)){
+            fprintf(stderr, "The %d EF Channel claims channel %d, and collides with DISTREAM\n", efnum, dconf->efch[efnum].channel);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+
 // Initialization declares the buffer memory and initializes all
 // internal variables to describe the buffer's size and read/write oeprations
 int init_buffer(lc_ringbuf_t* RB,    // Ring buffer struct to initialize
@@ -856,12 +879,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // The DOX
         //
         }else if(sscanf(param, "do%d", &itemp) == 1){
-            if(itemp & dconf[devnum].distream){
-                print_error(
-                    "LOAD: Setting DO%d collides with the DISTREAM configuration.\n",
-                    itemp);
-                loadfail();
-            }else if(sscanf(value, "%d", &itemp2)!=1 || itemp2<0 || itemp2>1){
+            if(sscanf(value, "%d", &itemp2)!=1 || itemp2<0 || itemp2>1){
                 print_error(
                     "LOAD: DO%d received unexpected value: %s\n",
                     itemp, value);
@@ -1722,12 +1740,16 @@ int lc_upload_config(lc_devconf_t* dconf){
     nefch = dconf->nefch;
     handle = dconf->handle;
 
+    if(test_digital(dconf)){
+        fprintf(stderr, "UPLOAD: Digital settings conflict.\n");
+        return LCONF_ERROR;
+    }
+
     // Verify that the device is open
     if(!lc_isopen(dconf)){
         print_error( "UPLOAD: The device connection is not open.\n");
         return LCONF_ERROR;
     }
-
 
     // Global parameters...
 
