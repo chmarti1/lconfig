@@ -32,7 +32,7 @@
 #define DEF_CONFIGFILE  "lcstat.conf"
 #define MAXSTR          128
 #define MAXDEV          16
-#define REFRESH_SEC     0.5
+#define UPDATE_SEC      0.5
 // Column widths
 #define FMT_CHANNEL     "%18s"
 #define FMT_CHEAD       "\x1B[4m%18s\x1B[0m"
@@ -59,7 +59,7 @@
 . Help text
 .....................*/
 const char help_text[] = \
-"lcstat [-dhmpr] [-c CONFIGFILE] [-n SAMPLES]\n"\
+"lcstat [-dhmpr] [-c CONFIGFILE] [-n SAMPLES] [-u UPDATE_SEC]\n"\
 "  LCSTAT is a utility that shows the status of the configured channels\n"\
 "  in real time.  The intent is that it be used to aid with debugging and\n"\
 "  setup of experiments from the command line.\n"
@@ -105,6 +105,10 @@ const char help_text[] = \
 "-r\n"\
 "  Display rms values in the results table.\n"\
 "\n"\
+"-u UPDATE_SEC\n"\
+"  Accepts a floating point indicating the approximate time in seconds between\n"\
+"  display updates.\n"\
+"\n"\
 "GPLv3\n"\
 "(c)2020 C.Martin\n";
 
@@ -137,11 +141,14 @@ int main(int argc, char *argv[]){
         unsigned int redraw:1;
     } state;
     time_t now, then;
+    // Command-line options
+    double update_sec = UPDATE_SEC;
 
     // Finally, the essentials
     lc_devconf_t dconf[MAXDEV];     // device configuration array
     lct_stat_t  * values = NULL,    // Live arrays of channel statistics
                 * working = NULL;   // working arrays of channel statistics
+    lct_idle_t  idle;
     
 
     // Initialize the state
@@ -156,7 +163,7 @@ int main(int argc, char *argv[]){
     // Parse the command-line options
     // use an outer foor loop as a catch-all safety
     for(ii=0; ii<argc; ii++){
-        switch(getopt(argc, argv, "hprdmc:n:")){
+        switch(getopt(argc, argv, "hprdmc:n:u:")){
         // Help text
         case 'h':
             printf(help_text);
@@ -199,6 +206,12 @@ int main(int argc, char *argv[]){
                     return -1;
             }
             break;
+        case 'u':
+            if(sscanf(optarg, "%lf", &update_sec) != 1){
+                printf("LCSTAT: -u expects a number, but got: %s\n", optarg);
+                return -1;
+            }
+        break;
         case -1:    // What if we're out of switch options?
             // Force the loop to exit.
             ii = argc;
@@ -263,12 +276,20 @@ int main(int argc, char *argv[]){
     }
     
     then = time(NULL);
+    lct_idle_init(&idle, 100, 5);
     while(state.run){
         now = time(NULL);
         // When it's time to redraw the screen
-        if(difftime(now,then) > REFRESH_SEC){
+        if(difftime(now,then) > update_sec){
             then = now;
             // REFRESH CODE
+            
+            // EXTENDED FEATURE DIO CHANNELS
+            // If there are any extended feature channels, update them before
+            // beginning the redraw
+            if(dconf[ii].nefch)
+                lc_update_ef(&dconf[ii]);
+            
             // Start fresh
             lct_clear_terminal();
             // Loop through the devices
@@ -333,10 +354,7 @@ int main(int argc, char *argv[]){
                     printf("\n");
                 }
                 
-                // EXTENDED FEATURE DIO CHANNELS
-                // If there are any extended feature channels, update them
-                if(dconf[ii].nefch)
-                    lc_update_ef(&dconf[ii]);
+                // Draw the EF channels
                 // Then display them
                 for(jj=0; jj<dconf[ii].nefch; jj++){
                     // CHANNEL LABEL
@@ -393,7 +411,7 @@ int main(int argc, char *argv[]){
         }
         
         // Time for a little downtime
-        usleep(10000);
+        lct_idle(&idle);
         
         // Check for the escape keypress
         if(lct_is_keypress() && getchar()=='Q')
