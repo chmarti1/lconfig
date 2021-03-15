@@ -213,9 +213,9 @@ int lct_keypress_prompt(int look_for, const char* prompt, char* input, unsigned 
 .   label that matches LABEL.  If no matching channel is found, the functions
 .   return -1.
 */
-int lct_ai_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
-int lct_ao_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
-int lct_fio_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]);
+int lct_ai_bylabel(lc_devconf_t *dconf, char label[]);
+int lct_ao_bylabel(lc_devconf_t *dconf, char label[]);
+int lct_fio_bylabel(lc_devconf_t *dconf, char label[]);
 
 
 

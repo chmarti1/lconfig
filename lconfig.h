@@ -37,7 +37,7 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LCONF_VERSION 4.00   // Track modifications in the header
+#define LCONF_VERSION 4.05   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LCONF_VERSION
@@ -171,6 +171,14 @@ with init_data_file() and write_data_file() utilities.
 10/2020
 - Changed analog input channel units to default to "V"
 - Added DOMASK and DOVALUE
+
+** 4.05
+3/2021
+- Transitioned to a non-blocking stream service
+- Added the lct_idle() method for streaming applications
+- Rewrote lcrun to work on parallel devices using the non-blocking service
+- Eliminated vestigial "devnum" arguments to the X_bylabel() functions in
+    lctools.h and lctools.c.
 */
 
 #define TWOPI 6.283185307179586

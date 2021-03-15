@@ -1,14 +1,14 @@
 ## <a name="top"></a> Documentation
 
-Version 4.03<br>
-September 2020<br>
-Chris Martin<br>
+Version 4.05  
+March 2021  
+Christopher R. Martin  
 
 
 ## <a name="intro"></a> Introduction
-The **L**aboratory **CONFIG**uration system processes human-readable configuration files to automate the configuration of the LabJack T4 and T7, the execution of the data acquisition process, and writing data files.  The base system is contained in a single c-file and exposed through a header for inclusion in an application.  There are two generic applications that accomplish most data acquisition tasks; `lcrun`, `lcburst`, and `lcstat`.
+The **L**aboratory **CONFIG**uration system is organized into top-level binaries (`lcrun`, `lcburst`, and `lcstat`), the core header (`lconfig.h`), its corresponding c-file (`lconfig.c`), supporting headers (`lmap.h` and `lctools.h`), and their c-files (`lmap.c` and `lctools.c`).
 
-Detailed documentation for the [LConfig API](api.md) describes the system functions and their use.  There is also a [Reference](reference.md) for a complete list of funcitons, constants, and the available configuration directives.  Finally, the `lconfig.h` header is commented with detailed documentation and a changelog.  If these sources ever contradict one another, the header file should be interpreted as the authoritative resource.
+Most jobs can be done by the [Thebinaries](bin.md), so users should probably start there.  Detailed documentation for the [LConfig API](api.md) describes the system functions and their use.  There is also a [Reference](reference.md) for a complete list of funcitons, constants, and the available configuration directives.  Finally, the `lconfig.h` header is commented with detailed documentation and a changelog.  If these sources ever contradict one another, the header file should be interpreted as the authoritative resource.
 
 
 ### To get started

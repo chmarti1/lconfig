@@ -220,7 +220,7 @@ int lct_keypress_prompt(int look_for, const char* prompt, char* input, const uns
 .   label that matches LABEL.  If no matching channel is found, the functions
 .   return -1.
 */
-int lct_ai_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
+int lct_ai_bylabel(lc_devconf_t *dconf, char label[]){
     int ii;
     for(ii=0; ii<dconf->naich; ii++){
         if(strcmp(label, dconf->aich[ii].label)==0)
@@ -229,7 +229,7 @@ int lct_ai_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
     return -1;
 }
 
-int lct_ao_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
+int lct_ao_bylabel(lc_devconf_t *dconf, char label[]){
     int ii;
     for(ii=0; ii<dconf->naoch; ii++){
         if(strcmp(label, dconf->aoch[ii].label)==0)
@@ -238,7 +238,7 @@ int lct_ao_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
     return -1;
 }
 
-int lct_ef_bylabel(lc_devconf_t *dconf, unsigned int devnum, char label[]){
+int lct_ef_bylabel(lc_devconf_t *dconf, char label[]){
     int ii;
     for(ii=0; ii<dconf->nefch; ii++){
         if(strcmp(label, dconf->efch[ii].label)==0)

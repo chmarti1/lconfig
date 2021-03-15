@@ -2,26 +2,20 @@
 
 Headers and utilities for laboratory measurements and machine control with the [LabJack T4 and T7](https://labjack.com/products)
 
-By Christopher R. Martin<br>
-Assistant Professor of Mechanical Engineering<br>
-Penn State University<br>
- [crm28@psu.edu](mailto:crm28@psu.edu)
+By Christopher R. Martin  
+Assistant Professor of Mechanical Engineering  
+Penn State University  
+ [crm28@psu.edu](mailto:crm28@psu.edu)  
 
-Version 4.00
+Version 4.05
 
 ### Foreword
 
-This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder and is linked below.
-
-For detailed documentation on the LCONFIG package, use these links:
-
-- [Documentation](docs/documentation.md)
-- [The LConfig API](docs/api.md)
-- [Reference](docs/reference.md)
+This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder: [General Documentation](docs/documentation.md)  
 
 ---
 
-### Contents 
+## Contents of this README
 
 - [About](#about)
 - [License](#license)
@@ -33,11 +27,11 @@ For detailed documentation on the LCONFIG package, use these links:
 
 In the summer of 2016, I realized I needed to be able to adjust my data acquisition parameters day-by-day as I was tweaking and optimizing an experiment.  I love my LabJacks, and the folks at LabJack do a great job of documenting their intuitive interface.  HOWEVER, the effort involved in tweaking DAQ properties on the fly AND documenting them with each experiment can be cumbersome.
 
-This little **L**aboratory **CONFIG**uration system is designed to work with text-based configuration files using an intuitive human readable format.  The philosophy is that most (admittedly not all) laboratory jobs that require data acquisition are quite similar and can be configured using simple text without Labview or other expensive (computationally or monitarily) software.
+This little **L**aboratory **CONFIG**uration system is designed to work with text-based configuration files using an intuitive human readable format on Linux systems.  Configuration and meta data about the experiment are all embedded together in one place as a long term record for easy distribution and sharing of data.
 
-All of the acquisition tools are written in C, and only the top-level binaries are specifically written for Linux.  Some minor tweaks should make the base system suitable for Windows.  Still, unless you are ready to dive into the source, I don't recommend it.
+The installation includes three top-level binaries that do just about all the jobs I require: `lcrun`, `lcburst`, and `lcstat`.  `lcburst` collects high speed data in short bursts.  `lcrun` streams data from up to 8 parallel devices directly into data files until stopped with a keystroke.  It will run as long as you have hard drive space, so tests that last for days, months, or years become possible.  `lcstat` prints a continuously updating display of the measurements from multiple parallel devices (respecting the channel calibration).
 
-I have included two binaries, `lcrun` and `lcburst`, built on the LConfig system that do most of the jobs I need in the lab that also serve as examples for how to use LConfig.  `lcburst` collects high speed data in short bursts, and `lcrun` streams data directly to a data file until I tell it to stop.  It will run as long as you have hard drive space, so tests that last for days, months, or years become possible.  If these binaries don't work for you, the back-end configuration is contained in `lconfig.c`, `lconfig.h`, `lctools.c`, and `lctools.h`.  I occasionally build specialized codes on them, but for the most part, the binaries are good enough.
+If these binaries don't work for you, the back-end configuration is contained in `lconfig.c`, `lconfig.h`, `lctools.c`, and `lctools.h`.  It has been years since I've needed to build a custom binary, and I've taken some relatively sophisticated measurements with these codes.
 
 While I do my best to keep this README up to date, the authoritative documentation for the behavior of LCONFIG is contained in the headers, `lconfig.h` and `lctools.h`.  Each function has comments that defines its behavior, and there are even some examples that indicate how the functions should be used.  The comments to the `lc_load_config()` function give a detailed description for each configuration parameter.  There is also a changelog commented at the top of the header.
 
@@ -52,7 +46,15 @@ LCONFIG allows automatic configuration and control of most of the T4/T7's advanc
     - Channel labeling
     - Linear calibration to engineering units (e.g. Volts to psi for pressure sensors)
     - Built-in buffer (no dynamic data management required)
+    - Non-blocking service for parallel device streaming
 - Digital input streaming
+- Static digital output
+- Software trigger
+    - Rising/falling/any edge on any AI channel
+    - Supports pretrigger buffering
+- Hardware trigger
+    - On device-supported DIO channels
+    - Rising/falling/any edge
 - Analog output function generator
     - Constant value
     - Sine wave offset, amplitude, frequency
@@ -68,15 +70,13 @@ LCONFIG allows automatic configuration and control of most of the T4/T7's advanc
     - Pulse width measurement
     - Pulse width output with configurable phase
     - Channel labeling
-- Software trigger
-    - Rising/falling/any edge on any AI channel
-    - Can use the high-speed counter to identify a digital trigger
-    - Supports pretrigger buffering
 - Digital Communication Interface
     - UART interface
+    - (future support for other interfaces planned)
 - Automatic generation of data files
-    - The active configuratino is embedded in the data
-    - Stream directly to a file
+    - The active configuration is embedded in the data
+    - Stream directly to a file for simplicity
+    - Stream to buffer then to file for speed
 - Tools for real time applications in `lctools.h`
     - Tools for formatted printing to a POSIX terminal
     - Tools for handling keyboard interrupts without external libraries
@@ -86,8 +86,9 @@ LCONFIG allows automatic configuration and control of most of the T4/T7's advanc
         - max and min
         - root-mean-square (RMS) value
         - standard deviation
+    - Tools for idle time in service loops
 - Post processing in Python
-    - `lconfig' package loads configurations and data automatically
+    - `lconfig.py` package loads configurations and data automatically
     - Applies calibrations
     - Index by channel number or channel label
 - Error handling
