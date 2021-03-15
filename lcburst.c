@@ -18,7 +18,6 @@
     Authored by C.Martin crm28@psu.edu
 */
 
-#include "ldisplay.h"
 #include "lconfig.h"
 #include <string.h>     // duh
 #include <unistd.h>     // for system calls

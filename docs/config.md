@@ -1,8 +1,8 @@
 [back](documentation.md)
 
-Version 4.03<br>
-September 2020<br>
-Chris Martin<br>
+Version 4.05  
+September 2021  
+Christopher R. Martin  
 
 ## <a name="config"></a> Writing configuration files
 
@@ -230,11 +230,13 @@ aoduty 0.4
 
 A *trigger* event is something that tells the device to start collecting data.  When trigger parameters are not configured, the data acquisition device simply starts taking data whenever the configuration is complete.  For experiments where data collection needs to be synchronized with a physical event, this is rarely good enough.
 
-The `trigchannel` parameters names an analog input channel that should be monitored for a trigger event.  It should be emphasized that the `triggerchannel` is NOT the physical analog input channel, but integer indicating which (by the order they were configured) input channel should be monitored.  
+There are two types of triggers supported by LCONFIG: hardware and software.  A hardware trigger is implemented by hardware (or firmware) inside the DAQ itself.  A software trigger quietly streams data and analyzes it in real time to detect a trigger event from the data.  The software trigger is more sophisticated, but it is also slower.
+
+To configure a software trigger, the `trigchannel` parameter names an analog input channel that should be monitored for a trigger event.  It should be emphasized that the `triggerchannel` is NOT the physical analog input channel, but integer indicating which (by the order they were configured) input channel should be monitored.  
 
 Trigger events on an analog input is determined by when the voltage crosses a *threshold* voltage.  The value of the threshold is set by the `triglevel` parameter in volts.  If the signal MUST be increasing from below for the event to qualify, then the `trigedge` parameter should be set to `rising`.  Alternately, `trigedge` may be set to `falling` or `all`.
 
-If `trigchannel` is set to `hsc`, then the high-speed-counter 2 will be used instead.  This allows a fast digital pulse to be used for synchronizing without needing to add an unnecessary analog input channel.
+The software trigger also supports pre-triggering.  A pre-trigger buffer contains a continuous stream of data that were read in while waiting for a trigger event.  Once a trigger occurs, the post-trigger data is appended, and an entire data set is available; including a window of samples before the trigger occurred.  The `trigpre` parameter should be set to the minimum number of samples to be included in the pretrigger buffer.  Since data are always returned in blocks, the actual number of pretrigger data will be _at least_ that many.
 
 ```bash
 # Configure a generic single-ended analog input on physical
@@ -247,7 +249,19 @@ airange 10
 trigchannel 0
 triglevel 2.5
 trigedge rising
+trigpre 100
 ```
+
+A hardware trigger can be used by passing a digital pulse to one of the supported DIO channels.  LCONFIG will configure the DAQ for a hardware trigger when the corresponding `efsignal` parameter is set to `trigger`.
+
+```bash
+# Hardware trigger on DIO0
+efchannel 0
+efsignal trigger
+efedge rising
+```
+
+See below for more extended feature channel options.
 
 ### <a name="ef"></a> Extended features
 

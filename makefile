@@ -42,3 +42,8 @@ install: lcburst.bin lcrun.bin lcstat.bin
 	chmod 755 $(LCBURST)
 	cp -f lcstat.bin $(LCSTAT)
 	chmod 755 $(LCSTAT)
+
+uninstall:
+	rm $(LCRUN)
+	rm $(LCBURST)
+	rm $(LCSTAT)

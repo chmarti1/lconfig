@@ -18,7 +18,6 @@
     Authored by C.Martin crm28@psu.edu
 */
 
-#include "ldisplay.h"
 #include "lconfig.h"
 #include "lctools.h"
 #include "lcmap.h"
