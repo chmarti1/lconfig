@@ -61,7 +61,10 @@ const char help_text[] = \
 "-d DATAFILE\n"\
 "  This option overrides the default continuous data file name\n"\
 "  \"YYYYMMDDHHmmSS_lcrun.dat\"\n"\
-"     $ lcrun -d mydatafile.dat\n"\
+"     $ lcrun -d mydatafile\n"\
+"  For configurations with only one device, a .dat is automatically\n"\
+"  appended.  For configurations with multiple devices, a data file\n"\
+"  is created for each device, mydatafile_#.dat"\
 "\n"\
 "-n MAXREAD\n"\
 "  This option accepts an integer number of read operations after which\n"\
@@ -241,7 +244,10 @@ int main(int argc, char *argv[]){
         }
         
         // Prepare the data file
-        sprintf(data_file, "%s_%d.dat", data_file_base, devnum);
+        if(ndev == 1)
+            sprintf(data_file, "%s.dat", data_file_base, devnum);
+        else
+            sprintf(data_file, "%s_%d.dat", data_file_base, devnum);
         dfile[devnum] = fopen(data_file,"w");
         if(dfile[devnum] == NULL){
             fprintf(stderr, "LCRUN: Failed to open data file: %s\n", data_file);
