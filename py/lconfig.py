@@ -6,7 +6,7 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 
-__version__ = '4.02'
+__version__ = '4.04'
 
 
 
@@ -374,7 +374,7 @@ is not intended for direct access.  Instead, use the get() function.
                     # parameters are defined by their defaults in 
                     # DEF_DEV
                     self._devconf.append({
-                            'aich':[], 'aoch':[], 'efch':[], 'meta':{}, 'comch':[]})
+                            'aich':[], 'aoch':[], 'efch':[], 'meta':{}, 'comch':[], 'domask':0, 'dovalue':0})
                 # Detect a new analog input channel        
                 elif param == 'aichannel':
                     # Append a minimal dictionary
@@ -389,7 +389,7 @@ is not intended for direct access.  Instead, use the get() function.
                     self._devconf[-1]['efch'].append({})
                 elif param == 'comsignal':
                     self._devconf[-1]['comch'].append({})
-                    
+
                 #####
                 # Deal with the parameter
                 #####
@@ -409,7 +409,15 @@ is not intended for direct access.  Instead, use the get() function.
                 elif param in DEF_COMCH:
                     self._devconf[-1]['comch'][-1][param] = \
                             _filter_value(value, DEF_COMCH[param])
-                            
+                # Deal with the special case of doXX parameters
+                elif param.startswith('do') and param[2:].isnumeric():
+                    channel = int(param[2:])
+                    value = int(value)
+                    self._devconf[-1]['domask'] |= 1<<channel
+                    if value:
+                        self._devconf[-1]['domask'] |= 1<<channel
+                    else:
+                        self._devconf[-1]['domask'] &= ~(1<<channel)
                 # Check for meta parameters
                 elif param == 'meta':
                     if value == 'str' or value == 'string':
