@@ -277,6 +277,7 @@ void init_config(lc_devconf_t* dconf){
     dconf->samplehz = -1.;
     dconf->settleus = 1.;
     dconf->nsample = LCONF_DEF_NSAMPLE;
+    dconf->dataformat = LC_DF_ASCII;
     // Trigger settings
     dconf->trigchannel = -1;
     dconf->triglevel = 0.;
@@ -715,6 +716,15 @@ Found \"%s\"\n", param);
                 print_error("LOAD: **WARNING** NSAMPLE value was less than or equal to zero.\n"
                        "      Fix this before initiating a stream!\n");
             dconf[devnum].nsample = itemp;
+        //
+        // The DATAFORMAT parameter
+        //
+        }else if(streq(param, "dataformat")){
+            if(lcm_get_value(lcm_dataformat, value, &dconf[devnum].dataformat)){
+                print_error( "LOAD: Unrecognized dataformat: %s\n", value);
+                print_error( "Expected \"ascii\" \"text\" \"bin\" or \"binary\"\n");
+                loadfail();
+            }
         //
         // The AICHANNEL parameter
         //
@@ -1405,6 +1415,8 @@ void lc_write_config(lc_devconf_t* dconf, FILE* ff){
     write_flt(settleus,settleus);
     write_int(nsample,nsample);
     
+    fprintf(ff, "dataformat %s\n", 
+            lcm_get_config(lcm_dataformat, dconf->dataformat));
     // Analog inputs
     if(dconf->naich)
         fprintf(ff,"\n# Analog Inputs\n");
@@ -3373,15 +3385,25 @@ int lc_datafile_write(lc_devconf_t* dconf, FILE* FF){
     int err,index,row,ainum;
     unsigned int channels, samples_per_read;
     double *data = NULL;
+    float ftemp;
 
     err = lc_stream_read(dconf,&data,&channels,&samples_per_read);
     if(data){
-        index = 0;
-        // Write data one element at a time.
-        for(row=0; row<samples_per_read; row++){
-            for(ainum=0; ainum<channels-1; ainum++)
-                fprintf(FF, "%.6e\t", data[ index++ ]);
-            fprintf(FF, "%.6e\n", data[ index++ ]);
+        // Write using the ascii format
+        if(dconf->dataformat == LC_DF_ASCII){
+            index = 0;
+            // Write data one element at a time.
+            for(row=0; row<samples_per_read; row++){
+                for(ainum=0; ainum<channels-1; ainum++)
+                    fprintf(FF, "%.6e\t", data[ index++ ]);
+                fprintf(FF, "%.6e\n", data[ index++ ]);
+            }
+        // Write using binary format
+        }else if(dconf->dataformat == LC_DF_BIN){
+            for(index=0; index<channels*samples_per_read; index++){
+                ftemp = (float) data[index];
+                fwrite(&ftemp, sizeof(ftemp), 1, FF);
+            }
         }
     }
     return err;

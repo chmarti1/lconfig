@@ -263,6 +263,15 @@ typedef struct __lc_aoconf_t__ {
 
 typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
 
+
+// The file format specifier indicates whether to use binary or ascii/text 
+// data formatting.  The former is faster and more efficient, but the latter
+// is human readable.
+typedef enum __lc_dataformat_t__ {
+    LC_DF_ASCII = 0,
+    LC_DF_BIN = 1,
+} lc_dataformat_t;
+
 // Flexible Input/Output configuration struct
 // This includes everything needed to configure an extended feature EF channel
 typedef struct __lc_efconf_t__ {
@@ -312,6 +321,7 @@ typedef struct __lc_comconf_t__ {
         } uart;
     } options;
 } lc_comconf_t;
+
 
 // The lc_meta_t is a struct for user-defined flexible parameters.
 // These are not used to configure the DAQ, but simply data of record
@@ -407,6 +417,8 @@ typedef struct __lc_devconf_t__ {
     double triglevel;               // What voltage should the trigger seek?
     lc_edge_t trigedge; // Trigger edge
     enum {LC_TRIG_IDLE, LC_TRIG_PRE, LC_TRIG_ARMED, LC_TRIG_ACTIVE} trigstate; // Trigger state
+    // data file format
+    lc_dataformat_t dataformat;
     // Meta & filestream
     lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
     lc_ringbuf_t RB;                  // ring buffer
@@ -549,6 +561,11 @@ The following parameters are recognized:
 .   conneciton is through ethernet, lconfig can not make changes to any of
 .   the TCP parameters.  These are the IP address for the subnet's gateway
 .   and the subnet mask respectively.
+-DATAFORMAT
+.   Accepts ASCII or TEXT to indicate human readable data.  For speed and
+.   efficiency, use BIN or BINARY to indicate a binary file.  Note that 
+.   the application should open the file in "binary" mode to ensure that
+.   both modes will be supported.
 -SAMPLEHZ
 .   This parameter is not explicitly used to configure the T7.  It is intended
 .   to specify the sample rate in Hz for streaming applications run by the 

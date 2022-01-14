@@ -6,7 +6,8 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 
-__version__ = '4.04'
+__version__ = '4.06'
+
 
 
 
@@ -209,149 +210,122 @@ LE2 = LEnum(LE)
             return
         raise Exception('LE setstate: State is out-of-range: %d'%ind)
 
-###
-# Default dictionaries
-###
 
-DEF_DEV = {
-    'connection':LEnum(['any', 'usb', 'eth', 'ethernet'], values=[0,1,3,3]),
-    'serial':'',
-    'device':LEnum(['any', 't4', 't7', 'tx', 'digit'], values=[0, 4, 7, 84, 200]),
-    'name':'',
-    'ip':'',
-    'gateway':'',
-    'subnet':'',
-    'samplehz':-1.,
-    'settleus':1.,
-    'nsample':64,
-    'distream':0,
-    'trigchannel':-1,
-    'triglevel':0.,
-    'trigpre':0,
-    'trigedge':LEnum(['rising', 'falling', 'all'], state=0),
-    'effrequency':0,
-}
+class Conf(object):
+    def __setattr__(self,name,value):
+        if name not in self.__dict__:
+            raise Exception('Unsupported configuration parameter: ' + name)
+        thistype = type(self.__dict__[name])
+        if thistype is list or thistype is dict:
+            raise Exception('Cannot overwrite parameter set: ' + name)
+        elif thistype is LEnum:
+            self.__dict__[name].set(value)
+        else:
+            self.__dict__[name] = thistype(value)
 
-DEF_AICH = {
-    'aichannel':-1,
-    'ainegative':LEnum(
-            ['differential', 'differential', 'differential', 'differential', 'differential', 'differential', 'differential', 'ground'], 
-            values=[1, 3, 5, 7, 9, 11, 13, 199], state=7),
-    'airange':10.,
-    'airesolution':0,
-    'aicalslope':1.,
-    'aicalzero':0.,
-    'ailabel':'',
-    'aicalunits':''
-}
+class DevConf(Conf):
+    def __init__(self):
+        self.__dict__.update({
+            'connection':LEnum(['any', 'usb', 'eth', 'ethernet'], values=[0,1,3,3]),
+            'serial':'',
+            'device':LEnum(['any', 't4', 't7', 'tx', 'digit'], values=[0, 4, 7, 84, 200]),
+            'dataformat':LEnum(['ascii','text','bin','binary'], values=[0,0,1,1]),
+            'name':'',
+            'ip':'',
+            'gateway':'',
+            'subnet':'',
+            'samplehz':-1.,
+            'settleus':1.,
+            'nsample':64,
+            'distream':0,
+            'domask':0,
+            'dovalue':0,
+            'trigchannel':-1,
+            'triglevel':0.,
+            'trigpre':0,
+            'trigedge':LEnum(['rising', 'falling', 'all'], state=0),
+            'effrequency':0,
+            'aich':[],
+            'aoch':[],
+            'efch':[],
+            'comch':[],
+            'meta':'',
+            'meta_values':{},
+        })
+        
+class AiConf(Conf):
+    def __init__(self):
+        self.__dict__.update({
+            'aichannel':-1,
+            'ainegative':LEnum(
+                    ['differential', 'differential', 'differential', 'differential', 'differential', 'differential', 'differential', 'ground'], 
+                    values=[1, 3, 5, 7, 9, 11, 13, 199], state=7),
+            'airange':10.,
+            'airesolution':0,
+            'aicalslope':1.,
+            'aicalzero':0.,
+            'ailabel':'',
+            'aicalunits':''
+        })
 
-DEF_AOCH = {
-    'aochannel':-1,
-    'aosignal':LEnum(['constant', 'sine', 'square', 'triangle', 'noise']),
-    'aofrequency':-1.,
-    'aoamplitude':1.,
-    'aooffset':2.5,
-    'aoduty':0.5,
-    'aolabel':''
-}
+class AoConf(Conf):
+    def __init__(self):
+        self.__dict__.update({
+            'aochannel':-1,
+            'aosignal':LEnum(['constant', 'sine', 'square', 'triangle', 'noise']),
+            'aofrequency':-1.,
+            'aoamplitude':1.,
+            'aooffset':2.5,
+            'aoduty':0.5,
+            'aolabel':''
+        })
 
-DEF_EFCH = {
-    'efchannel':-1,
-    'efsignal':LEnum(['pwm', 'count', 'frequency', 'phase', 'quadrature']),
-    'efedge':LEnum(['rising', 'falling', 'all']),
-    'efdebounce':LEnum(['none', 'fixed', 'reset', 'minimum']),
-    'efdirection':LEnum(['input', 'output']),
-    'efusec':0.,
-    'efdegrees':0.,
-    'efduty':0.5,
-    'efcount':0,
-    'eflabel':''
-}
+class EfConf(Conf):
+    def __init__(self):
+        self.__dict__.update({
+            'efchannel':-1,
+            'efsignal':LEnum(['pwm', 'count', 'frequency', 'phase', 'quadrature']),
+            'efedge':LEnum(['rising', 'falling', 'all']),
+            'efdebounce':LEnum(['none', 'fixed', 'reset', 'minimum']),
+            'efdirection':LEnum(['input', 'output']),
+            'efusec':0.,
+            'efdegrees':0.,
+            'efduty':0.5,
+            'efcount':0,
+            'eflabel':''
+        })
+        
+class ComConf(Conf):
+    def __init__(self):
+        self.__dict__.update({
+            'comchannel':LEnum(['none', 'uart', '1wire', 'spi', 'i2c', 'sbus']),
+            'comrate':-1,
+            'comin':-1,
+            'comout':-1,
+            'comclock':-1,
+            'comoptions':'',
+            'comlabel':''
+        })
 
-DEF_COMCH = {
-    'comchannel':LEnum(['none', 'uart', '1wire', 'spi', 'i2c', 'sbus']),
-    'comrate':-1,
-    'comin':-1,
-    'comout':-1,
-    'comclock':-1,
-    'comoptions':'',
-    'comlabel':''
-}
 
-
-class LConf:
-    """Laboratory Configuration class
-
-The Python LConf class does not directly mirror the C DEVCONF struct. It
-contains all of the DEVCONF structs defined by a single LConfig file and
-all of the data sets that might have been defined by the data 
-acquisition operation.  Write operations are not allowed; this class is
-strictly defined for retrieving data and configuration parameters.
-
-LConf objects are initialized with a mandatory LConfig file
-    LC = LConf( 'path/to/drun.conf' )
+class LData:
     
-Once loaded, the parameters are accessed using the "get" method: 
-    LC.get(devnum=0, param='samplehz')
-    LC.get(devnum=0, aich=2, param='airange')
-See help(LC.get) for more information.
-
-The optional 'data' keyword prompts the LConf object to read in the file
-as a data file instead of just a configuration file.  Additionally, the
-'cal' keyword prompts __init__ to apply the channel configurations to
-the data.
-    LC = LConf( 'path/to/drun.dat', data=True, cal=True)
-    
-If digital input streaming is active, there is an additional optional keyword
-'dibits' that signals whether the digital input stream should be treated as 
-sixteen individual one-bit channels or a single 16-bit channel.
-    LC = LConf( 'path/to/data.dat', data=True, dbits=True ) # 16 1-bit channels
-    LC = LConf( 'path/to/data.dat', data=True, dbits=False) # 1 16-bit channel
-    
-Once loaded, the data can be accessed individually by channel index or
-by channel label.  The corresponding time vector is also available.
-    LC.get_channel(1)
-    LC.get_channel('T3')
-    LC.get_dichannel(0)
-    LC.get_time()
-
-There are also method for plotting the data
-    LC.show_channel(0)
-    LC.show_dichannel(0)
-
-There are methods to determine some information on what was configured
-    LC.ndev()           Number of configured devices
-    LC.ndata()          Number of data points loaded
-    LC.naich(devnum)    Number of analog inputs on device devnum
-    LC.naoch(devnum)    Number of analog outputs on device devnum
-    LC.nefch(devnum)    Number of flexible IO channels on device devnum
-    LC.ncomch(devnum)   Number of com channels on device devnum
-    
-The labels of all configured channels can also be retrieved
-    LC.get_labels(devnum, source='aich')
-
-There are a number of static members that contain useful information:
-    LC.cal      Were the channel calibrations applied during load? T/F
-    LC.data         An array of data loaded from the data file or None
-    LC.didata       A separate array of the digital input stream data
-    LC.filename     The global path to the source file
-    LC.time         The array returned by get_time() or None
-    LC.timestamp    The timestamp string loaded from the data file
-    
-The above members are intended for public access, but the _devconf list
-is not intended for direct access.  Instead, use the get() function.
-"""
-    def __init__(self, filename, data=False, dibits=False, cal=True):
-        self._devconf = []
-        self.time = None
-        # Externals
-        self.timestamp = ''
+    def __init__(self):
+        self.t = None
         self.data = None
-        self.didata = None
-        self.cal = cal
+        self.timestamp = None
+        self.filename = ''
+        self.cal = False
+        self.config = None
+        
+
+
+def lc_load(filename, data=False, dibits=False, cal=True):
+        devconf = []
+        data = LData()
         self.filename = os.path.abspath(filename)
 
-        with open(filename,'r') as ff:
+        with open(filename,'rb') as ff:
             
             # start the parse
             # Read in the new
@@ -373,63 +347,32 @@ is not intended for direct access.  Instead, use the get() function.
                     # need to be defined explicitly.  All other 
                     # parameters are defined by their defaults in 
                     # DEF_DEV
-                    self._devconf.append({
-                            'aich':[], 'aoch':[], 'efch':[], 'meta':{}, 'comch':[], 'domask':0, 'dovalue':0})
+                    self.devconf.append(DevConf())
                 # Detect a new analog input channel        
                 elif param == 'aichannel':
                     # Append a minimal dictionary
-                    self._devconf[-1]['aich'].append({})
+                    self.devconf[-1]['aich'].append(AiConf())
+                    
                 # Detect a new analog output channel
                 elif param == 'aochannel':
                     # Append a minimal dictionary
-                    self._devconf[-1]['aoch'].append({})
+                    self.devconf[-1]['aoch'].append(AoConf())
                 # Detect a new analog output channel
                 elif param == 'efchannel':
                     # Append a minimal dictionary
-                    self._devconf[-1]['efch'].append({})
+                    self._devconf[-1]['efch'].append(EfConf())
                 elif param == 'comsignal':
-                    self._devconf[-1]['comch'].append({})
-
-                #####
-                # Deal with the parameter
-                #####
-                # IF this is a global parameter
-                if param in DEF_DEV:
-                    self._devconf[-1][param] = \
-                            _filter_value(value, DEF_DEV[param])
-                elif param in DEF_AICH:
-                    self._devconf[-1]['aich'][-1][param] = \
-                            _filter_value(value, DEF_AICH[param])
-                elif param in DEF_AOCH:
-                    self._devconf[-1]['aoch'][-1][param] = \
-                            _filter_value(value, DEF_AOCH[param])
-                elif param in DEF_EFCH:
-                    self._devconf[-1]['efch'][-1][param] = \
-                            _filter_value(value, DEF_EFCH[param])
-                elif param in DEF_COMCH:
-                    self._devconf[-1]['comch'][-1][param] = \
-                            _filter_value(value, DEF_COMCH[param])
-                # Deal with the special case of doXX parameters
+                    self._devconf[-1]['comch'].append(ComConf())
+                # The digital output mask values require special treatment
                 elif param.startswith('do') and param[2:].isnumeric():
                     channel = int(param[2:])
                     value = int(value)
                     self._devconf[-1]['domask'] |= 1<<channel
                     if value:
-                        self._devconf[-1]['domask'] |= 1<<channel
+                        self._devconf[-1]['dovalue'] |= 1<<channel
                     else:
-                        self._devconf[-1]['domask'] &= ~(1<<channel)
-                # Check for meta parameters
-                elif param == 'meta':
-                    if value == 'str' or value == 'string':
-                        metatype = 's'
-                    elif value == 'int' or value == 'integer':
-                        metatype = 'i'
-                    elif value == 'flt' or value == 'float':
-                        metatype = 'f'
-                    elif value == 'none' or value == 'end' or value == 'stop':
-                        metatype = 'n'
-                    else:
-                        raise Exception('Unrecognized meta flag {:s}.'.format(param))
+                        self._devconf[-1]['dovalue'] &= ~(1<<channel)
+
                 elif param.startswith('int:'):
                     self._devconf[-1]['meta'][param[4:]] = int(value)
                 elif param.startswith('flt:'):
@@ -460,13 +403,18 @@ is not intended for direct access.  Instead, use the get() function.
                 
             # Read in the date/timestamp
             self.timestamp = ff.readline()
-            
-            # Read in the data
-            thisline = ff.readline()
-            while thisline:
-                self.data.append([float(this) for this in thisline.split()])
+            # If the data are in binary format
+            if(self._devconf[-1]['dataformat'].getvalue()):
+                # We need to figure out how many input channels there are
+                naich = len(self._devconf[-1]['aich']) + (self._devconf[-1]['distream'] != 0)
+                
+            else:
+                # Read in the data as ascii
                 thisline = ff.readline()
-            self.data = np.array(self.data)
+                while thisline:
+                    self.data.append([float(this) for this in thisline.split()])
+                    thisline = ff.readline()
+                self.data = np.array(self.data)
             
             # Was digital input streaming active?
             if self.get(0,'distream'):
@@ -497,7 +445,6 @@ is not intended for direct access.  Instead, use the get() function.
             T = 1./self.get(0, 'samplehz')
             N = self.data.shape[0]
             self.time = np.arange(0., (N-0.5)*T, T) 
-
 
     def __str__(self, width=80):
         out = ''

@@ -62,6 +62,17 @@ static const lcm_map_t lcm_device[] = {
 };
 
 //
+// File format
+//
+static const lcm_map_t lcm_dataformat[] = {
+    {.value=LC_DF_ASCII, .message="ASCII", .config="ascii"},
+    {.value=LC_DF_BIN, .message="Binary", .config="bin"},
+    {.value=LC_DF_ASCII, .message="", .config="text"},
+    {.value=LC_DF_BIN, .message="", .config="binary"},
+    {.value=-1}
+};
+
+//
 // Analog Output Signal
 //
 static const lcm_map_t lcm_aosignal[] = {

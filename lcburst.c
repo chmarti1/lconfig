@@ -357,7 +357,7 @@ int main(int argc, char *argv[]){
     // Open the output file
     printf("Writing the data file");
     fflush(stdout);
-    dfile = fopen(data_file,"w");
+    dfile = fopen(data_file,"wb");
     if(dfile == NULL){
         printf("FAILED\n");
         fprintf(stderr, "LCBURST failed to open the data file \"%s\"\n", data_file);
