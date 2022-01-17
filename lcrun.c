@@ -248,7 +248,7 @@ int main(int argc, char *argv[]){
             sprintf(data_file, "%s.dat", data_file_base, devnum);
         else
             sprintf(data_file, "%s_%d.dat", data_file_base, devnum);
-        dfile[devnum] = fopen(data_file,"w");
+        dfile[devnum] = fopen(data_file,"wb");
         if(dfile[devnum] == NULL){
             fprintf(stderr, "LCRUN: Failed to open data file: %s\n", data_file);
             halt();
