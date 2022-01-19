@@ -281,9 +281,69 @@ class DevConf(Conf):
             else:
                 self.__dict__[name] = thistype(value)
 
-    def naich(self):
+    def __str__(self, width=80):
+
+        fmt = '{:>14s} : {:<14s}\n'
+        out ='::Global Settings::\n'
+        out += fmt.format('connection', self.connection.get())
+        out += fmt.format('device', self.device.get())
+        for attr in ['name', 'serial', 'ip', 'subnet', 'gateway', 
+                'dataformat', 'samplehz', 'settleus', 'nsample', 'distream',
+                'domask', 'dovalue']:
+            
+            value = getattr(self, attr)
+            if isinstance(value, LEnum):
+                value = value.get()
+            elif isinstance(value, (int,float)):
+                value = str(value)
+            if value:
+                out += fmt.format(attr,value)
+            
+        # Detect trigger settings?
+        if self.trigchannel>0:
+            out += '::Trigger Settings::\n'
+            out += fmt.format('trigchannel', str(self.trigchannel))
+            out += fmt.format('trigedge', self.trigedge.get())
+            out += fmt.format('trigpre', str(self.trigpre))
+            out += fmt.format('triglevel', str(self.triglevel))
+        
+        if self.meta_values:
+            out += '::Meta Data::\n'
+            for param,value in self.meta_values.items():
+                fmt.format(param,value)
+        
+        if self.aich:
+            out += '::Analog Inputs::\n'
+            for ii,aich in enumerate(self.aich):
+                out += 'Channel [%d]\n'%(ii)
+                out += str(aich)
+        
+        if self.aoch:
+            out += '::Analog Outputs::\n'
+            for ii,aoch in enumerate(self.aoch):
+                out += 'Channel [%d]\n'%(ii)
+                out += str(aoch)
+            
+        if self.efch:
+            out += '::Digital Extended Feature Channels::\n'
+            for ii,efch in enumerate(self.efch):
+                out += 'Channel [%d]\n'%(ii)
+                out += str(efch)
+                
+        if self.comch:
+            out += '::Digital Com Channels::\n'
+            for ii,comch in enumerate(self.comch):
+                out += 'Channel [%d]\n'%(ii)
+                out += str(comch)
+        return out
+        
+    def nistream(self):
+        """Returns the number of configured input stream channels"""
         return len(self.aich) + (self.distream != 0)
 
+    def get_meta(self, param):
+        """Return a meta parameter or None if not found"""
+        return self.meta_values.get(param)
 
         
 class AiConf(Conf):
@@ -300,6 +360,20 @@ class AiConf(Conf):
             'ailabel':'',
             'aicalunits':''
         })
+        
+    def __str__(self):
+        fmt = '{:>14s} : {:<14s}\n'
+        out = ''
+        for param in ['aichannel', 'ainegative', 'airange', 'airesolution',
+                'aicalslope', 'aicalzero', 'ailabel', 'aicalunits']:
+            value = getattr(self,param)
+            if isinstance(value, LEnum):
+                value = value.get()
+            elif isinstance(value, (int,float)):
+                value = str(value)
+            out += fmt.format(param,value)
+        return out
+
 
 class AoConf(Conf):
     def __init__(self):
@@ -312,6 +386,20 @@ class AoConf(Conf):
             'aoduty':0.5,
             'aolabel':''
         })
+        
+    def __str__(self):
+        fmt = '{:>14s} : {:<14s}\n'
+        out = ''
+        for param in ['aochannel', 'aosignal', 'aofrequency', 'aoamplitude',
+                'aooffset', 'aoduty', 'aolabel']:
+            value = getattr(self,param)
+            if isinstance(value, LEnum):
+                value = value.get()
+            elif isinstance(value, (int,float)):
+                value = str(value)
+            out += fmt.format(param,value)
+        return out
+
 
 class EfConf(Conf):
     def __init__(self):
@@ -328,6 +416,19 @@ class EfConf(Conf):
             'eflabel':''
         })
         
+    def __str__(self):
+        fmt = '{:>14s} : {:<14s}\n'
+        out = ''
+        for param in ['efchanne', 'efsigna', 'efedge', 'efdebounce', 
+                'efdirection', 'efusec', 'efduty', 'efcount', 'eflabel']:
+            value = getattr(self,param)
+            if isinstance(value, LEnum):
+                value = value.get()
+            elif isinstance(value, (int,float)):
+                value = str(value)
+            out += fmt.format(param,value)
+        return out
+        
 class ComConf(Conf):
     def __init__(self):
         self.__dict__.update({
@@ -340,6 +441,18 @@ class ComConf(Conf):
             'comlabel':''
         })
 
+    def __str__(self):
+        fmt = '{:>14s} : {:<14s}\n'
+        out = ''
+        for param in ['comchannel', 'comrate', 'comin', 'comout', 
+                'comclock', 'comoptions', 'comlabel']:
+            value = getattr(self,param)
+            if isinstance(value, LEnum):
+                value = value.get()
+            elif isinstance(value, (int,float)):
+                value = str(value)
+            out += fmt.format(param,value)
+        return out
 
 class LData:
     """LData - The lconfig data class for python
@@ -357,11 +470,6 @@ corresponds to a channel, and each row is a sample.  When distreaming
 is active, the digital channel is always last.  The analog channels
 appear in the same order in which they were ligsted in the configuration.
 
-.dbits          digital input stream bit array
-If the distream was configured and the `dbits` keyword was set to `True`
-this array mimics the `data` member; each column is one of the sixteen
-available digital bits, and each row is one of the streamed samples.
-
 .timestamp      Time when the data collection began
 Once populated, the timestamp is a `time.time_struct` instance converted
 from the timestamp embedded in the data file.
@@ -378,14 +486,20 @@ configuration under which the data were collected.
 Class methods
 ==========================
 .apply_cal()        Applies the channel calibrations
-.get_channel()      Returns a 1D array of the channel data
-.get_time()         Returns a 1D array of times since collection started
+.get_index()        Finds a channel index in the order it was configured
+.get_config()       Returns the configuration class for a channel
+.get_channel()      Returns a 1D array of a channel's data
+.time()             Returns a 1D array of times since collection started
+.ds()               Produces a slice for selecting data segments by time
+.dbits()            Returns digital input stream channels
 
 Interacting with data
 ==========================
 In addition to the `get_channel()` method, `LData` instances can be 
 indexed directly using [] notation.  This interface supports rerencing
-channels by their labels and slicing.
+channels by their labels and slicing.  Where the get_XXX methods deal
+with class data channel-by-channel, the [] notation allows an array-like
+interface that still supplorts referencing channels by their labels.
 
 When only one index is present, it is interpreted as a channel specifier
 >>> ldata_instance[0]
@@ -404,7 +518,7 @@ the second identifies the channel.  This also supports slicing.
 # Returns a 1D array of measurements from time index 2 to 24 from the
 # second channel (index 1).
 """
-    def __init__(self, config, data, cal=True, dbits=True):
+    def __init__(self, config, data, cal=True):
         self.data = None
         self.dbits = None
         self.timestamp = None
@@ -413,6 +527,7 @@ the second identifies the channel.  This also supports slicing.
         self.config = None
         # Private members
         self._time = None
+        self._dbits = None
         self._bylabel = {}
         self._byainum = {}
         
@@ -420,7 +535,7 @@ the second identifies the channel.  This also supports slicing.
         # format the data array
         self.data = np.array(data, dtype=float)
         # Check for correct shape
-        nch = config.naich()
+        nch = config.nistream()
         if self.data.shape[1] != nch:
             raise Exception('LData: %d channels configured, but %d channels found in data'%(nch, self.data.shape[1]))
         # Apply calibration
@@ -433,14 +548,11 @@ the second identifies the channel.  This also supports slicing.
             self._byainum[aiconf.aichannel] = ii
         # Add digital input stream if present
         if config.distream:
-            ndata = self.data.shape[0]
             self._bylabel['distream'] = nch-1
-            self.dbits = np.zeros((ndata,16), dtype=bool)
-            if dbits:
-                for ii in range(ndata):
-                    for jj in range(16):
-                        self.dbits[ii, jj] = bool(int(self.data[ii, nch-1]) & 1<<jj)
 
+
+    def __str__(self):
+        out = '<LData %d samples x %d channels>'%(self.data.shape[0], self.data.shape[1])
 
     def __getitem__(self, varg):
         N = len(varg)
@@ -464,7 +576,18 @@ the second identifies the channel.  This also supports slicing.
             ch = temp
             
         return self.data[index,ch]
-
+        
+    def __len__(self):
+        return self.data.shape[0]
+        
+    def ndata(self):
+        """Returns the number of samples in the data set"""
+        return self.data.shape[0]
+        
+    def nch(self):
+        """Returns the number of channels in the data set"""
+        return self.data.shape[1]
+        
     def apply_cal(self):
         """apply_cal()  Applies calibrations to the data
     If the `cal` member is `False`, the `apply_cal()` method applies 
@@ -477,17 +600,44 @@ the appropriate calibration to each channel and sets `cal` to `True`.
             self.data[:,ii] *= aich.aicalslope
         self.cal = True
 
-    def get_channel(self, target=None, ainum=None, tstart=None, tstop=None, downselect=0):
-        """get_channel( 'channel label' )
-    OR
-get_channel( number )
-    OR
-get_channel(ainum = number)
 
-Returns a 1D array of samples for a single channel.  This is similar to
-the functionality offered by the item interface [] notation, but it
-includes more advanced options for specifying the channel and for down-
-selecting the data in time.
+    def dbits(self, dich=None):
+        """dbits()
+    OR
+dbits(dich)
+
+Returns a 2D boolean array with sixteen columns corresponding to each of
+the digital input stream bits.  When `dich` is an integer or a slice,
+it is used to select which of the digital input channels to return in 
+the array.  
+
+If distream was not set, then this `dibits()` returns with an error.
+"""
+        if not self.config.distream:
+            raise Exception('DBITS: The digital input stream was not configured for this data set.')
+        
+        # If the conversion hasn't already been performed, do it    
+        if self._dbits is None:
+            self._dbits = np.zeros((ndata,16), dtype=bool)
+            for ii in range(ndata):
+                for jj in range(16):
+                    self._dbits[ii, jj] = bool(int(self.data[ii, nch-1]) & 1<<jj)
+        
+        if dich is None:
+            return self._dbits
+        else:
+            return self._dbits[:,dich]
+
+
+    def get_index(self, target=None, ainum=None):
+        """get_index('channel label')
+    OR
+get_index(number)
+    OR
+get_index(ainum = number)
+
+Returns the integer index corresponding to the column in the data 
+corresponding to the channel indicated.  
 
 :: Specifying a channel by its label ::
 When the argument (or the `target` keyword) is set to a string, it is
@@ -503,6 +653,10 @@ If the digital input stream is present, it always appears last,
 regardless of where the `distream` directive appeared in the 
 configuration file.
 
+Negative indexes are transposed to be indexed from the last channel in
+the list.  So, -1 indicates the last channel.  When nch is the number of
+channels, the range of valid integer indices is [-nch, nch-1].
+
 :: Specifying a channel by its hardware number ::
 When the `ainum` keyword is used instead, the channel is identified by 
 its corresponding positive hardware channel.  For example, a channel 
@@ -510,68 +664,78 @@ configured to accept `AIN2` as the positive input would be identified
 by `ainum = 2`.  It would be strange to configure an analog input stream
 with the same hardware channel appearing twice, but if that occurs, 
 whichever is configured last will be returned.
-
-:: Specifying a start and stop time ::
-Optional keyword parameters, tstart and tstop, allow the user to specify
-a time window by which to down-select the data.  These are specified in
-seconds.  When start (stop) is not specified, then the beginning (end) 
-of data is used.
->>> ldata_instance.get_channel(0, tstart = 1.5, tstop = 2.5)
-
-:: Downselection filter ::
-Optionally, the `downselect` keyword can be used to specify a number of
-data points to skip.  For every datum returned, `downselect` specifies
-the number of points to skip.  By default, it is zero.
 """
         ai = None
-        ti = slice(0,-1)
-        # Deal with slicing
-        if tstart or tstop or downselect:
-            start = 0
-            stop = -1
-            step = 1
-            if tstart:
-                start = int(tstart * self.config.samplehz)
-            if tstop:
-                stop = int(tstop * self.config.samplehz)
-            if downselect:
-                step = int(downselect + 1)
-            ti = slice(start,stop,step)
-            
-        
+        nch = self.config.nistream()
+
         # If target was not specified
         if target is None:
             # The input must have been through ainum.
             if ainum is None:
-                raise Exception('GET_CHANNEL: Missing mandatory argument.')
+                raise Exception('GET_AIINDEX: Missing mandatory argument.')
             ai = self._byainum.get(ainum)
             if ai is None:
-                raise Exception('GET_CHANNEL: Analog input number %d not found.'%ainum)
+                raise Exception('GET_AIINDEX: Analog input number %d not found.'%ainum)
         # If the target was specified
         else:
             # Make sure both weren't specified
             if ainum is not None:
-                raise Exception('GET_CHANNEL: Accepts only one argument.')
+                raise Exception('GET_AIINDEX: Accepts only one argument.')
             # If the channel is specified by label
             if isinstance(target, str):
                 ai = self._bylabel.get(target)
                 # If the channel was not found
                 if ai is None:
-                    raise Exception('GET_CHANNEL: Label not recognized: ' + target)
+                    raise Exception('GET_AIINDEX: Label not recognized: ' + target)
             # If the channel is specified by index
             elif isinstance(target, int):
-                nch = self.config.naich()
                 # Handle integer wrapping
                 ai = target
                 if target < 0:
                     ai += nch
-                if ai < 0 or ai >= self.config.naich():
-                    raise Exception('GET_CHANNEL: Index, %d, is out of range with %d channels.'%(target, nch)) 
+                if ai < 0 or ai >= nch:
+                    raise Exception('GET_AIINDEX: Index, %d, is out of range with %d channels.'%(target, nch)) 
         
         if ai is None:
             raise Exception('GET_CHANNEL: Unhandled exception!')
-        
-        return self.data[ti,ai]
+            
+        return ai
+
+    def get_channel(self, target=None, ainum=None):
+        """get_channel( 'channel label' )
+    OR
+get_channel( number )
+    OR
+get_channel(ainum = number)
+
+Returns a 1D array of samples for a single channel.  This is similar to
+the functionality offered by the item interface [] notation, but it
+includes the option to specify a channel by its hardware number.
+
+See the get_index() for a detailed description of the arguments
+
+See the class documentation for other operations that can be performed
+with the item retrieval [] notation.
+"""
+        return self.data[:,self.get_aiindex(target=target, ainum=ainum)]
+            
+    
+    def get_config(self, target=None, ainum=None):
+        """get_config( 'channel label' )
+    OR
+get_config( number )
+    OR
+get_config(ainum = number)
+
+Returns the analog input configuration instance for the input channel
+
+See the get_index() for a detailed description of the arguments
+"""
+        ai = self.get_index(target=target,ainum=ainum)
+        if ai==len(self.aich):
+            raise Exception('GET_CONFIG: The DISTREAM configuration is not supported by get_config()')
+        return self.aich[ai]
+    
             
     def time(self):
         """time()       Return a 1D time array
@@ -589,8 +753,341 @@ they want the effects to be permanent.
             self._time = np.arange(0.,N*T,T)
         return self._time
 
+    def ds(self, tstart, tstop=None, downsample=0):
+        """ds(tstart, tstop=None, downsample=0)
+   
+    I = ds(tstart, tstop, downsample=0)
+    
+Returns a slice object that can be used to select a portion of the data
+beginning at time `tstart` and ending at time `tstop`.  If tstop is not
+specified, then it will revert to the end of the dataset.  Optionally, 
+for each datum included, `ds` data will be skipped (or downsampled).
 
-def load(filename, data=False, cal=True, dbits=False):
+Great care should be taken when downsampling data in this way, because
+no filter has been applied to prevent aliasing.  It is solid practice to
+apply a digital filter to the data before artificially reducing the 
+sample rate.
+"""
+        start = round(tstart * self.config.samplehz)
+        if tstop is not None:
+            stop = round(tstop * self.config.samplehz)
+        else:
+            stop = -1
+        step = int(downsample) + 1
+        return slice(start, stop, step)
+
+
+    def show_channel(self, aich, ax=None, fig=None, 
+            show=True, ylabel=None, xlabel=None, fs=16,
+            tstart=0., tstop=None, downsample=0, 
+            plot_param={}):
+        """Plot the data from a channel
+    mpll = show_channel(aich)
+    
+Returns the handle to the matplotlib line object created by the plot
+command.  The aich is the same index or string used by the get_channel
+command.  Optional parameters are:
+
+AX
+An optional matplotlib axes object pointing to an existing axes to which
+the line should be added.  This method can be used to show multiple data
+sets on a single plot.
+
+FIG
+The figure can be specified either with a matplotlib figure object or an
+integer figure number.  If it exists, the figure will be cleared and a
+new axes will be created for the plot.  If it does not exist, a new one
+will be created.
+
+TSTART, TSTOP, DOWNSAMPLE
+These parameters are passed to the `ds()` method to downsample the data
+shown on the plot.
+
+SHOW
+If True, then a non-blocking show() command will be called after 
+plotting to prompt matplotlib to display the plot.  In some interfaces,
+this step is not necessary.
+
+XLABEL, YLABEL
+If either is supplied, it will be passed to the set_xlabel and 
+set_ylabel functions instead of the automatic values generated from the
+channel labels and units
+
+FS
+Short for "fontsize" indicates the label font size in points.
+
+PLOT_PARAM
+A dictionar of keyword, value pairs that will be passed to the plot 
+command to configure the line object.
+"""
+
+        # Initialize the figure and the axes
+        if ax is not None:
+            fig = ax.get_figure()
+        elif fig is not None:
+            if isinstance(fig, int):
+                fig = plt.figure(fig)
+            fig.clf()
+            ax = fig.add_subplot(111)
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        
+        # Which channel is this?
+        ai = self.get_index(aich)
+        aiconf = self.config.aich[ai]
+        
+        # Get the downsampled slice
+        ii = self.ds(tstart,tstop,downsample)
+        
+        # Get some descriptive text for the plot
+        if aiconf.ailabel:
+            ailabel = aiconf.ailabel
+        else:
+            ailabel = 'AI%d'%aiconf.aichannel
+            
+        aicalunits = 'V'
+        if aiconf.aicalunits:
+            aicalunits = aiconf.aicalunits
+            
+            
+        # Get data and time
+        t = self.time()[ii]
+        y = self.data[ii,ai]
+        
+        ll = ax.plot(t, y, label=ailabel, **plot_param)
+        
+        if xlabel:
+            ax.set_xlabel(xlabel, fontsize=fs)
+        else:
+            ax.set_xlabel('Time (s)', fontsize=fs)
+        if ylabel:
+            ax.set_ylabel(ylabel, fontsize=fs)
+        else:
+            ax.set_ylabel('%s (%s)'%(ailabel, aicalunits), fontsize=fs)
+        ax.grid('on')
+        if show:
+            plt.show(block=False)
+
+        return ll
+
+    def event_filter(self, x, edge='any', debounce=1, count=None):
+        """This is "private" routine builds a list of indicies where rising/falling
+rising/falling edge transitions are found to occur in an array of bools.
+
+    index_list = event_filter(x, edge='any', debounce=1, count=None)
+    
+x           A 1D numpy boolean array
+edge        'rising', 'falling, or 'any'
+debounce    Debounce filter count
+count       Maximum events to return (ignore if None)
+
+The debounce filter requires that DEBOUNCE (integer) samples before and
+after a transition remain high/low.  Redundant transitions within that
+range are ignored.  For example, if debounce=3, the following would 
+indicate a single rising edge
+    000111
+    00010111
+    00011001100111
+The following would not be identified as any kind of edge
+    00011000
+    000110011000
+    
+In this way, a rapid series of transitions are all grouped as a single 
+edge event.  The window in which these transitions are conflated is 
+determined by the debounce integer.  If none is specified, then debounce
+is 1 (no filter).
+
+The index reported is the datum just prior to the first transition.  In
+the successful examples above, all of them have an event index of 2; 
+corresponding to the last of the three successive 0 samples.
+"""
+        # Translate the edge into a number.  1: rising, 0: any, -1: falling
+        edge = edge.lower()
+        edge_mode = 0
+        if edge == 'rising':
+            edge_mode = 1
+        elif edge == 'falling':
+            edge_mode = -1
+
+        # The filter is applied with a state machine that looks for 
+        # sequences of bits with the same value.  Each bit with the same
+        # value as the last causes the series counter to be incremented
+        # Once the counter is the same size (or larger) than the 
+        # debounce filter, the appropriate index register is updated to
+        # point to the current sample.
+        series_count = 0
+        # The index registers track the last potential edge index.  For
+        # example, the rising_index is updated once `debounce` low bits
+        # in a row have been added. It is not recorded as a transition 
+        # until `debounce` high bits have also been detected.  If more
+        # low bits are found first, then it will be updated before it is
+        # ever recorded.
+        falling_index = None
+        rising_index = None
+        # The output is a list of indices.  It starts empty.
+        out = []
+        # Pretend the last sample was the same as the first
+        xlast = x[0]
+        # Parse the array one element at a time
+        for ii,xi in enumerate(x):
+            # If this sample is the same as the last, increment the 
+            # series counter.  If not, return it to 1 to begin a new
+            # series.
+            if xi == xlast:
+                series_count += 1
+            else:
+                series_count = 1
+            # If the series counter is high enough, update the indices
+            if series_count >= debounce:
+                # If this sample is high, this could be a falling edge
+                if xi:
+                    falling_index = ii
+                    # If there was a candidate rising edge, then it is
+                    # now officially an edge event. Record it if the 
+                    # edge mode is appropriate
+                    if rising_index is not None and edge_mode >= 0:
+                        out.append(rising_index)
+                        rising_index = None
+                # If this sample is low, this could be a rising edge
+                else:
+                    rising_index = ii
+                    # If there was a candidate falling edge, then it is
+                    # now officially an edge event. Record it if the 
+                    # edge mode is appropriate
+                    if falling_index is not None and edge_mode <= 0:
+                        out.append(falling_index)
+                        falling_index = None
+                        
+                # Check for a fully populated array
+                if count is not None and len(out) >= count:
+                    break
+        return np.array(out, dtype=int)
+
+
+    def get_events(self, aich, level=0., edge='any', tstart=None, 
+            tstop=None, count=None, debounce=1, diff=0):
+        """Detect edge crossings returns a list of indexes corresponding to data 
+where the crossings occur.
+
+AICH
+The channel to search for edge crossings
+
+LEVEL
+The level of the crossing
+
+EDGE
+can be rising, falling, or any.  Defaults to any
+
+TSTART
+The time (in seconds) to start looking for events.  Starts at t=0 if 
+unspecified.
+
+TSTOP
+The time to stop looking for events.  Defaults to the end of data.
+
+COUNT
+The integer maximum number of events to return.  If unspecified, there 
+is no limit to the number of events.
+
+DEBOUNCE
+See the `event_filter()` method for a detailed description of the 
+debounce filter.  An edge will not be recorded unless there have been
+`debounce` samples in a row with the same boolean value before and after
+the candidate event.  In this way, a rapid series of transitions are all
+grouped as a single edge event.  Setting `debounce` to 1 removes the 
+filter; all transitions will be reported.
+
+DIFF
+Specifies how many times the signal should be differentiated prior to 
+searching for edges.  This can be useful when searching for sudden 
+changes when the exact level may not be known, but it can also amplify
+high-frequency small signal noise, so be careful.  When `diff` is not 0,
+the level is interpreted in appropriate units, e.g. V / (sec ** diff)
+"""
+        
+        i0 = 0
+        i1 = -1
+        if tstart:
+            i0 = int(round(tstart * self.config.samplehz))
+        if tstop:
+            i1 = int(round(tstop * self.config.samplehz))
+            
+        indices = []
+        
+        # Get the channel data
+        y = self[i0:i1,aich]
+        if diff:
+            y = np.diff(y, diff)
+            y *= self.config.samplehz**diff
+        
+        # Transpose to a boolean array
+        y = (y > level)
+        
+        indices = self.edge_filter(y, debounce=debounce, edge=edge, count=count)
+        
+        # Adjust the indices for the offsets created by downselection
+        # and differentiation
+        if diff or i0:
+            indices += diff + i0
+        
+        return indices
+        
+
+    def get_dievents(self, dich=None, level=0., edge='any', tstart=None, 
+            tstop=None, count=None, debounce=1):
+        """Detect edges on the digital input stream.  When the data were loaded with the DIBITS
+keyword set, the LEVEL is ignored, and DICH indicates which bit should be tested.
+When the data were loaded with the DIBITS keyword clear, an edge is detected by
+the comparison operation:
+    LC.get_dichannel() >= level
+
+DICH
+The digital input bit to search for edge crossings
+
+LEVEL
+The level of the crossing
+
+EDGE
+can be rising, falling, or any.  Defaults to any
+
+TSTART
+The time (in seconds) to start looking for events.  Starts at t=0 if 
+unspecified.
+
+TSTOP
+The time to stop looking for events.  Defaults to the end of data.
+
+COUNT
+The integer maximum number of events to return.  If unspecified, there 
+is no limit to the number of events.
+
+DEBOUNCE
+See the `event_filter()` method for a detailed description of the 
+debounce filter.  An edge will not be recorded unless there have been
+`debounce` samples in a row with the same boolean value before and after
+the candidate event.  In this way, a rapid series of transitions are all
+grouped as a single edge event.  Setting `debounce` to 1 removes the 
+filter; all transitions will be reported.
+"""
+        
+        i0 = 0
+        i1 = -1
+        if tstart:
+            i0 = int(round(self.config.samplehz*tstart))
+        if tstop:
+            i1 = int(round(self.config.samplehz*tstop))
+        
+        # Get the channel data
+        y = self[i0:i1,dich]
+        # Correct for the offset imposed by the downselect
+        if i0:
+            indices += i0
+            
+        return indices
+        
+
+def load(filename, data=True, cal=True):
     out = []
     dconf = None
     ldata = None
@@ -666,7 +1163,7 @@ def load(filename, data=False, cal=True, dbits=False):
                     s = ff.read(4)
                 if samples:
                     print('LOAD: WARNING: last data line was not complete.')
-            DATA = LData(dconf, data_temp, cal=cal, dbits=dbits)
+            DATA = LData(dconf, data_temp, cal=cal)
             DATA.timestamp = timestamp
             out.append(DATA)
     return out
