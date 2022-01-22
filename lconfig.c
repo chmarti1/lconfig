@@ -2083,9 +2083,9 @@ int lc_upload_config(lc_devconf_t* dconf){
     for(efnum=minch; efnum<=maxch; efnum++){
         sprintf(stemp, "DIO%d_EF_ENABLE", efnum);
         if(LJM_eWriteName(handle, stemp, 0)){
-			print_error("UPLOAD: Failed to disable DIO extended features on channel DIO%d\n", efnum);
-			uploadfail();
-		}
+            print_error("UPLOAD: Failed to disable DIO extended features on channel DIO%d\n", efnum);
+            uploadfail();
+        }
     }
 
     // Determine the clock 0 rollover and clock divisor from the EFFREQUENCY parameter
@@ -2174,6 +2174,8 @@ int lc_upload_config(lc_devconf_t* dconf){
                 */
                 // Calculate the start index
                 // Unwrap the phase first (lazy method)
+                while(dconf->efch[efnum.phase>=360.)
+                    dconf->efch[efnum.phase -= 360.;
                 while(dconf->efch[efnum].phase<0.)
                     dconf->efch[efnum].phase += 360.;
                 itemp1 = ef_clk_roll * (dconf->efch[efnum].phase / 360.);
@@ -2188,12 +2190,12 @@ int lc_upload_config(lc_devconf_t* dconf){
                 sprintf(stemp, "DIO%d_EF_OPTIONS", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 0x00000000);
                 if(dconf->efch[efnum].edge==LC_EDGE_FALLING){
-                    // Write the start index
-                    sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
-                    err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
-                    // Write the stop index
+                    // Write the start index (A = high->low)
                     sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp1);
+                    // Write the stop index (B = low->high)
+                    sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
+                    err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
                 }else{
                     // Write the start index
                     sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
@@ -2277,9 +2279,47 @@ int lc_upload_config(lc_devconf_t* dconf){
                 // Enable the EF channel
                 sprintf(stemp, "DIO%d_EF_ENABLE", channel);
                 err = err ? err : LJM_eWriteName(handle, stemp, 1);
+            // Pulse output
             }else{
-                print_error( "UPLOAD: Count output is not currently supported.\n");
-                uploadfail();
+                // Measurement index 2
+                
+                // Calculate the start and stop indices first...
+                // Unwrap the phase first (lazy method)
+                while(dconf->efch[efnum.phase>=360.)
+                    dconf->efch[efnum.phase -= 360.;
+                while(dconf->efch[efnum].phase<0.)
+                    dconf->efch[efnum].phase += 360.;
+                // Calculate the start index
+                itemp1 = ef_clk_roll * (dconf->efch[efnum].phase / 360.);
+                itemp1 %= ef_clk_roll;
+                // Calculate the stop index
+                itemp2 = ef_clk_roll * dconf->efch[efnum].duty;
+                itemp2 = (((long int) itemp1) + ((long int) itemp2))%ef_clk_roll;
+                // Measurement index 1
+                sprintf(stemp, "DIO%d_EF_INDEX", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, 1);
+                // Options - use clock 0
+                sprintf(stemp, "DIO%d_EF_OPTIONS", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, 0x00000000);
+                // Case out the rising/falling edge modes
+                if(dconf->efch[efnum].edge==LC_EDGE_FALLING){
+                    // Write the start index (A = high->low)
+                    sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
+                    err = err ? err : LJM_eWriteName( handle, stemp, itemp1);
+                    // Write the stop index (B = low->high)
+                    sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
+                    err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
+                }else{
+                    // Write the start index (B = low->high)
+                    sprintf(stemp, "DIO%d_EF_CONFIG_B", channel);
+                    err = err ? err : LJM_eWriteName( handle, stemp, itemp1);
+                    // Write the stop index (A = high->low)
+                    sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
+                    err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
+                }
+                // Enable the EF channel
+                sprintf(stemp, "DIO%d_EF_ENABLE", channel);
+                err = err ? err : LJM_eWriteName(handle, stemp, 1);
             }
         break;
         case LC_EF_TRIGGER:
@@ -2294,7 +2334,7 @@ int lc_upload_config(lc_devconf_t* dconf){
             }else if(dconf->efch[efnum].edge == LC_EDGE_RISING){
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 3);
-            // PWM accepts any edge
+            // Frequency accepts any edge
             }else{
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 5);
@@ -2500,7 +2540,7 @@ void lc_show_config(lc_devconf_t* dconf){
                 "Output Values", dconf->dovalue);
     }
     
-    // Trigger
+    // Software Trigger
     if(dconf->trigchannel >= 0){
         printf(LC_FONT_YELLOW LC_FONT_BOLD "* Trigger Settings *\n" LC_FONT_NULL);
         printf(SHOW_PARAM LC_FONT_BOLD "%d\n" LC_FONT_NULL,
@@ -2688,12 +2728,21 @@ int lc_update_ef(lc_devconf_t* dconf){
             }
         break;
         case LC_EF_COUNT:
-            sprintf(stemp, "DIO%d_EF_READ_A", channel);
-            err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
-            dconf->efch[efnum].counts = (unsigned int) ftemp;
-            dconf->efch[efnum].time = 0.;
-            dconf->efch[efnum].duty = 0.;
-            dconf->efch[efnum].phase = 0.;
+            // If this is a counter input
+            if(dconf->efch[efnum].direction) == LC_EF_INPUT){
+                sprintf(stemp, "DIO%d_EF_READ_A", channel);
+                err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
+                dconf->efch[efnum].counts = (unsigned int) ftemp;
+                dconf->efch[efnum].time = 0.;
+                dconf->efch[efnum].duty = 0.;
+                dconf->efch[efnum].phase = 0.;
+            // If this is a pulse output and there are counts to output
+            }else if(dconf->efch[efnum].counts){
+                sprintf(stdemp, "DIO%d_EF_CONFIG_C", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, dconf->efch[efnum].counts);
+                // Zero the counts so redundant calls do not generate redundant outputs
+                dconf->efch[efnum].counts = 0;
+            }
         break;
         case LC_EF_FREQUENCY:
             sprintf(stemp, "DIO%d_EF_READ_A", channel);
@@ -3187,13 +3236,7 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
 
     // Initialize the trigger
     dconf->trigmem = 0;
-    if(dconf->trigchannel >= LCONF_TRIG_EFOFFSET){
-        err = LJM_eWriteName(dconf->handle, "STREAM_TRIGGER_INDEX", dconf->trigchannel);
-        if(err){
-            print_error("STREAM_START: Failed to initialize the hardware trigger\n");
-            return LCONF_ERROR;
-        }
-    }else if(dconf->trigchannel >= 0)
+    if(dconf->trigchannel >= 0)
         dconf->trigstate = LC_TRIG_PRE;
     
     // Start the stream.

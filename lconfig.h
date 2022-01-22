@@ -284,6 +284,7 @@ typedef struct __lc_efconf_t__ {
     // Flexible IO mode enumerated type
     enum {  LC_EF_NONE,   // No extended features
             LC_EF_PWM,    // Pulse width modulation (input/output)
+            LC_EF_PULSE,  // One-time series of pulses (output)
             LC_EF_COUNT,  // Counter (input/output)
             LC_EF_FREQUENCY,  // Frequency (input)
             LC_EF_PHASE,  // Line-to-line phase (input)
@@ -763,41 +764,63 @@ The following parameters are recognized:
 .   member efch[] member variables, duty, counts, or time.  Their
 .   meaning is listed below each signal type.
 . * PWM - pulse width
-.       Input: valid channels 0,1
+.       Input: valid channels 0,1 (T7) 4,5 (T4)
 .           EFEDGE - "rising" indicates duty cycle high, "falling" inverts.
 .           duty - Holds the measured duty cycle
 .           counts - Holds the signal period in counts
 .           time - Holds the signal period in usec
-.       Output: valid channels 0,2,3,4,5
+.       Output: valid channels 0,2,3,4,5 (T7) 6,7 (T4)
 .           EFFREQUENCY - Determines the waveform frequency
 .           EFEDGE - "rising" indicates duty cycle high, "falling" invergs.
 .           EFDUTY - Number 0-1 indicating % time high (low in "falling" mode).
 .           EFDEGREES - Phase of the PWM waveform in degrees.
+.       In both input and output modes, the duty and phase are updated by the
+.       lc_update_ef() function.  
 . * COUNT - edge counter
-.       Input: valid channels 0,1,2,3,6,7
+.       Input: valid channels 0,1,2,3,6,7 (T7) 4,5,6,7,8,9 (T4)
 .           EFEDGE - Count rising, falling, or ALL edges.
 .           EFDEBOUNCE - What debounce filter to use?
 .           EFUSEC - What debounce interval to use?
 .           counts - Holds the measured count.
-.       Output: Not supported
+.       Output: valid channels 0,2,3,4,5 (T7) 6,7 (T4)
+.           EFFREQUENCY - Determines the pulse frequency
+.           EFDUTY - What fraction of the period is high?
+.           EFDEGREES - When does the pulse transition high?
+.           EFCOUNT/count - How many pulses should be transmitted?
+.           EFEDGE - On which edge does the pulse begin: rising or falling?
+.       In output mode, a one-time burst of pulses will be generated, after 
+.       which the signal will halt.  The pulses will not be output until 
+.       lc_update_ef() is called, and the counts value will be set to zero.
+.       In this way, redundant subsequent calls to lc_update_ef() have no 
+.       effect until the count member is rewritten.  The duty and phase are
+.       written by lc_upload_config() and will not be updated unless it is
+.       called again.
+.
+.       In input mode, the counts member is updated by lc_update_ef().
 . * FREQUENCY - period or frequency tracker
-.       Input: valid channels 0,1
-.           EFUSEC - Holds the measured period.
+.       Input: valid channels 0,1 (T7) 4,5 (T4)
+.           EFEDGE - which edge is used for the measurement?
+.           counts - Holds the number of clock ticks between edges
+.           time - Holds the measured period of the waveform in microseconds
 .       Output: Not supported
 . * PHASE - Delay between edges on two channels
 .       Input: valid channels are in pairs 0/1 (only one needs to be specified)
-.           EFEDGE - rising/falling
-.           EFUSEC - Holds the measured delay between edges
+.           EFEDGE - which edge is used for the measurement?
+.           counts - Holds the number of clock ticks between edges
+.           time - Holds the measured delay between edges in microseconds
 .       Output: Not supported
 . * QUADRATURE - Two-channel encoder quadrature
-.       Input: valid channels are in pairs 0/1, 2/3, 6/7
+.       Input: valid channels are in pairs 0/1,2/3,6/7 (T7) 4/5,6/7,8/9 (T4)
 .       (only one needs to be specified)
-.           EFCOUNT - Holds the measured encoder count
+.           count - Holds the measured encoder count
 .       Output: Not supported
 . * TRIGGER - Configure a hardware trigger
-.       Input: Same as FREQUENCY
+.       Input: See FREQUENCY Input mode for valid channels
 .           EFEDGE - trigger on rising or falling edge?
 .       Output: Not supported
+.       Hardware triggering is accomplished by configuring a frequency input
+.       channel to wait for a pair of rising/falling (or falling/rising) edges
+.       to begin a data acquisition process.
 -EFEDGE
 .   Used by the frequency and phase signals, this parameter determines whether
 .   rising, falling, or both edges should be counted.  Valid values are "all",
@@ -834,11 +857,12 @@ The following parameters are recognized:
 .   specifies which of the analog measurements should be monitored for a 
 .   trigger.
 .
-.   For fast digital pulses, LCONFIG can be configured to watch the high speed
-.   counter 2 by passing "HSC" instead of a trigger channel.  If the value in 
-.   the counter increases, then a trigger event will be registered.
+.   For a higher performing hardware trigger, see the EFSIGNAL TRIGGER directive
+.   for a means to configure a hardware trigger.  In this mode, the lconfig 
+.   software starts data acquisition immediately, and triggering is left to the
+.   firm/hardware.
 .
-.   The read_data_stream() function is responsible for monitoring the number of
+.   The lc_stream_service() function is responsible for monitoring the number of
 .   samples and looking for a trigger.  There are four trigger states indicated
 .   by the TRIGSTATE member of the lc_devconf_t structure.
 .       TRIG_IDLE - the trigger is inactive and data will be collected as 
