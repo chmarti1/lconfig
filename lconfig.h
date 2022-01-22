@@ -179,6 +179,12 @@ with init_data_file() and write_data_file() utilities.
 - Rewrote lcrun to work on parallel devices using the non-blocking service
 - Eliminated vestigial "devnum" arguments to the X_bylabel() functions in
     lctools.h and lctools.c.
+
+** 4.06
+1/2022
+- Added a datatype parameter and support for binary data files
+- Rewrote python postprocessing to use a more coherent class-based system
+- Wrote python support for binary data files
 */
 
 #define TWOPI 6.283185307179586

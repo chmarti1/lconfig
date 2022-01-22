@@ -82,7 +82,7 @@ const char help_text[] = \
 "     $ lcrun -f height=5.25 -i temperature=22 -s day=Monday\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017-2021 C.Martin\n";
+"(c)2017-2022 C.Martin\n";
 
 
 /*....................

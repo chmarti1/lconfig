@@ -1,10 +1,12 @@
 [back](documentation.md)
 
-Version 4.10  
-March 2021  
-Chris Martin<  
+Version 4.6
+January 2022
+Chris Martin  
 
 ## Binaries
+
+A binary starts its job by reading in a configuration file, which is just a plain text file written by a user.  Based on the instructions it finds there, it configures the data acquisition device(s) and executes the corresponding data acquisition operation.  The precise job that is done depends on the configuration file and the binary.
 
 There are three binaries included with LConfig: `lcrun`, `lcburst`, and `lcstat`.  These are inteded to be sufficiently generic to do most data acquisition tasks.  `lcrun` is intended for long slow sample-rate tests where the test duration may not be known in advance.  `lcburst` is intended for short high-speed tests.  `lcstat` is intended for monitoring and debugging an experiment.
 
@@ -65,7 +67,7 @@ lcrun [-h] [-r PREFILE] [-p POSTFILE] [-d DATAFILE] [-c CONFIGFILE]
      $ lcrun -f height=5.25 -i temperature=22 -s day=Monday
 
 GPLv3
-(c)2017-2021 C.Martin
+(c)2017-2022 C.Martin
 ```
 
 ### lcburst
@@ -134,7 +136,7 @@ lcburst [-h] [-c CONFIGFILE] [-n SAMPLES] [-t DURATION] [-d DATAFILE]
   specified, then LCBURST will collect one packet worth of data.
 
 GPLv3
-(c)2017-2021 C.Martin
+(c)2017-2022 C.Martin
 
 ```
 
@@ -197,6 +199,6 @@ lcstat [-dhmpr] [-c CONFIGFILE] [-n SAMPLES] [-u UPDATE_SEC]
   display updates.
 
 GPLv3
-(c)2020-2021 C.Martin
+(c)2020-2022 C.Martin
 
 ```

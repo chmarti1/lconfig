@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 4.05  
-September 2021  
+Version 4.06  
+January 2022  
 Christopher R. Martin  
 
 ## <a name="config"></a> Writing configuration files
@@ -20,7 +20,7 @@ Christopher R. Martin
 - [Meta parameters](#meta)
 
 
-Configuration files are just plain text; no special editors or software required.  Let's look at a really simple example:
+Configuration files are at the center of the entire system, but they are just plain text; no special editors or software required.  Let's look at a really simple example:
 ```bash
 connection any
 samplehz 1000
@@ -97,6 +97,8 @@ So far, all of the parameters we have been discussing are applied to the device 
 In addition to the parameters used to identify the device, there are several important parameters that define the behavior of the device.  Perhaps the most important is `samplehz`, which indicates the number of times per second each channel will be sampled in a stream.  
 
 `nsample` is an integer sample count whose behavior depends on the application.  Nominally, `nsample` tells the  `iscomplete_data_stream()` function when to declare that the data acquisition process is complete, but it's entirely up to the application whether or not to keep going.  For example, `lcrun` utterly ignores `nsample` and just waits for a user keystroke.  However, `lcburst` uses `nsample` to determine the duration of the entire measurement when none is specified at the command line.
+
+The `dataformat` parameter is used to determine how data files will be constructed.  It accepts `ascii` or `text` to specify a tab-delimited text file, and `bin` or `binary` to specify a file of 32-bit floats.  When [data files](data.md) are written in binary mode, the configuration header still appears as plain text, so the data file can always be parsed in the same way.
 
 Especially for high-output-impedance sensors like thermocouples, the `settleus` parameter can be extremely useful in achieving clean measurements.  This specifies the time (in microseconds) for each signal to "settle" before a measurement occures.  Each time a device switches channels in a stream operation, there is some time required for the internal circuitry to settle in to the new value.  Read about [multiplexers](https://en.wikipedia.org/wiki/Multiplexer) or [ghosting](https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z0000019KzzSAE) for more information.
 
