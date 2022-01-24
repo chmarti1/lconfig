@@ -996,7 +996,7 @@ with their type prefixes.  For example, a parameter declared in a config file as
     int:year 2016
 can be referenced by 
     int year;
-    get_meta_int(dconf,devnum,"year",&year);
+    get_meta_int(&dconf,"year",&year);
 */
 int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value);
 int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value);
