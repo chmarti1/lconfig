@@ -230,9 +230,9 @@ aoduty 0.4
 
 ### <a name="trigger"></a> Triggering
 
-A *trigger* event is something that tells the device to start collecting data.  When trigger parameters are not configured, the data acquisition device simply starts taking data whenever the configuration is complete.  For experiments where data collection needs to be synchronized with a physical event, this is rarely good enough.
+A *trigger* event is something that tells the device to start collecting data.  When trigger parameters are not configured, the data acquisition device simply starts taking data whenever the configuration is complete.  For experiments where data collection needs to be synchronized with a physical event, triggers are often essential.
 
-There are two types of triggers supported by LCONFIG: hardware and software.  A hardware trigger is implemented by hardware (or firmware) inside the DAQ itself.  A software trigger quietly streams data and analyzes it in real time to detect a trigger event from the data.  The software trigger is more sophisticated, but it is also slower.
+There are two types of triggers supported by LCONFIG: hardware and software.  A hardware trigger is implemented by hardware (or firmware) inside the DAQ itself.  Software triggers are implemented by quietly streaming the data and analyzing it in real time to detect whether a trigger event has occurred.  A software trigger can implement more sophisticated features, but it is also slower.
 
 To configure a software trigger, the `trigchannel` parameter names an analog input channel that should be monitored for a trigger event.  It should be emphasized that the `triggerchannel` is NOT the physical analog input channel, but integer indicating which (by the order they were configured) input channel should be monitored.  
 
@@ -254,7 +254,7 @@ trigedge rising
 trigpre 100
 ```
 
-A hardware trigger can be used by passing a digital pulse to one of the supported DIO channels.  LCONFIG will configure the DAQ for a hardware trigger when the corresponding `efsignal` parameter is set to `trigger`.
+Hardware triggers block all data prior to the trigger event, so they do not permit pretrigger buffering.  However, they only have a single sample delay, and there is no need to scan the data in post-processing to find the actual sample where the trigger occurred.  The first measured sample will be immediately after the trigger event was registered.  A hardware trigger can be used by passing a digital pulse to one of the supported DIO channels.  LCONFIG will configure the DAQ for a hardware trigger when the corresponding `efsignal` parameter is set to `trigger`.
 
 ```bash
 # Hardware trigger on DIO0
@@ -262,6 +262,8 @@ efchannel 0
 efsignal trigger
 efedge rising
 ```
+
+At present, LConfig uses the frequency input feature for this functionality, which is only available on DIO0 and DIO1 on the T7.  Hardware triggering is not available on the T4.
 
 See below for more extended feature channel options.
 

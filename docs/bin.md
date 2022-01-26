@@ -1,14 +1,16 @@
 [back](documentation.md)
 
-Version 4.6
+Version 4.06
 January 2022
 Chris Martin  
 
 ## Binaries
 
-A binary starts its job by reading in a configuration file, which is just a plain text file written by a user.  Based on the instructions it finds there, it configures the data acquisition device(s) and executes the corresponding data acquisition operation.  The precise job that is done depends on the configuration file and the binary.
+The core of the LConfig system is a set of functions and structs that handle the complicated job of configuring an experiment automatically.  The binaries are the top-level code that actually do the job.  Which binary you want depends on what job is being done.
 
-There are three binaries included with LConfig: `lcrun`, `lcburst`, and `lcstat`.  These are inteded to be sufficiently generic to do most data acquisition tasks.  `lcrun` is intended for long slow sample-rate tests where the test duration may not be known in advance.  `lcburst` is intended for short high-speed tests.  `lcstat` is intended for monitoring and debugging an experiment.
+There are three binaries included with LConfig: `lcrun`, `lcburst`, and `lcstat`.  These are inteded to be sufficiently generic to do most data acquisition tasks.  `lcrun` is intended for long slow sample-rate tests where the test duration may not be known in advance.  `lcburst` is intended for short high-speed tests.  `lcstat` is intended to provide a real-time display of sensor values.
+
+A binary starts its job by reading in a configuration file, which is just a plain text file written by a user.  Based on the instructions it finds there, it configures the data acquisition device(s) and executes the corresponding data acquisition operation.  The precise job that is done depends on the configuration file and the binary.
 
 On a Linux system, following the steps in [Compiling](compiling.bin), the binaries will be installed in `/usr/local/bin`.  For help text, use
 

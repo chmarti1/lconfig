@@ -1,8 +1,8 @@
 [back to Documentation](documentation.md)
 
-Version 4.00<br>
-September 2019<br>
-Chris Martin<br>
+Version 4.06  
+September 2022  
+Chris Martin  
 
 ## <a name="compiling"></a> Compiling
 
@@ -51,9 +51,9 @@ User applications that use the LConfig system should include the `lconfig.h` hea
 #include "lctools.h"
 ```
 
-In the current LConfig design, the configuration system is NOT installed as a system library.  You should simply copy `lconfig.h`, `lconfig.c`, `lctools.h`, and `lctools.c` into your project.  This design may change in the future, but for now it is quite functional.  Most of all, it means I do not need to be aware of your system's library directory structure when I design my installation.
+In the current LConfig design, the configuration system is NOT installed as a system library.  You should simply copy `lconfig.h`, `lconfig.c`, `lctools.h`, `lctools.c`, `lcmap.h`, and `lcmap.c` into your project.  This design may change in the future, but for now it is quite functional.  The biggest advantage of this approach is that I have utilities that were written years ago on earlier versions of LConfig that will not be broken by pushing an update to my system libraries.  Instead, each can be built on its own version of LConfig.  If it's a utility I use regularly, it will make sense to update it.  That seems messy, but it's really quite functional for most of us that do regular laboratory work.
 
-When you are compiling your applicaiton, you will need to compile the `lconfig.o` object file (and `lctools.o` if you are using `lctools.h`.  Then, you will need to link your executable with `lconfig.o` (+ `lctools.o`), the LJM library, and the cmath library.  Take a look at the makefile for how the LConfig project does this for `lcrun` and `lcburst`.  For a user application called `mycode.c` producing an executable `mybinary`, the following compilation should work.
+When you are compiling your applicaiton, you will need to compile the `lconfig.o` and `lcmap.o` object files (and `lctools.o` if you are using `lctools.h`).  Then, you will need to link your executable with `lconfig.o`, `lcmap.o`, (`lctools.o`), the LJM library, and probably the c-math library.  Take a look at the makefile for how the LConfig project does this for `lcrun`, `lcburst`, and `lcstat`.  For a user application called `mycode.c` producing an executable `mybinary`, the following compilation should work.
 ```
 $ gcc -c lconfig.c -o lconfig.o
 $ gcc -c lctools.c -o lctools.o

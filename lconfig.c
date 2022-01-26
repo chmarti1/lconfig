@@ -2174,8 +2174,8 @@ int lc_upload_config(lc_devconf_t* dconf){
                 */
                 // Calculate the start index
                 // Unwrap the phase first (lazy method)
-                while(dconf->efch[efnum.phase>=360.)
-                    dconf->efch[efnum.phase -= 360.;
+                while(dconf->efch[efnum].phase>=360.)
+                    dconf->efch[efnum].phase -= 360.;
                 while(dconf->efch[efnum].phase<0.)
                     dconf->efch[efnum].phase += 360.;
                 itemp1 = ef_clk_roll * (dconf->efch[efnum].phase / 360.);
@@ -2281,12 +2281,14 @@ int lc_upload_config(lc_devconf_t* dconf){
                 err = err ? err : LJM_eWriteName(handle, stemp, 1);
             // Pulse output
             }else{
-                // Measurement index 2
+                // First, force the pin to be low at the resting state
+                sprintf(stemp, "DIO%d", dconf->efch[efnum].channel);
+                err = err ? err : LJM_eWriteName(handle, stemp, 0);
                 
                 // Calculate the start and stop indices first...
                 // Unwrap the phase first (lazy method)
-                while(dconf->efch[efnum.phase>=360.)
-                    dconf->efch[efnum.phase -= 360.;
+                while(dconf->efch[efnum].phase>=360.)
+                    dconf->efch[efnum].phase -= 360.;
                 while(dconf->efch[efnum].phase<0.)
                     dconf->efch[efnum].phase += 360.;
                 // Calculate the start index
@@ -2295,9 +2297,9 @@ int lc_upload_config(lc_devconf_t* dconf){
                 // Calculate the stop index
                 itemp2 = ef_clk_roll * dconf->efch[efnum].duty;
                 itemp2 = (((long int) itemp1) + ((long int) itemp2))%ef_clk_roll;
-                // Measurement index 1
+                // Measurement index 2
                 sprintf(stemp, "DIO%d_EF_INDEX", channel);
-                err = err ? err : LJM_eWriteName( handle, stemp, 1);
+                err = err ? err : LJM_eWriteName( handle, stemp, 2);
                 // Options - use clock 0
                 sprintf(stemp, "DIO%d_EF_OPTIONS", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, 0x00000000);
@@ -2729,7 +2731,7 @@ int lc_update_ef(lc_devconf_t* dconf){
         break;
         case LC_EF_COUNT:
             // If this is a counter input
-            if(dconf->efch[efnum].direction) == LC_EF_INPUT){
+            if(dconf->efch[efnum].direction == LC_EF_INPUT){
                 sprintf(stemp, "DIO%d_EF_READ_A", channel);
                 err = err ? err : LJM_eReadName( handle, stemp, &ftemp);
                 dconf->efch[efnum].counts = (unsigned int) ftemp;
@@ -2738,7 +2740,7 @@ int lc_update_ef(lc_devconf_t* dconf){
                 dconf->efch[efnum].phase = 0.;
             // If this is a pulse output and there are counts to output
             }else if(dconf->efch[efnum].counts){
-                sprintf(stdemp, "DIO%d_EF_CONFIG_C", channel);
+                sprintf(stemp, "DIO%d_EF_CONFIG_C", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, dconf->efch[efnum].counts);
                 // Zero the counts so redundant calls do not generate redundant outputs
                 dconf->efch[efnum].counts = 0;

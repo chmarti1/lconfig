@@ -101,6 +101,7 @@ static const lcm_map_t lcm_edge[] = {
 static const lcm_map_t lcm_ef_signal[] = {
     {.value=LC_EF_PWM, .message="Pulse Width Modulation", .config="pwm"},
     {.value=LC_EF_COUNT, .message="Counter", .config="counter"},
+    {.value=LC_EF_COUNT, .message="Pulse", .config="pulse"},
     {.value=LC_EF_FREQUENCY, .message="Pulse Frequency", .config="frequency"},
     {.value=LC_EF_PHASE, .message="Relative Phase", .config="phase"},
     {.value=LC_EF_QUADRATURE, .message="Encoder Quadrature", .config="quadrature"},

@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 4.03<br>
-September 2020<br>
+Version 4.06<br>
+January 2022<br>
 Chris Martin<br>
 
 This is a handy quick-reference for functions and configuration options, but the authoritative and up-to-date documentation on the api and configuration interface is always in the `lconfig.h` and `lctools.h` headers themselves.
@@ -25,6 +25,7 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | ip          | XXX.XXX.XXX.XXX                         | Global       | Over an ETH connection, specifies the devices to configure, but over a USB connection, IP is used to set the devices IP address.
 | gateway     | XXX.XXX.XXX.XXX                         | Global       | Used to set the T7's default TCP/IP gateway
 | subnet      | XXX.XXX.XXX.XXX                         | Global       | Used to set the T7's TCP/IP subnet mask
+| dataformat  | bin,binary,ascii,text					| Global	   | Determines how data files will be written by the `lc_datafile_write()` function.
 | samplehz    | floating point                          | Global       | The sample rate per channel in Hz
 | settleus    | floating point                          | Global       | The settling time per sample in microseconds. If less than 5, the T7 will choose automatically.
 | nsample     | integer                                 | Global       | How many samples should the ring buffer contain?  How many samples should the application collect?

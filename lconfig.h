@@ -776,7 +776,7 @@ The following parameters are recognized:
 .           EFDEGREES - Phase of the PWM waveform in degrees.
 .       In both input and output modes, the duty and phase are updated by the
 .       lc_update_ef() function.  
-. * COUNT - edge counter
+. * COUNT or PULSE - edge counter
 .       Input: valid channels 0,1,2,3,6,7 (T7) 4,5,6,7,8,9 (T4)
 .           EFEDGE - Count rising, falling, or ALL edges.
 .           EFDEBOUNCE - What debounce filter to use?
@@ -794,7 +794,12 @@ The following parameters are recognized:
 .       In this way, redundant subsequent calls to lc_update_ef() have no 
 .       effect until the count member is rewritten.  The duty and phase are
 .       written by lc_upload_config() and will not be updated unless it is
-.       called again.
+.       called again.  
+.
+.       The LJM interface presumes that the resting state for the pulse 
+.       output is low (0V) but this configuration permits inverted logic 
+.       with the EFEDGE parameter.  There may be unexpected behaviors if 
+.       falling edges are used instead of rising.
 .
 .       In input mode, the counts member is updated by lc_update_ef().
 . * FREQUENCY - period or frequency tracker
