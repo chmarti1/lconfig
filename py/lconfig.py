@@ -1,6 +1,25 @@
-#
-#   Load LCONF configuration and data
-#
+"""lconfig.py
+
+The Laboratory CONFIGuration system post-processing tools for python.
+For more information on this c-language-based toolset for data 
+acquisition in Linux using LabJack hardware, see the github project
+page:
+    https://github.com/chmarti1/lconfig
+    
+Once you create a datafile using the binaries or with lc_datafile_init()
+and lc_datafile_write(), you will probably want to do something with 
+the data.  You COULD open the whitespace separated variable files with 
+excel, but why volunteer for pain and suffering?
+
+The load() function is the primary tool for opening configuration and
+data files.
+
+>>> c = load('/path/to/file.conf')
+
+By default 
+
+"""
+
 import os, sys
 import numpy as np
 import json
@@ -200,6 +219,7 @@ LE2 = LEnum(LE)
 
 
 class Conf(object):
+    """Configuration object prototype"""
     def __setattr__(self,name,value):
         if name not in self.__dict__:
             raise Exception('Unsupported configuration parameter: ' + name)
@@ -212,6 +232,52 @@ class Conf(object):
             self.__dict__[name] = thistype(value)
 
 class DevConf(Conf):
+    """DevConf class
+
+The DevConf class manages device configuration parameters with class
+members that roughly parallel the lc_devconf_t struct:
+
+They are:
+    connection      LEnum   Type of connection
+    serial          str     Device serial number
+    device          LEnum   Device type: t4, t7, etc...
+    dataformat      LEnum   Binary, ASCII, etc...
+    name            str     Device name
+    ip              str     Device IP address
+    gateway         str     Default gateway IP address
+    subnet          str     Subnet mask
+    samplehz        float   Sample rate in hz
+    settleus        float   Settling time in microseconds
+    nsample         int     Number of samples per measurement burst
+    distream        int     Digital input stream mask
+    domask          int     Digital output mask
+    dovalue         int     Digital output value
+    trigchannel     int     Analog input channel for software triggering
+    triglevel       float   Voltage threshold for the software trigger
+    trigpre         int     Pre-trigger samples
+    trigedge        LEnum   Edge for trigger: rising, falling, any
+    effrequency     float   Extended feature frequency
+
+For the various input/output channels, there are lists that contain 
+their configuration instances:
+    aich[]          AiConf
+    aoch[]          AoConf
+    efch[]          EfConf
+    comch[]         ComConf
+    
+Finally, there is a dictionary that contains the meta parameters found
+    meta_values[]
+    
+This should not be confused with the "meta" member, which merely holds 
+the last meta mode configured in the configuration file.
+
+There are also methods to help with high-level jobs:
+    nistream()      Returns the number of input stream channels
+    get_meta()      Acts like a dictionary's get() method
+    
+A __str()__ method is included so print() calls on a DevConf instance 
+produce a detailed printout of the parameters.
+"""
     def __init__(self):
         self.__dict__.update({
             'connection':LEnum(['any', 'usb', 'eth', 'ethernet'], values=[0,1,3,3]),
@@ -347,6 +413,21 @@ class DevConf(Conf):
 
         
 class AiConf(Conf):
+    """AiConf class
+
+Analog Input channel CONFiguration objects have data members that mirror
+the lc_aiconf_t struct.  
+
+They are:
+    aichannel       int     The analog input channel number
+    ainegative      LEnum   differential or ground
+    airange         float   10., 1., 0.1, or .01
+    airesolution    int     The resolution index used by the T7
+    aicalslope      float   meas = (v - aicalzero) * aicalslope
+    aicalzero       float
+    aicalunits      str     The units for the calibrated measurement
+    ailabel         str     Human-readable text label for the channel
+"""
     def __init__(self):
         self.__dict__.update({
             'aichannel':-1,
@@ -376,6 +457,20 @@ class AiConf(Conf):
 
 
 class AoConf(Conf):
+    """AoConf class
+
+Analog Onput channel CONFiguration objects have data members that mirror
+the lc_aoconf_t struct.  
+
+They are:
+    aochannel       int     The analog output channel number
+    aosignal        LEnume  constant, sine, square, triangle, or noise
+    aofrequency     float   The signal frequency
+    aoamplitude     float   The amplitude of the signal 0.5*(max-min)
+    aooffset        float   The common mode dc offset 0.5*(max+min)
+    aoduty          float   Allows asymmetrical square and triangle waves
+    aolabel         str     Human readable text label for the channel
+"""
     def __init__(self):
         self.__dict__.update({
             'aochannel':-1,
@@ -402,10 +497,27 @@ class AoConf(Conf):
 
 
 class EfConf(Conf):
+    """EfConf class
+
+digital Extended Feature channel CONFiguration objects have data members
+that mirror the lc_efconf_t struct.  
+
+They are:
+    efchannel   int     The hardware digital channel
+    efsignal    LEnum   pwm, count, pulse, frequency, phase, quadrature
+    efedge      LEnum   rising, falling, all
+    efdebounce  LEnum   none, fixed, reset, minimum
+    efdirection LEnum   input, output
+    efusec      float   Time measurement/value for the signal
+    efdegrees   float   Phase measurement/value for the signal
+    efduty      float   Duty cycle measurement/value for the signal
+    efcount     int     Integer edge/pulse count for the signal
+    eflabel     str     Human readable text label for the channel
+"""
     def __init__(self):
         self.__dict__.update({
             'efchannel':-1,
-            'efsignal':LEnum(['pwm', 'count', 'frequency', 'phase', 'quadrature']),
+            'efsignal':LEnum(['pwm', 'count', 'pulse', 'frequency', 'phase', 'quadrature'], [0,1,1,2,3,4]),
             'efedge':LEnum(['rising', 'falling', 'all']),
             'efdebounce':LEnum(['none', 'fixed', 'reset', 'minimum']),
             'efdirection':LEnum(['input', 'output']),
@@ -430,6 +542,20 @@ class EfConf(Conf):
         return out
         
 class ComConf(Conf):
+    """ComConf class
+
+COMmunication channel CONFiguration objects have data members that mirror
+the lc_comconf_t struct.  
+
+They are:
+    comchannel      LEnum   none, uart, 1wire, spi, i2c, sbus
+    comrate         float   Communcation data rate
+    comin           int     Byte received
+    comout          int     Byte transmitted
+    comclock        int     Specify the communcations clock source
+    comoptions      str     mode-specific options string
+    comlabel        str     Human-readable text label for the channel
+"""
     def __init__(self):
         self.__dict__.update({
             'comchannel':LEnum(['none', 'uart', '1wire', 'spi', 'i2c', 'sbus']),
@@ -485,13 +611,25 @@ configuration under which the data were collected.
 
 Class methods
 ==========================
-.apply_cal()        Applies the channel calibrations
+--- Retrieving data ---
 .get_index()        Finds a channel index in the order it was configured
 .get_config()       Returns the configuration class for a channel
 .get_channel()      Returns a 1D array of a channel's data
 .time()             Returns a 1D array of times since collection started
-.ds()               Produces a slice for selecting data segments by time
 .dbits()            Returns digital input stream channels
+  --> See also "Interacting with data" below <--
+--- Getting basic information ---
+.nch()              How many channels are in the data?
+.ndata()            How many samples are there in each channel?
+--- Manipulating data ---
+.apply_cal()        Applies the channel calibrations (only once)
+.ds()               Produces a slice for selecting data segments by time
+--- Detecting events ---
+.event_filter()     Generic tool for detecting edge crossing events
+.get_events()       Find threshold crossings in analog input data
+.get_dievents()     Find high/low transitions in digital input streams
+--- Plotting data ---
+.show_channel()     Generates a plot of a single channel versus time
 
 Interacting with data
 ==========================
@@ -520,7 +658,6 @@ the second identifies the channel.  This also supports slicing.
 """
     def __init__(self, config, data, cal=True):
         self.data = None
-        self.dbits = None
         self.timestamp = None
         self.filename = ''
         self.cal = False
@@ -757,7 +894,9 @@ they want the effects to be permanent.
         """ds(tstart, tstop=None, downsample=0)
    
     I = ds(tstart, tstop, downsample=0)
-    
+
+D.S. stands for Down-Select.
+
 Returns a slice object that can be used to select a portion of the data
 beginning at time `tstart` and ending at time `tstop`.  If tstop is not
 specified, then it will revert to the end of the dataset.  Optionally, 
@@ -1088,6 +1227,31 @@ filter; all transitions will be reported.
         
 
 def load(filename, data=True, cal=True):
+    """load(filename, data=True, cal=True)
+    
+Opens the indicated file and (1) parses the configuration header, and 
+(2) if data=True, also loads the data contained therein.  The same tool
+can be used to load configuration files and data files since they use
+the same configuration format.
+
+When the data keyword is False, load() will return a DevConf instance 
+for each of the device configurations found in the file.  For most 
+applications, there will only be one.
+
+>>> [c] = load(filename, data=False)
+    OR, when there are multiple devices
+>>> [c0, c1, ...] = load(filename, data=False)
+
+When the data keyword is True, load() will also append an LData instance
+to the end of the returned list, which holds the data found in the file.
+In most data files, there will only be one device in the header, so the
+returned list will appear
+
+>>> [c, d] = load(filename)
+
+For more information on how to work with these DevConf and LData 
+instances, use the in-line help on them or their methods.
+"""
     out = []
     dconf = None
     ldata = None
