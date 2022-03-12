@@ -2319,9 +2319,22 @@ int lc_upload_config(lc_devconf_t* dconf){
                     sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
                 }
-                // Enable the EF channel
-                sprintf(stemp, "DIO%d_EF_ENABLE", channel);
-                err = err ? err : LJM_eWriteName(handle, stemp, 1);
+                sprintf(stepm, "DIO%d_EF_CONFIG_C", channel);
+                err = err ? err : LJM_eWriteName( handle, stemp, dconf->efch[efnum].counts);
+                
+                // If a count number has been configured, then enable
+                // the pulse out immediately.  Otherwise, wait for a call
+                // to lc_update_ef().  Use time to remember whether the 
+                // EF output was enabled.
+                if(dconf->efch[efnum].counts){
+                    sprintf(stemp, "DIO%d_EF_ENABLE", channel);
+                    err = err ? err : LJM_eWriteName(handle, stemp, 1);
+                    dconf->efch[efnum].counts = 0;
+                    dconf->efch[efnum].time = 0;
+                }else{
+                    dconf->efch[efnum].time = 1;
+                }
+
             }
         break;
         case LC_EF_TRIGGER:
@@ -2744,6 +2757,13 @@ int lc_update_ef(lc_devconf_t* dconf){
                 err = err ? err : LJM_eWriteName( handle, stemp, dconf->efch[efnum].counts);
                 // Zero the counts so redundant calls do not generate redundant outputs
                 dconf->efch[efnum].counts = 0;
+                // We used the time parameter to record whether the channel was
+                // already enabled.  If 1, then we need to enable now.
+                if(dconf->efch[efnum].time){
+                    sprintf(stemp, "DIO%d_EF_ENABLE", channel);
+                    err = err ? err : LJM_eWriteName( handle, stemp, 1);
+                    dconf->efch[efnum].time = 0;
+                }
             }
         break;
         case LC_EF_FREQUENCY:

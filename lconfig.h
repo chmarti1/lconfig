@@ -185,6 +185,12 @@ with init_data_file() and write_data_file() utilities.
 - Added a datatype parameter and support for binary data files
 - Rewrote python postprocessing to use a more coherent class-based system
 - Wrote python support for binary data files
+- Added pulse output (counter out) extended feature support
+
+** 4.07
+3/2022
+- Changed the pulse output to only enable immediately if a count value
+    is specified.
 */
 
 #define TWOPI 6.283185307179586
