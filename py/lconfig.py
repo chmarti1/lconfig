@@ -329,13 +329,20 @@ produce a detailed printout of the parameters.
             elif name == 'aochannel':
                 self.aoch.append(AoConf())
                 setattr(self.aoch[-1], name, value)
-            elif name.startsith('ao'):
+            elif name.startswith('ao'):
                 setattr(self.aoch[-1], name, value)
             elif name == 'efchannel':
                 self.efch.append(EfConf())
                 setattr(self.efch[-1], name, value)
             elif name.startswith('ef'):
                 setattr(self.efch[-1], name, value)
+            elif name.startswith('do'):
+                channel = int(name[2:])
+                self.__dict__['domask'] |= 1<<channel
+                if value:
+                    self.__dict__['dovalue'] |= 1<<channel
+                else:
+                    self.__dict__['dovalue'] &= ~(1<<channel)
             else:
                 raise Exception('Unsupported configuration parameter: ' + name)
         else:
