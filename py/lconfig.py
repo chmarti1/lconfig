@@ -298,7 +298,7 @@ produce a detailed printout of the parameters.
             'triglevel':0.,
             'trigpre':0,
             'trigedge':LEnum(['rising', 'falling', 'all'], state=0),
-            'effrequency':0,
+            'effrequency':0.,
             'aich':[],
             'aoch':[],
             'efch':[],
@@ -524,7 +524,7 @@ They are:
     def __init__(self):
         self.__dict__.update({
             'efchannel':-1,
-            'efsignal':LEnum(['pwm', 'count', 'pulse', 'frequency', 'phase', 'quadrature'], [0,1,1,2,3,4]),
+            'efsignal':LEnum(['pwm', 'counter', 'pulse', 'frequency', 'phase', 'quadrature'], [0,1,1,2,3,4]),
             'efedge':LEnum(['rising', 'falling', 'all']),
             'efdebounce':LEnum(['none', 'fixed', 'reset', 'minimum']),
             'efdirection':LEnum(['input', 'output']),
@@ -760,12 +760,14 @@ If distream was not set, then this `dibits()` returns with an error.
         if not self.config.distream:
             raise Exception('DBITS: The digital input stream was not configured for this data set.')
         
+        ndata = self.data.shape[0]
+        
         # If the conversion hasn't already been performed, do it    
         if self._dbits is None:
             self._dbits = np.zeros((ndata,16), dtype=bool)
             for ii in range(ndata):
                 for jj in range(16):
-                    self._dbits[ii, jj] = bool(int(self.data[ii, nch-1]) & 1<<jj)
+                    self._dbits[ii, jj] = bool(int(self.data[ii, -1]) & 1<<jj)
         
         if dich is None:
             return self._dbits
@@ -816,21 +818,21 @@ whichever is configured last will be returned.
         if target is None:
             # The input must have been through ainum.
             if ainum is None:
-                raise Exception('GET_AIINDEX: Missing mandatory argument.')
+                raise Exception('GET_INDEX: Missing mandatory argument.')
             ai = self._byainum.get(ainum)
             if ai is None:
-                raise Exception('GET_AIINDEX: Analog input number %d not found.'%ainum)
+                raise Exception('GET_INDEX: Analog input number %d not found.'%ainum)
         # If the target was specified
         else:
             # Make sure both weren't specified
             if ainum is not None:
-                raise Exception('GET_AIINDEX: Accepts only one argument.')
+                raise Exception('GET_INDEX: Accepts only one argument.')
             # If the channel is specified by label
             if isinstance(target, str):
                 ai = self._bylabel.get(target)
                 # If the channel was not found
                 if ai is None:
-                    raise Exception('GET_AIINDEX: Label not recognized: ' + target)
+                    raise Exception('GET_INDEX: Label not recognized: ' + target)
             # If the channel is specified by index
             elif isinstance(target, int):
                 # Handle integer wrapping
@@ -838,7 +840,7 @@ whichever is configured last will be returned.
                 if target < 0:
                     ai += nch
                 if ai < 0 or ai >= nch:
-                    raise Exception('GET_AIINDEX: Index, %d, is out of range with %d channels.'%(target, nch)) 
+                    raise Exception('GET_INDEX: Index, %d, is out of range with %d channels.'%(target, nch)) 
         
         if ai is None:
             raise Exception('GET_CHANNEL: Unhandled exception!')
@@ -861,7 +863,7 @@ See the get_index() for a detailed description of the arguments
 See the class documentation for other operations that can be performed
 with the item retrieval [] notation.
 """
-        return self.data[:,self.get_aiindex(target=target, ainum=ainum)]
+        return self.data[:,self.get_index(target=target, ainum=ainum)]
             
     
     def get_config(self, target=None, ainum=None):
@@ -1170,7 +1172,7 @@ the level is interpreted in appropriate units, e.g. V / (sec ** diff)
         # Transpose to a boolean array
         y = (y > level)
         
-        indices = self.edge_filter(y, debounce=debounce, edge=edge, count=count)
+        indices = self.event_filter(y, debounce=debounce, edge=edge, count=count)
         
         # Adjust the indices for the offsets created by downselection
         # and differentiation
@@ -1220,16 +1222,22 @@ filter; all transitions will be reported.
         i0 = 0
         i1 = -1
         if tstart:
-            i0 = int(round(self.config.samplehz*tstart))
+            i0 = int(round(tstart * self.config.samplehz))
         if tstop:
-            i1 = int(round(self.config.samplehz*tstop))
+            i1 = int(round(tstop * self.config.samplehz))
+            
+        indices = []
         
         # Get the channel data
-        y = self[i0:i1,dich]
-        # Correct for the offset imposed by the downselect
+        y = self.dbits()[i0:i1,dich]
+        
+        indices = self.event_filter(y, debounce=debounce, edge=edge, count=count)
+        
+        # Adjust the indices for the offsets created by downselection
+        # and differentiation
         if i0:
             indices += i0
-            
+        
         return indices
         
 
