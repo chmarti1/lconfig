@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import struct
 import time
 
-__version__ = '4.06'
+__version__ = '4.07'
 
 
 

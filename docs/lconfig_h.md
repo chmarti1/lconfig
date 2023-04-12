@@ -1,7 +1,7 @@
 [back to API](api.md)
 
-Version 4.05  
-March 2021  
+Version 4.07  
+March 2023  
 Christopher R. Martin  
 
 
@@ -266,6 +266,8 @@ lc_update_ef(&dconf);
 frequency = 1e6 / dconf.efch[0].time;
 ```
 
+See the [Extended Features](config.md#ef) section of the [configuration](config.md) documentation for more information.
+
 [top](#top)
 
 ## <a name='meta'></a> Meta configuration
@@ -287,8 +289,14 @@ int lc_get_meta_str(          lc_devconf_t* dconf,
                         const char* param, 
                               char* value);
 ```
-The `lc_get_meta_XXX` functions retrieve meta parameters from the `devnum` element of the `dconf` array by their name, `param`.  If the parameter does not exist or if it is of the incorrect type, 
-The values are written to target of the `value` pointer, and the function returns the `LCONF_ERROR` or `LCONF_NOERR` error status based on whether the parameter was found.
+The `lc_get_meta_XXX` functions retrieve meta parameters from the `devnum` element of the `dconf` array by their name, `param`. The values are written to target of the `value` pointer. If the parameter does not exist or if it is of the incorrect type, these functions return `LCONF_ERROR`, and the value is not changed.
+
+```c
+lc_metatype_t lc_get_meta_type( lc_devconf_t* dconf,
+							const char* param);
+```
+In cases where it is unclear which data type a meta parameter might have, the `lc_get_meta_type` function checks it by returning the enumerated meta types: `LC_MT_INT`, `LC_MT_FLT`, or `LC_MT_STR`.  This function is also a convenient way to silently (without error messages) check for existance of a parameter.  If the parameter does not exist, it returns `LC_MT_NONE`. 
+
 
 ```C
 int lc_put_meta_int(          lc_devconf_t* dconf, 
@@ -303,7 +311,14 @@ int lc_put_meta_str(          lc_devconf_t* dconf,
                         const char* param, 
                               char* value);
 ```
-The `lc_put_meta_XXX` functions retrieve meta parameters from the `devnum` element of the `dconf` array by their name, `param`.  The values are written to target of the `value` pointer, and the function returns the `LCONF_ERROR` or `LCONF_NOERR` error status based on whether the parameter was found.
+The `lc_put_meta_XXX` functions write to the meta parameters.  If the meta parameter does not already exist, a new one is created with the appropriate type.  If a parameter with the same name already exists, its value will be overwritten and (if necessary) its type will be changed appropriately.  `lc_put_meta_XXX` only fails if the memory allocated to meta data is full.
+
+```c
+int lc_del_meta(			lc_devconf_t *dconf,
+						const char* param);
+```
+
+The list of meta parameters are in a c-string style list, so the appearance of the first empty parameter terminates the list.  As a result, deletion of a parameter requires shifting all subsequent parameters forward in the list.  This function manages that process and also checks for illegal parameter types and other sources of list corruption.  For example, if non-empty meta parameters are found beyond the end of the list (a "zombie" element), a warning is printed to `stderr` and they are cleared.
 
 [top](#top)
 
