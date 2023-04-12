@@ -2319,7 +2319,7 @@ int lc_upload_config(lc_devconf_t* dconf){
                     sprintf(stemp, "DIO%d_EF_CONFIG_A", channel);
                     err = err ? err : LJM_eWriteName( handle, stemp, itemp2);
                 }
-                sprintf(stepm, "DIO%d_EF_CONFIG_C", channel);
+                sprintf(stemp, "DIO%d_EF_CONFIG_C", channel);
                 err = err ? err : LJM_eWriteName( handle, stemp, dconf->efch[efnum].counts);
                 
                 // If a count number has been configured, then enable
@@ -3008,6 +3008,7 @@ int lc_com_read(lc_devconf_t* dconf, const unsigned int comchannel,
 
 
 lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param){
+    int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;

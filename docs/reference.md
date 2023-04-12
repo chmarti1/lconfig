@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 4.06<br>
-January 2022<br>
+Version 4.08<br>
+April 2023<br>
 Chris Martin<br>
 
 This is a handy quick-reference for functions and configuration options, but the authoritative and up-to-date documentation on the api and configuration interface is always in the `lconfig.h` and `lctools.h` headers themselves.
@@ -75,15 +75,81 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 
 ## <a name="types"></a> LCONFIG data types
 
-These are the data types provided by `lconfig.h`.
+These are the data types provided by `lconfig.h`:
+- `lc_devconf_t` [Device Configuration](#devconf)
+- `lc_aiconf_t` [Analog Input Configuration](#aiconf)
+- `lc_aoconf_t` [Analog Output Configuration](#aoconf)
+- `lc_efconf_t` [Digital Extended Feature Configuration](#efconf)
+- `lc_comconf_t` [Digital Communication Channel Configuration](#comconf)
+- `lc_meta_t` [Meta Parameters](#meta)
+- `lc_ringbuf_t` [Ring Buffer](#ring)
+- and finally, the various [Enumerated Types](#enum) used in these structs
 
-### lc_aiconf_t Struct
+### lc_devconf_t Struct <a name="devconf"></a>
 
-Holds data relevant to the configuration of a single analog input channel
+This structure contains all of the information needed to configure a device.  This is the workhorse data type, and usually it is the only one that needs to be explicitly used in the host application.
+
+```C
+// DEVICE CONFIGURATION STRUCT TYPE
+//  This is the top-level configuration struct. 
+//
+typedef struct __lc_devconf_t__ {
+    // Global configuration
+    lc_con_t connection;                 // requested connection type index
+    lc_con_t connection_act;             // actual connection type index
+    lc_dev_t device;                     // The requested device type index
+    lc_dev_t device_act;                 // The actual device type
+    char ip[LCONF_MAX_STR];         // ip address string
+    char gateway[LCONF_MAX_STR];    // gateway address string
+    char subnet[LCONF_MAX_STR];     // subnet mask string
+    char serial[LCONF_MAX_STR];     // serial number string
+    char name[LCONF_MAX_NAME];      // device name string
+    int handle;                     // device handle
+    double samplehz;                // *sample rate in Hz
+    double settleus;                // *settling time in us
+    unsigned int nsample;           // *number of samples per read
+    // Analog input
+    lc_aiconf_t aich[LCONF_MAX_NAICH];    // analog input configuration array
+    unsigned int naich;             // number of configured analog input channels
+    // Digital input streaming
+    unsigned int distream;          // input stream mask
+    // digital output masks
+    unsigned int domask;            // output tristate mask
+    unsigned int dovalue;           // output value mask
+    // Analog output
+    lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
+    unsigned int naoch;             // number of configured analog output channels
+    // Flexible Input/output
+    double effrequency;            // flexible input/output frequency
+    lc_efconf_t efch[LCONF_MAX_NEFCH]; // flexible digital input/output
+    unsigned int nefch;            // how many of the EF are configured?
+    // Communication
+    lc_comconf_t comch[LCONF_MAX_COMCH]; // Communication channels
+    unsigned int ncomch;            // how many of the com channels are configured?
+    // Trigger
+    int trigchannel;                // Which channel should be used for the trigger?
+    unsigned int trigpre;           // How many pre-trigger samples?
+    unsigned int trigmem;           // Persistent memory for the trigger
+    double triglevel;               // What voltage should the trigger seek?
+    lc_edge_t trigedge; // Trigger edge
+    enum {LC_TRIG_IDLE, LC_TRIG_PRE, LC_TRIG_ARMED, LC_TRIG_ACTIVE} trigstate; // Trigger state
+    // data file format
+    lc_dataformat_t dataformat;
+    // Meta & filestream
+    lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
+    lc_ringbuf_t RB;                  // ring buffer
+} lc_devconf_t;
+```
+
+[top](#ref:top)
+
+### lc_aiconf_t Struct<a name="aiconf"></a>
+
+Analog input configuration is managed by the `lc_aiconf_t` struct.
 ```C
 // Analog input configuration
 // This includes everyting the DAQ needs to configure and AI channel
-typedef struct {
+typedef struct __lc_aiconf_t__ {
     unsigned int    channel;     // channel number (0-13)
     unsigned int    nchannel;    // negative channel number (0-13 or 199)
     double          range;       // bipolar input range (0.01, 0.1, 1.0, or 10.)
@@ -93,19 +159,16 @@ typedef struct {
     char            calunits[LCONF_MAX_STR];   // calibration units
     char            label[LCONF_MAX_STR];   // channel label
 } lc_aiconf_t;
+//  The calibration and zero parameters are used by the aical function
 ```
 
-[top](#ref:top)
+### lc_aoconf_t Struct<a name="aoconf"></a>
 
-
-### lc_aoconf_t Struct
-
-A structure that holds data relevant to the configuration of a single analog output channel
-
+The analog output configuration is managed by the `lc_aoconf_t` struct.
 ```C
 // Analog output configuration
 // This includes everything we need to know to construct a signal for output
-typedef struct {
+typedef struct __lc_aoconf_t__ {
     unsigned int    channel;      // Channel number (0 or 1)
     // What function type is being generated?
     enum {LC_AO_CONSTANT, LC_AO_SINE, LC_AO_SQUARE, LC_AO_TRIANGLE, LC_AO_NOISE} signal;
@@ -118,49 +181,8 @@ typedef struct {
 } lc_aoconf_t;
 ```
 
-[top](#ref:top)
 
-
-### Enumerated types
-
-The supported LabJack connection types mapped to their LJM header values.
-```C
-typedef enum {
-    LC_CON_NONE=-1,
-    LC_CON_USB=LJM_ctUSB, 
-    LC_CON_ANY=LJM_ctANY, 
-    LC_CON_ANY_TCP=LJM_ctANY_TCP,
-    LC_CON_ETH=LJM_ctETHERNET_ANY,
-    LC_CON_ETH_TCP = LJM_ctETHERNET_TCP,
-    LC_CON_ETH_UDP = LJM_ctETHERNET_UDP,
-    LC_CON_WIFI = LJM_ctWIFI_ANY,
-    LC_CON_WIFI_TCP = LJM_ctWIFI_TCP,
-    LC_CON_WIFI_UDP = LJM_ctWIFI_UDP
-} lc_con_t;
-```
-
-The supported LabJack devices mapped to their LJM header values.
-```C
-typedef enum {
-    LC_DEV_NONE=-1,
-    LC_DEV_ANY=LJM_dtANY, 
-    LC_DEV_T4=LJM_dtT4,
-    LC_DEV_T7=LJM_dtT7,
-    LC_DEV_TX=LJM_dtTSERIES,
-    LC_DEV_DIGIT=LJM_dtDIGIT
-} lc_dev_t;
-```
-
-An enumerated type defining an edge type for triggering and extended features.
-
-```C
-typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
-```
-
-[top](#ref:top)
-
-
-### lc_efconf_t Struct
+### lc_efconf_t Struct<a name="efconf"></a>
 
 Extended features configuration for a single channel
 
@@ -199,7 +221,7 @@ typedef struct {
 [top](#ref:top)
 
 
-### lc_comconf_t Struct
+### lc_comconf_t Struct<a name="comconf"></a>
 
 ```C
 // Digital Communications Configuration Structure
@@ -226,7 +248,7 @@ typedef struct {
 [top](#ref:top)
 
 
-### lc_meta_t Struct
+### lc_meta_t Struct <a name="meta"></a>
 
 ```C
 // The lc_meta_t is a struct for user-defined flexible parameters.
@@ -247,7 +269,7 @@ typedef struct {
 [top](#ref:top)
 
 
-### lc_ringbuf_t Struct
+### lc_ringbuf_t Struct<a name="ring"></a>
 
 This structure is responsible for managing the data stream behind the scenes.  This ring buffer struct is designed to allow data to stream continuously in chunks called "blocks."  These are nothing more than the size of the data blocks sent by `LJM_eReadStream()`, and LCONFIG always sets them to LCONF_SAMPLES_PER_READ samples per channel.
 
@@ -270,100 +292,104 @@ typedef struct {
 [top](#ref:top)
 
 
-### lc_devconf_t Struct
+### Enumerated types <a name="enum"></a>
 
-This structure contains all of the information needed to configure a device.  This is the workhorse data type, and usually it is the only one that needs to be explicitly used in the host application.
-
+The supported LabJack connection types mapped to their LJM header values:
 ```C
-typedef struct devconf {
-    // Global configuration
-    lc_con_t connection;                 // requested connection type index
-    lc_con_t connection_act;             // actual connection type index
-    lc_dev_t device;                     // The requested device type index
-    lc_dev_t device_act;                 // The actual device type
-    char ip[LCONF_MAX_STR];         // ip address string
-    char gateway[LCONF_MAX_STR];    // gateway address string
-    char subnet[LCONF_MAX_STR];     // subnet mask string
-    char serial[LCONF_MAX_STR];     // serial number string
-    char name[LCONF_MAX_NAME];      // device name string
-    int handle;                     // device handle
-    double samplehz;                // *sample rate in Hz
-    double settleus;                // *settling time in us
-    unsigned int nsample;           // *number of samples per read
-    // Analog input
-    lc_aiconf_t aich[LCONF_MAX_NAICH];    // analog input configuration array
-    unsigned int naich;             // number of configured analog input channels
-    // Digital input streaming
-    unsigned int distream;          // input stream mask
-    // Analog output
-    lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
-    unsigned int naoch;             // number of configured analog output channels
-    // Flexible Input/output
-    double effrequency;            // flexible input/output frequency
-    lc_efconf_t efch[LCONF_MAX_NEFCH]; // flexible digital input/output
-    unsigned int nefch;            // how many of the EF are configured?
-    // Communication
-    lc_comconf_t comch[LCONF_MAX_COMCH]; // Communication channels
-    unsigned int ncomch;            // how many of the com channels are configured?
-    // Trigger
-    int trigchannel;                // Which channel should be used for the trigger?
-    unsigned int trigpre;           // How many pre-trigger samples?
-    unsigned int trigmem;           // Persistent memory for the trigger
-    double triglevel;               // What voltage should the trigger seek?
-    lc_edge_t trigedge; // Trigger edge
-    enum {LC_TRIG_IDLE, LC_TRIG_PRE, LC_TRIG_ARMED, LC_TRIG_ACTIVE} trigstate; // Trigger state
-    // Meta & filestream
-    lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
-    lc_ringbuf_t RB;                  // ring buffer
-} lc_devconf_t;
+typedef enum {
+    LC_CON_NONE=-1,
+    LC_CON_USB=LJM_ctUSB, 
+    LC_CON_ANY=LJM_ctANY, 
+    LC_CON_ANY_TCP=LJM_ctANY_TCP,
+    LC_CON_ETH=LJM_ctETHERNET_ANY,
+    LC_CON_ETH_TCP = LJM_ctETHERNET_TCP,
+    LC_CON_ETH_UDP = LJM_ctETHERNET_UDP,
+    LC_CON_WIFI = LJM_ctWIFI_ANY,
+    LC_CON_WIFI_TCP = LJM_ctWIFI_TCP,
+    LC_CON_WIFI_UDP = LJM_ctWIFI_UDP
+} lc_con_t;
+```
+The supported LabJack devices mapped to their LJM header values.
+```C
+typedef enum {
+    LC_DEV_NONE=-1,
+    LC_DEV_ANY=LJM_dtANY, 
+    LC_DEV_T4=LJM_dtT4,
+    LC_DEV_T7=LJM_dtT7,
+    LC_DEV_TX=LJM_dtTSERIES,
+    LC_DEV_DIGIT=LJM_dtDIGIT
+} lc_dev_t;
+```
+An enumerated type defining an edge type for triggering and extended features:
+```C
+typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
+```
+A method for specifying the data format to use when writing data files:
+```C
+// The file format specifier indicates whether to use binary or ascii/text 
+// data formatting.  The former is faster and more efficient, but the latter
+// is human readable.
+typedef enum __lc_dataformat_t__ {
+    LC_DF_ASCII = 0,
+    LC_DF_BIN = 1,
+} lc_dataformat_t;
+```
+An enumerated integer for identifying the data type of a meta parameter:
+```C
+typedef enum __lc_metatype_t__ {
+    LC_MT_ERR = LCONF_ERROR,
+    LC_MT_NONE = 0,
+    LC_MT_INT = 1,
+    LC_MT_FLT = 2,
+    LC_MT_STR = 3
+} lc_metatype_t;
 ```
 
 [top](#ref:top)
+
 
 ## <a name="functions"></a> The LCONFIG functions
 
 | Function | Description
 |:---:|:---
-| [**Interacting with Configuration Files**](api.md#fun:config) ||
-|load_config| Parses a configuration file and encodes the configuration on an array of DEVCONF structures
-|write_config| Writes a configuration file based on the configuration of a DEVCONF struct
-| [**Device Interaction**](api.md#fun:dev) ||
-|open_config| Opens a connection to the device identified in a DEVCONF configuration struct.  The handle is remembered by the DEVCONF struct.
-|close_config| Closes an open connection to the device handle in a DEVCONF configuration struct
-|upload_config| Perform the appropriate read/write operations to implement the DEVCONF struct settings on the T7
-|download_config| Populate a fresh DEVCONF structure to reflect a device's current settings.  Not all settings can be verified, so only some of the settings are faithfully represented.
-| [**Configuration Diagnostics**](api.md#fun:diag) ||
-|show_config| Calls download_config and automatically generates an item-by-item comparison of the T7's current settings and the settings contained in a DEVCONF structure.
-|ndev_config | Returns the number of configured devices in a DEVCONF array
-|nistream_config| Returns the number of configured input channels in a DEVCONF device structure.  This includes analog AND digital streaming.
-|nostream_config| Returns the number of configured output channels in a DEVCONF device
-|aichan_config| Returns the range of legal analog input channels on the actual device type (`device_act`)
-|aochan_config| Returns the range of legal anaog output channels on the actual device type
-|efchan_config| Returns the range of legal digital extended feature channels on the actual device type
-|status_data_stream| Returns the number of samples streamed from the T7, to the application, and waiting in the buffer
-|iscomplete_data_stream| Returns a 1 if the number of samples streamed into the buffer is greater than or equal to the NSAMPLE configuration parameter
-|isempty_data_stream| Returns a 1 if the buffer has no samples ready to be read
-| [**Data Collection**](api.md#fun:data) ||
-|start_data_stream | Checks the available RAM, allocates the buffer, and starts the acquisition process
-|service_data_stream | Collects new data from the T7, updates the buffer registers, tests for a trigger event, services the trigger state
-|read_data_stream | Returns a pointer into the buffer with the next available data to be read
-|stop_data_stream | Halts the T7's data acquisition process
-|clean_data_stream| Frees the buffer memory
-|init_file_stream | Writes a header to a data file
-|write_file_stream | Calls read_data_stream and writes formatted data to a data file
-|status_data_stream | Retrieves information on the data streaming process
-|update_ef | Update all flexible I/O measurements and output parameters in the EFCONF structs
-| [**Meta Configuration**](#fun:meta) ||
-| get_meta_int, get_meta_flt, get_meta_str | Returns a meta parameter integer, floating point, or string value.  
-| put_meta_int, put_meta_flt, put_meta_str | Write an integer, floating point, or a string value to a meta parameter.
-| **Helper Functions** | **(Not needed by most users)** |
-|clean_file_stream | Clean up after a file stream process; close the file and deallocate the buffer.  This is done automatically by `stop_file_stream`.
-|str_lower | Modify a string to be all lower case
-|airegisters | Returns the modbus registers relevant to configuring an analog input channel
-|aoregisters | Returns the modbus registers relevant to configuring an analog output channel
-|print_color | Used by the `show_config` function to print colored text to the terminal
-|read_param | Used by the `load_config` function to strip the whitespace around parameter/value pairs
-|init_config | Writes sensible defaults to a configuration struct
+| **Interacting with Configuration Files** ||
+|`lc_load_config` | Parses a configuration file and encodes the configuration on an array of DEVCONF structures |
+| `lc_write_config` | Writes a configuration file based on the configuration of a DEVCONF struct |
+| **Device Interaction** ||
+| `lc_open` | Opens a connection to the device identified in a DEVCONF configuration struct.  The handle is remembered by the DEVCONF struct. |
+| `lc_close` | Closes an open connection to the device handle in a DEVCONF configuration struct |
+| `lc_upload_config` | Perform the appropriate read/write operations to implement the DEVCONF struct settings on the T7 |
+| **Configuration Diagnostics** ||
+| `lc_show_config` | Calls download_config and automatically generates an item-by-item comparison of the T7's current settings and the settings contained in a DEVCONF structure. |
+| `lc_ndev` | Returns the number of configured devices in a DEVCONF array |
+| `lc_nistream` | Returns the number of configured input channels in a DEVCONF device structure.  This includes analog AND digital streaming. |
+| `lc_nostream` | Returns the number of configured output channels in a DEVCONF device |
+| `lc_aichannels` | Returns the range of legal analog input channels on the actual device type (`device_act`) |
+| `lc_aochannels` | Returns the range of legal anaog output channels on the actual device type |
+| `lc_efchannels` | Returns the range of legal digital extended feature channels on the actual device type |
+| **Data Collection** ||
+| `lc_stream_start` | Checks the available RAM, allocates the buffer, and starts the acquisition process |
+| `lc_stream_service` | Collects new data from the T7, updates the buffer registers, tests for a trigger event, services the trigger state |
+| `lc_stream_read` | Returns a pointer into the buffer with the next available data to be read |
+| `lc_stream_stop` | Halts the T7's data acquisition process |
+| `lc_stream_clear` | Frees the buffer memory |
+| `lc_datafile_init` | Writes a header to a data file |
+| `lc_datafile_write` | Calls read_data_stream and writes formatted data to a data file |
+| `lc_stream_status` | Returns the number of samples streamed from the T7, to the application, and waiting in the buffer |
+| `lc_stream_iscomplete` | Returns a 1 if the number of samples streamed into the buffer is greater than or equal to the NSAMPLE configuration parameter |
+| `lc_stream_isempty` | Returns a 1 if the buffer has no samples ready to be read |
+| **Digital IO Extended Features** | |
+| `lc_update_ef` | Update all flexible I/O measurements and output parameters in the EFCONF structs |
+| **Digital Communication** ||
+| `lc_com_start` | Upload communication channel configuration and begin listening/transmitting |
+| `lc_com_stop` | Stop listening/transmitting on a digital channel |
+| `lc_communicate` | Transmit and listen for a response on a digital channel |
+| `lc_com_read` | Obtain data (blocking or non-blocking) from a digital channel |
+| `lc_com_write` | Transmit data over a digital channel |
+| **Meta Configuration** ||
+| `lc_get_meta_int`, `lc_get_meta_flt`, `lc_get_meta_str` | Returns a meta parameter integer, floating point, or string value.  |
+| `lc_get_meta_type` | Detects whether a parameter exists, and returns an enumerated integer identifying its type. |
+| `lc_put_meta_int`, `lc_put_meta_flt`, `lc_put_meta_str` | Write an integer, floating point, or a string value to a meta parameter. |
 
 [top](#ref:top)
 

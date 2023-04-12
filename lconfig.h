@@ -37,7 +37,7 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LCONF_VERSION 4.06   // Track modifications in the header
+#define LCONF_VERSION 4.08   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LCONF_VERSION
@@ -188,6 +188,11 @@ with init_data_file() and write_data_file() utilities.
 - Added extended feature pulse/count output support
 
 ** 4.07
+3/2022
+- Changed the pulse output to only enable immediately if a count value
+    is specified.
+
+** 4.08
 3/2023
 - Transitioned to enumerated meta parameter types isntead of character values
 - Added LC_DEL_META() and LC_GET_META_TYPE()
@@ -345,7 +350,7 @@ typedef struct __lc_comconf_t__ {
 
 
 typedef enum __lc_metatype_t__ {
-    LC_MT_ERR = LC_ERROR,
+    LC_MT_ERR = LCONF_ERROR,
     LC_MT_NONE = 0,
     LC_MT_INT = 1,
     LC_MT_FLT = 2,
@@ -1040,7 +1045,7 @@ lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param);
 
 /*DEL_META
 Delete an existing meta parameter.
-If the parameter is not found, returns LC_ERROR, and prints an error message to
+If the parameter is not found, returns LCONF_ERROR, and prints an error message to
 stderr.  Otherwise, the parameter is removed from the meta parameter list.
 
 DEL_META also checks to make sure that there are no "zombie" parameters.  The meta
