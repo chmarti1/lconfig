@@ -348,10 +348,10 @@ void lct_cal_inplace(lc_devconf_t *dconf,
 int lct_cal(lc_devconf_t *dconf, unsigned int ainum, double *data){
 	if(ainum >= dconf->naich){
 		fprintf(stderr, "LCT_CAL: Analog input channel %d is out of range.  Only %d are configured.\n", ainum, dconf->naich);
-		return LCONF_ERROR;
+		return LC_ERROR;
 	}
 	*data = (*data - dconf->aich[ainum].calzero) * dconf->aich[ainum].calslope;
-	return LCONF_NOERR;
+	return LC_NOERR;
 }
 
 /* LCT_CAL_UNITS
@@ -398,7 +398,7 @@ int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxch
     if(err = lc_stream_read(dconf, &data, &channels, &samples_per_read))
         return err;
     else if(!data)
-        return LCONF_ERROR;
+        return LC_ERROR;
         
     // Are the number of channels legal?
     if(maxchannels > 0 && channels > maxchannels){
@@ -414,7 +414,7 @@ int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxch
         // initialize an iterator for this channel
         if(lct_diter_init(dconf, &diter, data, channels*samples_per_read, ii)){
             fprintf(stderr, "LCT_STREAM_STAT: Failed to initialize the channel iterator for channel %d\n", ii);
-            return LCONF_ERROR;
+            return LC_ERROR;
         }
         // Modify the prior statistics to receive in-place calculation
         // Adjust the variance to be mean squre
@@ -436,7 +436,7 @@ int lct_stream_stat(lc_devconf_t *dconf, lct_stat_t values[], unsigned int maxch
         values[ii].var = values[ii].var - values[ii].mean*values[ii].mean;
 
     }
-    return LCONF_NOERR;
+    return LC_NOERR;
 }
 
 

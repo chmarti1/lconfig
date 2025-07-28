@@ -56,7 +56,7 @@ These are the parameters recognized by LCONFIG.  The valid values list the value
 | efchannel   | integer [0-7]                           | Flexible IO   | The physical channel to use for a digital IO operation.
 | eflabel     | string                                  | Flexible IO   | A string used to name the EF channel.
 | efsignal    | pwm, count, frequency, phase, quadrature | Flexible IO  | The EF signal/feature to use on this EF channel.
-| efdirection | input, output                          | Flexible IO   | Is this channel an input or an output? (input is default)
+| efdirection | input, output, stream                   | Flexible IO   | Is this channel an input or an output? (input is default)
 | efedge      | rising, falling, all                    | Flexible IO   | Specifies the behavior of EF features that depend on edge direction (count, phase, PWM).
 | efdebounce  | none, fixed, reset, minimum             | Flexible IO   | The debounce filter to be used for a counter input.
 | efusec      | floating point [>0]                     | Flexible IO   | A generic time parameter for configuring EF channels.

@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 4.06  
-January 2022  
+Version 4.09  
+July 2025  
 Christopher R. Martin  
 
 ## <a name="config"></a> Writing configuration files
@@ -269,11 +269,30 @@ See below for more extended feature channel options.
 
 ### <a name="ef"></a> Extended features
 
-Digital input-output extended features can be configured just like an analog input or output.  The biggest difference is that they do not participate in streaming, so applications need to interact with them via the `lc_update_ef` function.
+Digital input-output extended features can be configured just like an analog input or output.  An extended feature channel is created by the `EFCHANNEL` parameter, which accepts a single integer digital pin number on which the channel is to be configured.  Like the analog channels, extended features can be given a string label using the `EFLABEL` parameter.  
 
-An extended feature channel is created by the `EFCHANNEL` parameter, which accepts a single integer digital pin number on which the channel is to be configured.  Like the analog channels, extended features can be given a string label using the `EFLABEL` parameter.
+The function of the channel is determined jointly by the `EFSIGNAL` and `EFDIRECTION` parameters.  The signal indicates what kind of extended feature is to be used, accepting keywords: `pwm`, `counter`, `pulse`, `frequency`, `phase`, `quadrature`, or `trigger`.  The direction specifies whether the channel should be used as an `output`, `input` or `stream` (input stream).
 
-The function of the channel is determined by the `EFSIGNAL` and `EFDIRECTION` parameters.  The direction indicates whether the channel is an input or an output.  The signal indicates what kind of extended feature is to be used.
+Channels that are configured as normal EF inputs or outputs force the user to interact directly with the `efch` struct within the `lc_devconf_t` struct.  Unfortunately, this layer is only well documented in the `lconfig.h` header file.  On the other hand, streaming data automatically captures the `DIO#_EF_READ_A` 16-bit register as a channel of streamed data.
+
+```C
+lc_devconf_t dconf;
+
+lc_load_config(&dconf, 1, "myconfig.conf");
+lc_open_config(&dconf);
+lc_upload_config(&dconf);
+
+// Assuming EF0 was configured for PWM output, 
+// we can modify the duty cycle.
+dconf.efch[0].duty = 0.5
+
+// The setting is not applied until we call lc_update_ef()
+lc_update_ef(&dconf);
+
+// Assuming EF1 was configured as a counter, we can check
+// its value the last time update_ef was run.
+printf("Current count: %d\n", dconf.efch[1].counts);
+```
 
 Because of the way LabJacks manage the internal timing for the extended features, all extended feature output signals share a single global `EFFREQUENCY` parameter that defines their repetition rate.  For example, the following example configures two pulse-width-modulated outputs with one signal phase-shifted relative to the first.  Both signals will share the same 1000Hz frequency.
 
@@ -293,8 +312,6 @@ efdirection output
 efduty 0.25
 efdegrees 270
 ```
-
-The LCONFIG system supports most of the LabJack EF features, but the functional interface is not very thoroughly developed as of version 4.00.  Enabling features require calling the `lc_update_ef()` function, and applications must acquire measurement results directly from the `lc_devconf_t` struct.  This is intended to change in the near future.
 
 For now, the behavior of the extended features is sufficiently complicated and changing quickly enough, that detailed documentation here is not warranted.  For detailed documentation of the extended features support, see the comments of the `lc_load_config()` function in the `lconfig.h` header file.
 
