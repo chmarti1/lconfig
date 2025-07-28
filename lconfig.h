@@ -37,23 +37,23 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LCONF_VERSION 4.08   // Track modifications in the header
+#define LC_VERSION 4.08   // Track modifications in the header
 /*
 These change logs follow the convention below:
-**LCONF_VERSION
+**LC_VERSION
 Date
 Notes
 
 **NONE
 ?/?/?
 Original copy
-There was no LCONF_VERSION constant defined.  Included configuration file
+There was no LC_VERSION constant defined.  Included configuration file
 analog input, calibration, and ascii data export.
 
 **1.1
 6/20/16
 First implementation in The Lab
-Defined LCONF_VERSION constant and added this log.
+Defined LC_VERSION constant and added this log.
 Improved commenting in the header file.  
 Added support for analog output.
 Removed calibration information from the lc_aiconf_t struct
@@ -197,44 +197,49 @@ with init_data_file() and write_data_file() utilities.
 - Transitioned to enumerated meta parameter types isntead of character values
 - Added LC_DEL_META() and LC_GET_META_TYPE()
 - Changed the behavior of LC_GET_META_XXX() to raise an error on incorrect type
+
+** 4.09
+7/2025
+- Changed all lconfig.h macros from LCONF_XXX to LC_XXX for consistency
+- added the "stream" option to the EFDIRECTION parameter, allowing streaming
 */
 
 #define TWOPI 6.283185307179586
 
-#define LCONF_MAX_STR 80    // longest supported string
-#define LCONF_MAX_NAME 49   // longest device name allowed
-#define LCONF_MAX_META 32   // how many meta parameters should we allow?
-#define LCONF_MAX_STCH  LCONF_MAX_AICH + LCONF_MAX_AOCH + 1 // Maximum streaming channels
-#define LCONF_MAX_AOCH 1    // maximum analog output channel number allowed
-#define LCONF_MAX_NAOCH 2   // maximum analog output channels to allow
-#define LCONF_MAX_AICH 14   // highest analog input channel number allowed
-#define LCONF_MAX_NAICH 15  // maximum analog input channels to allow
-#define LCONF_MAX_AIRES 8   // maximum resolution index
-#define LCONF_MAX_NDEV 32   // catch runaway cases if the user passes junk to devmax
-#define LCONF_MAX_EFCH 22  // Highest flexible IO channel
-#define LCONF_MAX_NEFCH 8  // maximum flexible IO channels to allow
-#define LCONF_MAX_COMCH 22  // Highest digital communications channel
-#define LCONF_MAX_UART_BAUD 38400   // Highest COMRATE setting when in UART mode
-#define LCONF_MAX_NCOMCH 4  // maximum com channels to allow
-#define LCONF_MAX_AOBUFFER  512     // Maximum number of buffered analog outputs
-#define LCONF_BACKLOG_THRESHOLD 1024 // raise a warning if the backlog exceeds this number.
-#define LCONF_CLOCK_MHZ 80.0    // Clock frequency in MHz
-#define LCONF_SAMPLES_PER_READ 64  // Data read/write block size
-#define LCONF_TRIG_EFOFFSET  2000    // Offset in trigger channel number for hardware trigger
+#define LC_MAX_STR 80    // longest supported string
+#define LC_MAX_NAME 49   // longest device name allowed
+#define LC_MAX_META 32   // how many meta parameters should we allow?
+#define LC_MAX_STCH  LC_MAX_AICH + LC_MAX_AOCH + 1 // Maximum streaming channels
+#define LC_MAX_AOCH 1    // maximum analog output channel number allowed
+#define LC_MAX_NAOCH 2   // maximum analog output channels to allow
+#define LC_MAX_AICH 14   // highest analog input channel number allowed
+#define LC_MAX_NAICH 15  // maximum analog input channels to allow
+#define LC_MAX_AIRES 8   // maximum resolution index
+#define LC_MAX_NDEV 32   // catch runaway cases if the user passes junk to devmax
+#define LC_MAX_EFCH 22  // Highest flexible IO channel
+#define LC_MAX_NEFCH 8  // maximum flexible IO channels to allow
+#define LC_MAX_COMCH 22  // Highest digital communications channel
+#define LC_MAX_UART_BAUD 38400   // Highest COMRATE setting when in UART mode
+#define LC_MAX_NCOMCH 4  // maximum com channels to allow
+#define LC_MAX_AOBUFFER  512     // Maximum number of buffered analog outputs
+#define LC_BACKLOG_THRESHOLD 1024 // raise a warning if the backlog exceeds this number.
+#define LC_CLOCK_MHZ 80.0    // Clock frequency in MHz
+#define LC_SAMPLES_PER_READ 64  // Data read/write block size
+#define LC_TRIG_EFOFFSET  2000    // Offset in trigger channel number for hardware trigger
 
-#define LCONF_SE_NCH 199    // single-ended negative channel number
+#define LC_SE_NCH 199    // single-ended negative channel number
 
-#define LCONF_DEF_NSAMPLE 64
-#define LCONF_DEF_AI_NCH LCONF_SE_NCH
-#define LCONF_DEF_AI_RANGE 10.
-#define LCONF_DEF_AI_RES 0
-#define LCONF_DEF_AO_AMP 1.
-#define LCONF_DEF_AO_OFF 2.5
-#define LCONF_DEF_AO_DUTY 0.5
-#define LCONF_DEF_EF_TIMEOUT 1000
+#define LC_DEF_NSAMPLE 64
+#define LC_DEF_AI_NCH LC_SE_NCH
+#define LC_DEF_AI_RANGE 10.
+#define LC_DEF_AI_RES 0
+#define LC_DEF_AO_AMP 1.
+#define LC_DEF_AO_OFF 2.5
+#define LC_DEF_AO_DUTY 0.5
+#define LC_DEF_EF_TIMEOUT 1000
 
-#define LCONF_NOERR 0
-#define LCONF_ERROR -1
+#define LC_NOERR 0
+#define LC_ERROR -1
 
 
 /*
@@ -260,8 +265,8 @@ typedef struct __lc_aiconf_t__ {
     unsigned int    resolution;  // resolution index (0-8) see T7 docs
     double          calslope;   // calibration slope
     double          calzero;    // calibration offset
-    char            calunits[LCONF_MAX_STR];   // calibration units
-    char            label[LCONF_MAX_STR];   // channel label
+    char            calunits[LC_MAX_STR];   // calibration units
+    char            label[LC_MAX_STR];   // channel label
 } lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
 
@@ -276,7 +281,7 @@ typedef struct __lc_aoconf_t__ {
     double          offset;       // What is the mean value?
     double          duty;         // Duty cycle for a square wave or triangle wave
                                   // duty=1 results in all-high square and an all-rising triangle (sawtooth)
-    char            label[LCONF_MAX_STR];   // Output channel label
+    char            label[LC_MAX_STR];   // Output channel label
 } lc_aoconf_t;
 
 
@@ -319,20 +324,20 @@ typedef struct __lc_efconf_t__ {
             LC_EF_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
         } debounce;
 
-    enum {  LC_EF_INPUT, LC_EF_OUTPUT } direction;
+    enum {  LC_EF_INPUT, LC_EF_OUTPUT, LC_EF_STREAM } direction;
     int channel;
     double time;        // Time parameter (us)
     double duty;        // PWM duty cycle (0-1)
     double phase;       // Phase parameters (degrees)
     unsigned int counts; // Pulse count
-    char label[LCONF_MAX_STR];
+    char label[LC_MAX_STR];
 } lc_efconf_t;
 
 // Digital Communications Configuration Structure
 //
 typedef struct __lc_comconf_t__ {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
-    char label[LCONF_MAX_STR];
+    char label[LC_MAX_STR];
     double rate;                // Data rate in bits/sec
     int pin_in;                 // Physical input DIO pin
     int pin_out;                // Physical output DIO pin
@@ -350,7 +355,7 @@ typedef struct __lc_comconf_t__ {
 
 
 typedef enum __lc_metatype_t__ {
-    LC_MT_ERR = LCONF_ERROR,
+    LC_MT_ERR = LC_ERROR,
     LC_MT_NONE = 0,
     LC_MT_INT = 1,
     LC_MT_FLT = 2,
@@ -363,9 +368,9 @@ typedef enum __lc_metatype_t__ {
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
 typedef struct __lc_meta_t__ {
-    char param[LCONF_MAX_STR];      // parameter name
+    char param[LC_MAX_STR];      // parameter name
     union {
-        char svalue[LCONF_MAX_STR];
+        char svalue[LC_MAX_STR];
         int ivalue;
         double fvalue;
     } value;                        // union for flexible data types
@@ -423,17 +428,17 @@ typedef struct __lc_devconf_t__ {
     lc_con_t connection_act;             // actual connection type index
     lc_dev_t device;                     // The requested device type index
     lc_dev_t device_act;                 // The actual device type
-    char ip[LCONF_MAX_STR];         // ip address string
-    char gateway[LCONF_MAX_STR];    // gateway address string
-    char subnet[LCONF_MAX_STR];     // subnet mask string
-    char serial[LCONF_MAX_STR];     // serial number string
-    char name[LCONF_MAX_NAME];      // device name string
+    char ip[LC_MAX_STR];         // ip address string
+    char gateway[LC_MAX_STR];    // gateway address string
+    char subnet[LC_MAX_STR];     // subnet mask string
+    char serial[LC_MAX_STR];     // serial number string
+    char name[LC_MAX_NAME];      // device name string
     int handle;                     // device handle
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
     unsigned int nsample;           // *number of samples per read
     // Analog input
-    lc_aiconf_t aich[LCONF_MAX_NAICH];    // analog input configuration array
+    lc_aiconf_t aich[LC_MAX_NAICH];    // analog input configuration array
     unsigned int naich;             // number of configured analog input channels
     // Digital input streaming
     unsigned int distream;          // input stream mask
@@ -441,14 +446,14 @@ typedef struct __lc_devconf_t__ {
     unsigned int domask;            // output tristate mask
     unsigned int dovalue;           // output value mask
     // Analog output
-    lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
+    lc_aoconf_t aoch[LC_MAX_NAOCH];   // analog output configuration array
     unsigned int naoch;             // number of configured analog output channels
     // Flexible Input/output
     double effrequency;            // flexible input/output frequency
-    lc_efconf_t efch[LCONF_MAX_NEFCH]; // flexible digital input/output
+    lc_efconf_t efch[LC_MAX_NEFCH]; // flexible digital input/output
     unsigned int nefch;            // how many of the EF are configured?
     // Communication
-    lc_comconf_t comch[LCONF_MAX_COMCH]; // Communication channels
+    lc_comconf_t comch[LC_MAX_COMCH]; // Communication channels
     unsigned int ncomch;            // how many of the com channels are configured?
     // Trigger
     int trigchannel;                // Which channel should be used for the trigger?
@@ -460,7 +465,7 @@ typedef struct __lc_devconf_t__ {
     // data file format
     lc_dataformat_t dataformat;
     // Meta & filestream
-    lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
+    lc_meta_t meta[LC_MAX_META];  // *meta parameters
     lc_ringbuf_t RB;                  // ring buffer
 } lc_devconf_t;
 
@@ -620,7 +625,7 @@ The following parameters are recognized:
 .   the word "sample" in the same way LabJack uses the word "scan".  In multi-
 .   channel configurations NSAMPLE * NAICH individual data points will be read.
 .
-.   Unlike most parameters, the NSAMPLE value defaults to LCONF_DEF_NSAMPLE 
+.   Unlike most parameters, the NSAMPLE value defaults to LC_DEF_NSAMPLE 
 .   (64), which is intended to be a quasi-reasonable value in most cases.  This 
 .   is so users shouldn't need to set the parameter unless they want to.
 -AICHANNEL
@@ -878,9 +883,11 @@ The following parameters are recognized:
 .   The intervals specified in these debounce modes are set by the EFUSEC
 .   parameter.
 -EFDIRECTION
-.   Valid parameters "input" or "output" determine whether the signal should
-.   be generated or measured.  EF outputs cannot be streamed, but are set
-.   statically.
+.   Valid parameters are "input", "output", and "stream".  This determines
+.   how the EF channel behaves.  If set as "output" or "input" the channel
+.   is updated using the lc_update_ef() function.  If set as "stream" then the
+.   EF channel is treated as a streamable input, and the appropriate READ
+.   register is added to the input data stream.
 -EFUSEC
 .   Specifies a time in microseconds.
 -EFDEGREES
@@ -1045,7 +1052,7 @@ lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param);
 
 /*DEL_META
 Delete an existing meta parameter.
-If the parameter is not found, returns LCONF_ERROR, and prints an error message to
+If the parameter is not found, returns LC_ERROR, and prints an error message to
 stderr.  Otherwise, the parameter is removed from the meta parameter list.
 
 DEL_META also checks to make sure that there are no "zombie" parameters.  The meta
@@ -1209,7 +1216,7 @@ int lc_stream_isfull(lc_devconf_t* dconf);
 /* LC_STREAM_START
 Start a stream operation based on the device configuration for device devnum.
 samples_per_read can be used to override the NSAMPLE parameter in the device
-configuration.  If samples_per_read is <= 0, then the LCONF_SAMPLES_PER_READ
+configuration.  If samples_per_read is <= 0, then the LC_SAMPLES_PER_READ
 value will be used instead.
 */
 int lc_stream_start(lc_devconf_t* dconf,   // Device array and number
