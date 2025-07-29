@@ -240,8 +240,8 @@ int main(int argc, char *argv[]){
     }
     
     // Declare memory for the working and active channel statistics
-    values = malloc(ndev * LCONF_MAX_NAICH * sizeof(lct_stat_t));
-    working = malloc(ndev * LCONF_MAX_NAICH * sizeof(lct_stat_t));
+    values = malloc(ndev * LC_MAX_NAICH * sizeof(lct_stat_t));
+    working = malloc(ndev * LC_MAX_NAICH * sizeof(lct_stat_t));
 
     // Initialize the terminal
     lct_clear_terminal();
@@ -270,8 +270,8 @@ int main(int argc, char *argv[]){
             return -1;
         }
         // initialize the statistics
-        lct_stat_init(&values[ii*LCONF_MAX_NAICH], LCONF_MAX_NAICH);
-        lct_stat_init(&working[ii*LCONF_MAX_NAICH], LCONF_MAX_NAICH);
+        lct_stat_init(&values[ii*LC_MAX_NAICH], LC_MAX_NAICH);
+        lct_stat_init(&working[ii*LC_MAX_NAICH], LC_MAX_NAICH);
     }
     
     then = time(NULL);
@@ -321,7 +321,7 @@ int main(int argc, char *argv[]){
                     if(dconf[ii].aich[jj].label[0])
                         printf(FMT_CHANNEL, dconf[ii].aich[jj].label);
                     // If the channel is not differential
-                    else if(dconf[ii].aich[jj].nchannel == LCONF_SE_NCH){
+                    else if(dconf[ii].aich[jj].nchannel == LC_SE_NCH){
                         sprintf(stemp, "+AI%02d -GND", dconf[ii].aich[jj].channel);
                         printf(FMT_CHANNEL, stemp);
                     }else{
@@ -338,17 +338,17 @@ int main(int argc, char *argv[]){
                         printf(FMT_UNITS, "V");
                     
                     // CHANNEL MEAN
-                    printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].mean);
+                    printf(FMT_NUMBER, values[ii*LC_MAX_NAICH+jj].mean);
                     
                     if(state.rms)
-                        printf(FMT_NUMBER, sqrt(values[ii*LCONF_MAX_NAICH+jj].mean*values[ii*LCONF_MAX_NAICH+jj].mean + values[ii*LCONF_MAX_NAICH+jj].var));   
+                        printf(FMT_NUMBER, sqrt(values[ii*LC_MAX_NAICH+jj].mean*values[ii*LC_MAX_NAICH+jj].mean + values[ii*LC_MAX_NAICH+jj].var));   
                     if(state.std)
-                        printf(FMT_NUMBER, sqrt(values[ii*LCONF_MAX_NAICH+jj].var));
+                        printf(FMT_NUMBER, sqrt(values[ii*LC_MAX_NAICH+jj].var));
                     if(state.peak)
-                        printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].max - values[ii*LCONF_MAX_NAICH+jj].min);
+                        printf(FMT_NUMBER, values[ii*LC_MAX_NAICH+jj].max - values[ii*LC_MAX_NAICH+jj].min);
                     if(state.maxmin){
-                        printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].max);
-                        printf(FMT_NUMBER, values[ii*LCONF_MAX_NAICH+jj].min);   
+                        printf(FMT_NUMBER, values[ii*LC_MAX_NAICH+jj].max);
+                        printf(FMT_NUMBER, values[ii*LC_MAX_NAICH+jj].min);   
                     }
                     printf("\n");
                 }
@@ -399,13 +399,13 @@ int main(int argc, char *argv[]){
         // Service the data connections
         for(ii=0;ii<ndev;ii++){
             lc_stream_service(&dconf[ii]);
-            lct_stream_stat(&dconf[ii], &working[ii*LCONF_MAX_NAICH], 0);
+            lct_stream_stat(&dconf[ii], &working[ii*LC_MAX_NAICH], 0);
             // If the working array has accumulated enough samples
-            if(working[ii*LCONF_MAX_NAICH].n >= dconf[ii].nsample){
+            if(working[ii*LC_MAX_NAICH].n >= dconf[ii].nsample){
                 // Copy the result and clear the worker
                 for(jj=0; jj<dconf[ii].naich; jj++) 
-                    values[ii*LCONF_MAX_NAICH + jj] = working[ii*LCONF_MAX_NAICH + jj];
-                lct_stat_init(&working[ii*LCONF_MAX_NAICH], dconf[ii].naich);
+                    values[ii*LC_MAX_NAICH + jj] = working[ii*LC_MAX_NAICH + jj];
+                lct_stat_init(&working[ii*LC_MAX_NAICH], dconf[ii].naich);
             }
         }
         
