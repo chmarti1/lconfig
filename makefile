@@ -1,47 +1,64 @@
+# Install destinations
 TODIR=/usr/local/bin
 LCBURST="$(TODIR)/lcburst"
 LCRUN="$(TODIR)/lcrun"
 LCSTAT="$(TODIR)/lcstat"
-
-#LINK=-lljacklm -lLabJackM -lm
+# Build destinations
+BUILD=build
+LCONFIG_O=$(BUILD)/lconfig.o
+LCTOOLS_O=$(BUILD)/lctools.o
+LCMAP_O=$(BUILD)/lcmap.o
+ALL_O=$(LCONFIG_O) $(LCTOOLS_O) $(LCMAP_O)
+LCSTAT_B=$(BUILD)/lcstat.bin
+LCRUN_B=$(BUILD)/lcrun.bin
+LCBURST_B=$(BUILD)/lcburst.bin
+ALL_B=$(LCSTAT_B) $(LCRUN_B) $(LCBURST_B)
+# Binary CHMOD settings
+BIN_CHMOD=755
+# Linked libraries
 LINK=-lLabJackM -lm
+# Compiler options
+OPT=-Wall
+
+# The build directory
+$(BUILD):
+	mkdir $(BUILD)
 
 # The LCONFIG object file
-lconfig.o: lconfig.c lconfig.h lcmap.h
-	gcc -Wall -c lconfig.c -o lconfig.o
+$(LCONFIG_O): $(BUILD) lconfig.c lconfig.h lcmap.h
+	gcc $(OPT) -c lconfig.c -o $(LCONFIG_O)
 
 # The LCTOOLS object file
-lctools.o: lctools.c lctools.h lconfig.h lconfig.o
-	gcc -Wall -c lctools.c -o lctools.o
+$(LCTOOLS_O): $(BUILD) lctools.c lctools.h lconfig.h lconfig.o
+	gcc $(OPT) -c lctools.c -o $(LCTOOLS_O)
 
 # The LCMAP object file
-lcmap.o: lcmap.c lcmap.h lconfig.h
-	gcc -Wall -c lcmap.c -o lcmap.o
+$(LCMAP_O): $(BUILD) lcmap.c lcmap.h lconfig.h
+	gcc $(OPT) -c lcmap.c -o $(LCMAP_O)
 
 # The Binaries...
 #
-lcstat.bin: lcmap.o lconfig.o lctools.o lcstat.c
-	gcc lcmap.o lconfig.o lctools.o lcstat.c $(LINK) -o lcstat.bin
-	chmod +x lcstat.bin
+$(LCSTAT_B): $(ALL_O) lcstat.c
+	gcc $(ALL_O) lcstat.c $(LINK) -o $(LCSTAT_B)
+	chmod $(BIN_CHMOD) $(LCSTAT_B)
 
-lcrun.bin: lcmap.o lconfig.o lctools.o lcrun.c
-	gcc lcmap.o lconfig.o lctools.o lcrun.c $(LINK) -o lcrun.bin
-	chmod +x lcrun.bin
+$(LCRUN_B): $(ALL_O) lcrun.c
+	gcc $(ALL_O) lcrun.c $(LINK) -o $(LCRUN_B)
+	chmod $(BIN_CHMOD) $(LCRUN_B)
 
-lcburst.bin: lcmap.o lconfig.o lctools.o lcburst.c
-	gcc lcmap.o lconfig.o lctools.o lcburst.c $(LINK) -o lcburst.bin
-	chmod +x lcburst.bin
+$(LCBURST_B): $(ALL_O) lcburst.c
+	gcc $(ALL_O) lcburst.c $(LINK) -o $(LCBURST_B)
+	chmod $(BIN_CHMOD) $(LCBURST_B)
 clean:
-	rm -f *.o
-	rm -f *.bin
+	rm -f $(BUILD)
 
-install: lcburst.bin lcrun.bin lcstat.bin
-	cp -f lcrun.bin $(LCRUN)
-	chmod 755 $(LCRUN)
-	cp -f lcburst.bin $(LCBURST)
-	chmod 755 $(LCBURST)
-	cp -f lcstat.bin $(LCSTAT)
-	chmod 755 $(LCSTAT)
+install: $(ALL_B)
+	cp -f $(LCRUN_B) $(LCRUN)
+	chmod $(BIN_CHMOD) $(LCRUN)
+	cp -f $(LCBURST_B) $(LCBURST)
+	chmod $(BIN_CHMOD) $(LCBURST)
+	cp -f $(LCSTAT_B) $(LCSTAT)
+	chmod $(BIN_CHMOD) $(LCSTAT)
 
 uninstall:
 	rm $(LCRUN)

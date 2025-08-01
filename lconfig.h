@@ -201,31 +201,39 @@ with init_data_file() and write_data_file() utilities.
 ** 4.09
 7/2025
 - Changed all lconfig.h macros from LCONF_XXX to LC_XXX for consistency
-- added the "stream" option to the EFDIRECTION parameter, allowing streaming
+- Added the "stream" option to the EFDIRECTION parameter, allowing streaming
+- Added lc_meta_get_num() for generic numerical parameters
+- Added string overrun protection in read_param()
+- Added individual LC_MAX_STR_XXX for parameter types to reduce memory demands
 */
 
 #define TWOPI 6.283185307179586
 
-#define LC_MAX_STR 80    // longest supported string
-#define LC_MAX_NAME 49   // longest device name allowed
-#define LC_MAX_META 32   // how many meta parameters should we allow?
-#define LC_MAX_STCH  LC_MAX_AICH + LC_MAX_AOCH + 1 // Maximum streaming channels
-#define LC_MAX_AOCH 1    // maximum analog output channel number allowed
-#define LC_MAX_NAOCH 2   // maximum analog output channels to allow
-#define LC_MAX_AICH 14   // highest analog input channel number allowed
-#define LC_MAX_NAICH 15  // maximum analog input channels to allow
-#define LC_MAX_AIRES 8   // maximum resolution index
-#define LC_MAX_NDEV 32   // catch runaway cases if the user passes junk to devmax
-#define LC_MAX_EFCH 22  // Highest flexible IO channel
-#define LC_MAX_NEFCH 8  // maximum flexible IO channels to allow
-#define LC_MAX_COMCH 22  // Highest digital communications channel
-#define LC_MAX_UART_BAUD 38400   // Highest COMRATE setting when in UART mode
-#define LC_MAX_NCOMCH 4  // maximum com channels to allow
-#define LC_MAX_AOBUFFER  512     // Maximum number of buffered analog outputs
-#define LC_BACKLOG_THRESHOLD 1024 // raise a warning if the backlog exceeds this number.
-#define LC_CLOCK_MHZ 80.0    // Clock frequency in MHz
-#define LC_SAMPLES_PER_READ 64  // Data read/write block size
-#define LC_TRIG_EFOFFSET  2000    // Offset in trigger channel number for hardware trigger
+#define LC_MAX_STR      80          // longest supported string (no strong may be longer)
+#define LC_MAX_STR_NAME 49          // longest device name allowed
+#define LC_MAX_STR_SERIAL 10        // longest device serial number allowed
+#define LC_MAX_STR_LABEL LC_MAX_STR // longest channel label
+#define LC_MAX_STR_IP   16          // longest IP address allowed
+#define LC_MAX_STR_PARAM 49         // longest meta parameter string
+#define LC_MAX_STR_VALUE LC_MAX_STR // longest meta value string
+#define LC_MAX_META     32          // how many meta parameters should we allow?
+#define LC_MAX_STCH     LC_MAX_AICH + LC_MAX_AOCH + 1 // Maximum streaming channels
+#define LC_MAX_AOCH     1           // maximum analog output channel number allowed
+#define LC_MAX_NAOCH    2           // maximum analog output channels to allow
+#define LC_MAX_AICH     14          // highest analog input channel number allowed
+#define LC_MAX_NAICH    15          // maximum analog input channels to allow
+#define LC_MAX_AIRES    8           // maximum resolution index
+#define LC_MAX_NDEV     32          // catch runaway cases if the user passes junk to devmax
+#define LC_MAX_EFCH     22          // Highest flexible IO channel
+#define LC_MAX_NEFCH    8           // maximum flexible IO channels to allow
+#define LC_MAX_COMCH    22          // Highest digital communications channel
+#define LC_MAX_UART_BAUD 38400      // Highest COMRATE setting when in UART mode
+#define LC_MAX_NCOMCH   4           // maximum com channels to allow
+#define LC_MAX_AOBUFFER 512         // Maximum number of buffered analog outputs
+#define LC_BACKLOG_THRESHOLD 1024   // raise a warning if the backlog exceeds this number.
+#define LC_CLOCK_MHZ    80.0        // Clock frequency in MHz
+#define LC_SAMPLES_PER_READ 64      // Data read/write block size
+#define LC_TRIG_EFOFFSET 2000       // Offset in trigger channel number for hardware trigger
 
 #define LC_SE_NCH 199    // single-ended negative channel number
 
@@ -266,7 +274,7 @@ typedef struct __lc_aiconf_t__ {
     double          calslope;   // calibration slope
     double          calzero;    // calibration offset
     char            calunits[LC_MAX_STR];   // calibration units
-    char            label[LC_MAX_STR];   // channel label
+    char            label[LC_MAX_STR_LABEL];   // channel label
 } lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
 
@@ -281,7 +289,7 @@ typedef struct __lc_aoconf_t__ {
     double          offset;       // What is the mean value?
     double          duty;         // Duty cycle for a square wave or triangle wave
                                   // duty=1 results in all-high square and an all-rising triangle (sawtooth)
-    char            label[LC_MAX_STR];   // Output channel label
+    char            label[LC_MAX_STR_LABEL];   // Output channel label
 } lc_aoconf_t;
 
 
@@ -330,14 +338,14 @@ typedef struct __lc_efconf_t__ {
     double duty;        // PWM duty cycle (0-1)
     double phase;       // Phase parameters (degrees)
     unsigned int counts; // Pulse count
-    char label[LC_MAX_STR];
+    char label[LC_MAX_STR_LABEL];
 } lc_efconf_t;
 
 // Digital Communications Configuration Structure
 //
 typedef struct __lc_comconf_t__ {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
-    char label[LC_MAX_STR];
+    char label[LC_MAX_STR_LABEL];
     double rate;                // Data rate in bits/sec
     int pin_in;                 // Physical input DIO pin
     int pin_out;                // Physical output DIO pin
@@ -368,9 +376,9 @@ typedef enum __lc_metatype_t__ {
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
 typedef struct __lc_meta_t__ {
-    char param[LC_MAX_STR];      // parameter name
+    char param[LC_MAX_STR_PARAM];      // parameter name
     union {
-        char svalue[LC_MAX_STR];
+        char svalue[LC_MAX_STR_VALUE];
         int ivalue;
         double fvalue;
     } value;                        // union for flexible data types
@@ -428,11 +436,11 @@ typedef struct __lc_devconf_t__ {
     lc_con_t connection_act;             // actual connection type index
     lc_dev_t device;                     // The requested device type index
     lc_dev_t device_act;                 // The actual device type
-    char ip[LC_MAX_STR];         // ip address string
-    char gateway[LC_MAX_STR];    // gateway address string
-    char subnet[LC_MAX_STR];     // subnet mask string
-    char serial[LC_MAX_STR];     // serial number string
-    char name[LC_MAX_NAME];      // device name string
+    char ip[LC_MAX_STR_IP];         // ip address string
+    char gateway[LC_MAX_STR_IP];    // gateway address string
+    char subnet[LC_MAX_STR_IP];     // subnet mask string
+    char serial[LC_MAX_STR_IP];     // serial number string
+    char name[LC_MAX_STR_NAME];      // device name string
     int handle;                     // device handle
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
@@ -1078,6 +1086,18 @@ can be referenced by
 int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value);
 int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value);
 int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value);
+
+/*GET_META_NUM
+Retireve a meta parameter and convert it into a double float.  If it is
+already a FLT parameter, no conversion is necessary.  If it is an integer,
+the conversion is trivial.  If it is a string, we will attempt to convert
+it to a float using sscanf().
+
+Returns LC_NOERR on success.
+Returns LC_ERROR if the parameter does not exist.
+Returns -LC_ERROR if the conversion fails.
+ */
+int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value);
 
 /*PUT_META_XXX
 Write to the meta array.  If the parameter already exists, the old data will be overwritten.

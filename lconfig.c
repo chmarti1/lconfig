@@ -673,27 +673,52 @@ Found \"%s\"\n", param);
         // The NAME parameter
         //
         }else if(streq(param,"name")){
-            strncpy(dconf[devnum].name,value,LC_MAX_NAME);
+            if(strlen(value) >= LC_MAX_STR_NAME){
+                print_error("LOAD: Device name must be fewer than %d characters.\n", LC_MAX_STR_NAME);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].name,value,LC_MAX_STR_NAME);
         //
         // The IP parameter
         //
         }else if(streq(param,"ip")){
-            strncpy(dconf[devnum].ip,value,LC_MAX_STR);
+            if(strlen(value) >= LC_MAX_STR_IP){
+                print_error("LOAD: IP addresses must be fewer than %d characters.\n", LC_MAX_STR_IP);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].ip,value,LC_MAX_STR_IP);
         //
         // The GATEWAY parameter
         //
         }else if(streq(param,"gateway")){
-            strncpy(dconf[devnum].gateway,value,LC_MAX_STR);
+            if(strlen(value) >= LC_MAX_STR_IP){
+                print_error("LOAD: IP addresses must be fewer than %d characters.\n", LC_MAX_STR_IP);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].gateway,value,LC_MAX_STR_IP);
         //
         // The SUBNET parameter
         //
         }else if(streq(param,"subnet")){
-            strncpy(dconf[devnum].subnet,value,LC_MAX_STR);
+            if(strlen(value) >= LC_MAX_STR_IP){
+                print_error("LOAD: IP addresses must be fewer than %d characters.\n", LC_MAX_STR_IP);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].subnet,value,LC_MAX_STR_IP);
         //
         // The SERIAL parameter
         //
         }else if(streq(param,"serial")){
-            strncpy(dconf[devnum].serial,value,LC_MAX_STR);
+            if(strlen(value) >= LC_MAX_STR_SERIAL){
+                print_error("LOAD: Device serial numbers must be fewer than %d characters.\n", LC_MAX_STR_SERIAL);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].serial,value,LC_MAX_STR_SERIAL);
         //
         // The SAMPLEHZ parameter
         //
@@ -871,7 +896,12 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
                 loadfail();
             }
-            strncpy(dconf[devnum].aich[ainum].label, value, LC_MAX_STR);
+            if(strlen(param) >= LC_MAX_STR_LABEL){
+                print_error("LOAD: Channel labels must be fewer than %d characters.\n", LC_MAX_STR_LABEL);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].aich[ainum].label, value, LC_MAX_STR_LABEL);
         //
         // The DISTREAM parameter
         //
@@ -1026,7 +1056,12 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set analog output parameters before the first AOchannel parameter.\n");
                 loadfail();
             }
-            strncpy(dconf[devnum].aoch[aonum].label, value, LC_MAX_STR);
+            if(strlen(param) >= LC_MAX_STR_LABEL){
+                print_error("LOAD: Channel labels must be fewer than %d characters.\n", LC_MAX_STR_LABEL);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].aoch[aonum].label, value, LC_MAX_STR_LABEL);
         //
         // TRIGCHANNEL parameter
         //
@@ -1220,7 +1255,12 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set flexible input-output parameters before the first EFchannel parameter.\n");
                 loadfail();
             }
-            strncpy(dconf[devnum].efch[efnum].label, value, LC_MAX_STR);
+            if(strlen(param) >= LC_MAX_STR_LABEL){
+                print_error("LOAD: Channel labels must be fewer than %d characters.\n", LC_MAX_STR_LABEL);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].efch[efnum].label, value, LC_MAX_STR_LABEL);
         //
         // COMCHANNEL
         //
@@ -1261,7 +1301,12 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set digital communication parameters before the first COMchannel parameter.\n");
                 loadfail();
             }
-            strncpy(dconf[devnum].comch[comnum].label, value, LC_MAX_STR);
+            if(strlen(param) >= LC_MAX_STR_LABEL){
+                print_error("LOAD: Channel labels must be fewer than %d characters.\n", LC_MAX_STR_LABEL);
+                print_error("      Found: %s\n", value);
+                loadfail();
+            }
+            strncpy(dconf[devnum].comch[comnum].label, value, LC_MAX_STR_LABEL);
         //
         // COMRATE
         //
@@ -1382,8 +1427,8 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         }else if(metatype == 's'){
             lc_put_meta_str(dconf, param, value);
         // Deal gracefully with empty cases; usually EOF.
-        }else if(   strncmp(param,"",LC_MAX_STR)==0 &&
-                    strncmp(value,"",LC_MAX_STR)==0){
+        }else if(   strncmp(param,"",LC_MAX_STR_PARAM)==0 &&
+                    strncmp(value,"",LC_MAX_STR_VALUE)==0){
             //ignore empty strings
         // Deal with unhandled parameters
         }else{
@@ -1655,7 +1700,7 @@ int lc_open(lc_devconf_t* dconf){
     //
     sprintf(stemp, "%d", serial);
     if(dconf->serial[0] == '\0'){
-        strncpy(dconf->serial, stemp, LC_MAX_STR);
+        strncpy(dconf->serial, stemp, LC_MAX_STR_SERIAL);
     }else if(!streq(dconf->serial, stemp)){
         print_error( 
                 "OPEN: Requested serial: %s, connected to serial: %s\n"\
@@ -1670,7 +1715,7 @@ int lc_open(lc_devconf_t* dconf){
     if(dconf->connection != LC_CON_USB){
         LJM_NumberToIP(ip, stemp);
         if(dconf->ip[0] == '\0'){
-            strncpy(dconf->ip, stemp, LC_MAX_STR);
+            strncpy(dconf->ip, stemp, LC_MAX_STR_IP);
         }else if(!streq(dconf->ip, stemp)){
             print_error( 
                     "OPEN: Requested ip: %s, connected to ip: %s\n"\
@@ -1691,7 +1736,7 @@ int lc_open(lc_devconf_t* dconf){
     }
     
     if(dconf->name[0] == '\0'){
-        strncpy(dconf->name, stemp, LC_MAX_NAME);
+        strncpy(dconf->name, stemp, LC_MAX_STR_NAME);
     }else if(!streq(dconf->name, stemp)){
         print_error( 
                 "OPEN: Requested device name: \"%s\", connected to device name: \"%s\"\n"\
@@ -3024,7 +3069,7 @@ lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param){
         dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR)==0)
+        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0)
             return dconf->meta[metanum].type;
     return LC_MT_NONE;
 }
@@ -3041,7 +3086,7 @@ int lc_del_meta(lc_devconf_t *dconf, const char* param){
         metanum++)
         // If the parameter matches, clear it and shift all remaining
         // data forward in the meta array
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
             // Forcing the parameter name to empty effectively deletes the parameter
             dconf->meta[metanum].param[0] = '\0';
             // Now, shift all remaining data forward
@@ -3106,7 +3151,7 @@ int lc_get_meta_int(lc_devconf_t *dconf, const char* param, int* value){
         dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
             // check that the type is correct
             if(dconf->meta[metanum].type!=LC_MT_INT){
                 print_warning("GET_META_INT: param %s is not a float.\n", param);
@@ -3129,7 +3174,7 @@ int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value){
         dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
             // check that the type is correct
             if(dconf->meta[metanum].type!=LC_MT_FLT){
                 print_warning("GET_META_FLT: param %s is not a float.\n", param);
@@ -3152,15 +3197,56 @@ int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value){
         dconf->meta[metanum].param[0] != '\0';
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR)==0){
+        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
             // check that the type is correct
             if(dconf->meta[metanum].type!=LC_MT_STR){
                 print_warning("GET_META_STR: param %s is not a string.\n", param);
                 return LC_ERROR;
             }
-            strncpy(value, dconf->meta[metanum].value.svalue, LC_MAX_STR);
+            strncpy(value, dconf->meta[metanum].value.svalue, LC_MAX_STR_VALUE);
             return LC_NOERR;
         }
+    print_error("GET_META: Failed to find meta parameter, %s\n",param);
+    return LC_ERROR;
+}
+
+
+/*GET_META_NUM
+Retireve a meta parameter and convert it into a double float.  If it is
+already a FLT parameter, no conversion is necessary.  If it is an integer,
+the conversion is trivial.  If it is a string, we will attempt to convert
+it to a float using sscanf().
+
+Returns LC_NOERR on success.
+Returns LC_ERROR if the parameter does not exist.
+Returns -LC_ERROR if the conversion fails.
+ */
+int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
+    int metanum;
+    int ii;
+    // Scan through the meta list
+    // stop if end-of-list or empty entry
+    for(metanum=0;
+        metanum<LC_MAX_META && \
+        dconf->meta[metanum].param[0] != '\0';
+        metanum++){
+        // If the parameter matches, return the value
+        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
+            switch(dconf->meta[metanum].type){
+            case LC_MT_FLT:
+                *value = dconf->meta[metanum].value.fvalue;
+                return LC_NOERR;
+            case LC_MT_INT:
+                *value = (double) dconf->meta[metanum].value.ivalue;
+                return LC_NOERR;
+            case LC_MT_STR:
+                ii = sscanf(dconf->meta[metanum].value.svalue, "%f", value);
+                if(ii == 1)
+                    return LC_NOERR;
+                return -LC_ERROR;
+            }
+        }
+    }
     print_error("GET_META: Failed to find meta parameter, %s\n",param);
     return LC_ERROR;
 }
@@ -3170,11 +3256,11 @@ int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value){
     int metanum;
     for(metanum=0; metanum<LC_MAX_META; metanum++){
         if(dconf->meta[metanum].param[0] == '\0'){
-            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR);
+            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM);
             dconf->meta[metanum].value.ivalue = value;
             dconf->meta[metanum].type = LC_MT_INT;
             return LC_NOERR;
-        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR)==0){
+        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM)==0){
             dconf->meta[metanum].value.ivalue = value;
             dconf->meta[metanum].type = LC_MT_INT;
             return LC_NOERR;
@@ -3189,11 +3275,11 @@ int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
     int metanum;
     for(metanum=0; metanum<LC_MAX_META; metanum++){
         if(dconf->meta[metanum].param[0] == '\0'){
-            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR);
+            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM);
             dconf->meta[metanum].value.fvalue = value;
             dconf->meta[metanum].type = LC_MT_FLT;
             return LC_NOERR;
-        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR)==0){
+        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM)==0){
             dconf->meta[metanum].value.fvalue = value;
             dconf->meta[metanum].type = LC_MT_FLT;
             return LC_NOERR;
@@ -3206,14 +3292,20 @@ int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
 
 int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value){
     int metanum;
+    // Test the value length
+    if(strlen(value) >= LC_MAX_STR_VALUE){
+        print_error("PUT_META: String meta values must be fewer than %d characters.\n", LC_MAX_STR_VALUE);
+        print_error("          Found: %s\n", value);
+        return LC_ERROR;
+    }
     for(metanum=0; metanum<LC_MAX_META; metanum++){
         if(dconf->meta[metanum].param[0] == '\0'){
-            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR);
-            strncpy(dconf->meta[metanum].value.svalue, value, LC_MAX_STR);
+            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM);
+            strncpy(dconf->meta[metanum].value.svalue, value, LC_MAX_STR_VALUE);
             dconf->meta[metanum].type = LC_MT_STR;
             return LC_NOERR;
-        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR)==0){
-            strncpy(dconf->meta[metanum].value.svalue, value, LC_MAX_STR);
+        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM)==0){
+            strncpy(dconf->meta[metanum].value.svalue, value, LC_MAX_STR_VALUE);
             dconf->meta[metanum].type = LC_MT_STR;
             return LC_NOERR;
         }
