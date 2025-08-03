@@ -118,6 +118,10 @@ int main(int argc, char *argv[]){
     // DCONF parameters
     int     nsample,        // number of samples to collect
             nich;           // number of channels in the operation
+    // Stream data
+    double  *data;
+    unsigned int channels,
+            samples_per_read;
     // Temporary variables
     int     count;          // a counter for loops
     double  ftemp;          // Temporary float
@@ -368,7 +372,8 @@ int main(int argc, char *argv[]){
     lc_datafile_init(&dconf,dfile);
     // Write the samples
     while(!lc_stream_isempty(&dconf)){
-        lc_datafile_write(&dconf,dfile);
+        lc_stream_read(&dconf, &data, &channels, &samples_per_read);
+        lc_datafile_write(&dconf,dfile,data,channels,samples_per_read);
         printf(".");
         fflush(stdout);
     }

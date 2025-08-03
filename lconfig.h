@@ -37,7 +37,7 @@ $chmod a+x your_exec.bin
 #include <LabJackM.h>
 
 
-#define LC_VERSION 4.08   // Track modifications in the header
+#define LC_VERSION 5.00   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LC_VERSION
@@ -205,6 +205,13 @@ with init_data_file() and write_data_file() utilities.
 - Added lc_meta_get_num() for generic numerical parameters
 - Added string overrun protection in read_param()
 - Added individual LC_MAX_STR_XXX for parameter types to reduce memory demands
+
+** 5.00
+8/2025
+- BREAKS REVERSE COMPAtIBILITY!!!
+- Rewrote lc_datafile_write() to require a separate call to lc_stream_read()
+  This change in call signature is to allow file write operations while also
+  gaining access to the data in the application.
 */
 
 #define TWOPI 6.283185307179586
@@ -1335,11 +1342,15 @@ int lc_datafile_init(lc_devconf_t* dconf, FILE *FF);
 
 
 /*LC_DATAFILE_WRITE
-Streams data from the dconf buffer to an open data file.  WRITE_DATA_FILE calls
-READ_DATA_STREAM to pull data from the device ring buffer.  The buffer will
-be empty unless there are also prior calls to SERVICE_DATA_STREAM.
+Writes data obtained from LC_STREAM_READ to a data file initialized by
+LC_DATAFILE_INIT.  Pass the data array, channels, and samples_per_read
+obtained from a call to LC_STREAM_READ.
+
+Note: Changed in version 5.00, previously LC_DATAFILE_WRITE called 
+LC_STREAM_READ.  
 */
-int lc_datafile_write(lc_devconf_t* dconf, FILE *FF);
+int lc_datafile_write(lc_devconf_t *dconf, FILE *FF, double *data, 
+        unsigned int channels, unsigned int samples_per_read);
 
 
 

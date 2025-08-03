@@ -3645,13 +3645,11 @@ int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
 
 
 
-int lc_datafile_write(lc_devconf_t* dconf, FILE* FF){
-    int err,index,row,ainum;
-    unsigned int channels, samples_per_read;
-    double *data = NULL;
+int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data, 
+        unsigned int channels, unsigned int samples_per_read){
+    int err,index,row;
     float ftemp;
 
-    err = lc_stream_read(dconf,&data,&channels,&samples_per_read);
     if(data){
         // Write using the ascii format
         if(dconf->dataformat == LC_DF_ASCII){
@@ -3669,8 +3667,9 @@ int lc_datafile_write(lc_devconf_t* dconf, FILE* FF){
                 fwrite(&ftemp, sizeof(ftemp), 1, FF);
             }
         }
+        return 0;
     }
-    return err;
+    return -1;
 }
 
 
