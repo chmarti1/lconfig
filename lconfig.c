@@ -3240,7 +3240,7 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
                 *value = (double) dconf->meta[metanum].value.ivalue;
                 return LC_NOERR;
             case LC_MT_STR:
-                ii = sscanf(dconf->meta[metanum].value.svalue, "%f", value);
+                ii = sscanf(dconf->meta[metanum].value.svalue, "%f", &value);
                 if(ii == 1)
                     return LC_NOERR;
                 return -LC_ERROR;
@@ -3647,7 +3647,7 @@ int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
 
 int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data, 
         unsigned int channels, unsigned int samples_per_read){
-    int err,index,row;
+    int err,index,row,ainum;
     float ftemp;
 
     if(data){
