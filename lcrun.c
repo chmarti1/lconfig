@@ -35,8 +35,8 @@
 #define halt(){\
     for(devnum=0; devnum<ndev; devnum++){\
         lc_stream_stop(&dconf[devnum]);\
-        lc_stream_clean(&dconf[devnum]);\
         lc_close(&dconf[devnum]);\
+        lc_clean(&dconf[devnum));\
         if(dfile[devnum]){fclose(dfile[devnum]);dfile[devnum]=NULL;}\
     }\
 };

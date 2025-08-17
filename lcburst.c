@@ -379,6 +379,7 @@ int main(int argc, char *argv[]){
     }
     fclose(dfile);
     lc_close(&dconf);
+    lc_clean(&dconf);
     printf("DONE\n");
 
     printf("Exited successfully.\n");

@@ -286,8 +286,11 @@ void init_config(lc_devconf_t* dconf){
     dconf->trigstate = LC_TRIG_IDLE;
     dconf->trigedge = LC_EDGE_RISING;
     // Metas
-    for(metanum=0; metanum<LC_MAX_META; metanum++)
-        dconf->meta[metanum].param[0] = '\0';
+    for(metanum=0; metanum<LC_MAX_META; metanum++){
+        dconf->meta[metanum].param = NULL;
+        dconf->meta[metanum].type = LC_MT_NONE;
+        dconf->meta[metanum].value.ivalue = 0;
+    }
     // Analog Inputs
     dconf->naich = 0;
     for(ainum=0; ainum<LC_MAX_NAICH; ainum++){
@@ -886,7 +889,10 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
                 print_error("LOAD: Cannot set analog input parameters before the first AIchannel parameter.\n");
                 loadfail();
             }
-            strncpy(dconf[devnum].aich[ainum].calunits, value, LC_MAX_STR);
+            if(strlen(value) > LC_MAX_STR_LABEL){
+                print_warning("LOAD: Truncating AICALUNITS parameter: %s\n", value);
+            }
+            strncpy(dconf[devnum].aich[ainum].calunits, value, LC_MAX_STR_LABEL+1);
         //
         // The AILABEL parameter
         //
@@ -1764,13 +1770,36 @@ int lc_close(lc_devconf_t* dconf){
     dconf->handle = -1;
     dconf->connection_act = -1;
     dconf->device_act = -1;
-    // Clean up the buffer
-    clean_buffer(&dconf->RB);
     return err;
 }
 
 
-
+int lc_clean(lc_devconf_t* dconf){
+    int metanum, inlist_f;
+    
+    // Clean up the ring buffer
+    clean_buffer(&dconf->RB);
+    // Clean up the meta parameters
+    // Warn the user if there are "zombie" data outside the list
+    inlist_f = 1;
+    for(metanum=0; metanum<LC_MAX_META; metanum++){
+        if(dconf->meta[metanum].param){
+            // If this parameter was not properly forward-shifted, warn the user
+            if(!inlist_f)
+                print_warning("CLEAN_META: Found zombie parameter: %s\n", dconf->meta[metanum].param);
+            free(dconf->meta[metanum].param);
+            dconf->meta[metanum].param = NULL;
+            if(dconf->meta[metanum].type == LC_MT_STR){
+                free(dconf->meta[metanum].value.svalue);
+                dconf->meta[metanum].value.svalue = NULL;
+            }
+            dconf->meta[metanum].type = LC_MT_NONE;
+        }else
+            inlist_f = 0;
+    }
+    
+    return LC_NOERR;
+}
 
 
 int lc_upload_config(lc_devconf_t* dconf){
@@ -3082,58 +3111,56 @@ int lc_del_meta(lc_devconf_t *dconf, const char* param){
     // stop if end-of-list or empty entry
     for(metanum=0;
         metanum<LC_MAX_META && \
-        dconf->meta[metanum].param[0] != '\0';
+        dconf->meta[metanum].param;
         metanum++)
         // If the parameter matches, clear it and shift all remaining
         // data forward in the meta array
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
-            // Forcing the parameter name to empty effectively deletes the parameter
-            dconf->meta[metanum].param[0] = '\0';
+        if(strcmp(dconf->meta[metanum].param,param)==0){
+            // Deallocate the parameter name memory
+            free(dconf->meta[metanum].param);
+            dconf->meta[metanum].param = NULL;
+            // If this is a string, deallocate the string memory
+            if(dconf->meta[metanum].type == LC_MT_STR){
+                free(dconf->meta[metanum].value.svalue);
+                dconf->meta[metanum].value.svalue = NULL;
+            }
+            dconf->meta[metanum].type = LC_MT_NONE:
             // Now, shift all remaining data forward
             // The "inlist" flag is used to identify any parameters that
             // were not already forward shifted - they will also be
             // deleted.
             inlist_f = 1;
             for(metanum++; metanum<LC_MAX_META; metanum++){
-                // If the new parameter is empty
-                if(dconf->meta[metanum].param[0] == '\0'){
-                    // We're past the end of the list
-                    inlist_f = 0;
-                    // Just to be safe, make sure the previous parameter is clear
-                    // This SHOULD be redundant, but it's cheap and safe.
-                    dconf->meta[metanum-1].param[0] = '\0';
-                // If the new parameter is NOT empty AND we're in the list
-                // Copy the data backwards
-                }else if(inlist_f){
-                    // Copy the parameter name
-                    strcpy(dconf->meta[metanum-1].param, dconf->meta[metanum].param);
-                    // Copy the parameter type
-                    dconf->meta[metanum-1].type = dconf->meta[metanum].type;
-                    // Case out the method for copying the data based on the data type
-                    switch(dconf->meta[metanum].type){
-                    case LC_MT_INT:
-                        dconf->meta[metanum-1].value.ivalue = dconf->meta[metanum].value.ivalue;
-                    break;
-                    case LC_MT_FLT:
-                        dconf->meta[metanum-1].value.fvalue = dconf->meta[metanum].value.fvalue;
-                    break;
-                    case LC_MT_STR:
-                        strcpy(dconf->meta[metanum-1].value.svalue, dconf->meta[metanum].value.svalue);
-                    break;
-                    default:
-                        print_warning("DEL_META: Unrecognized meta type for param %s. Setting value to (int) 1.\n", dconf->meta[metanum].param);
-                        dconf->meta[metanum-1].value.ivalue = 1;
-                        dconf->meta[metanum-1].type = LC_MT_INT;
-                    break;
+                // If we're still operating within the list
+                if(inlist_f){
+                    // If the next parameter is not empty
+                    if(dconf->meta[metanum].param){
+                        // Shift it backwards
+                        // Shift the parameter string pointer
+                        dconf->meta[metanum-1].param = dconf->meta[metanum].param;
+                        dconf->meta[metanum].param = NULL;
+                        // Shift the data
+                        dconf->meta[metanum-1].value = dconf->meta[metanum].value;
+                        if(dconf->meta[metanum].type == LC_MT_STR)
+                            dconf->meta[metanum].value.svalue = NULL;
+                        // Shift the type
+                        dconf->meta[metanum-1].type = dconf->meta[metanum].type;
+                        dconf->meta[metanum].type = LC_MT_NONE;
+                    // If this is the first empty meta entry
+                    }else{
+                        // We're now out of the list
+                        inlist_f = 0;
                     }
-                    // Finally, clear the current parameter
-                    // It is essential that this be done here, so that if
-                    // the list is full, the last element will now be empty.
-                    dconf->meta[metanum].param[0] = '\0';
-                // If there are data beyond the list end, but there's data anyway
-                }else{
-                    print_warning("DEL_META: Found zombie parameter, %s.  Deleting.\n", dconf->meta[metanum].param);
-                    dconf->meta[metanum].param[0] = '\0';
+                // If there are "zombie" data beyond the list end
+                }else if(dconf->meta[metanum].param){
+                    print_warning("DEL_META: Found zombie meta parameter, %s.  Deleting.\n", dconf->meta[metanum].param);
+                    free(dconf->meta[metanum].param);
+                    dconf->meta[metanum].param = NULL;
+                    if(dconf->meta[metanum].type == LC_MT_STR){
+                        free(dconf->meta[metanum].value.svalue);
+                        dconf->meta[metanum].svalue = NULL;
+                    }
+                    dconf->meta[metanum].type = LC_MT_NONE;
                 }
             }
             return LC_NOERR;
@@ -3142,25 +3169,25 @@ int lc_del_meta(lc_devconf_t *dconf, const char* param){
     return LC_ERROR;
 }
 
+
+
 int lc_get_meta_int(lc_devconf_t *dconf, const char* param, int* value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;
-        metanum<LC_MAX_META && \
-        dconf->meta[metanum].param[0] != '\0';
+        metanum<LC_MAX_META && dconf->meta[metanum].param;
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
+        if(strcmp(dconf->meta[metanum].param,param)==0){
             // check that the type is correct
             if(dconf->meta[metanum].type!=LC_MT_INT){
-                print_warning("GET_META_INT: param %s is not a float.\n", param);
+                print_error("GET_META_INT: param %s is not a float.\n", param);
                 return LC_ERROR;
             }
             *value = dconf->meta[metanum].value.ivalue;
             return LC_NOERR;
         }
-    print_error("GET_META: Failed to find meta parameter, %s\n",param);
     return LC_ERROR;
 }
 
@@ -3171,42 +3198,39 @@ int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value){
     // stop if end-of-list or empty entry
     for(metanum=0;
         metanum<LC_MAX_META && \
-        dconf->meta[metanum].param[0] != '\0';
+        dconf->meta[metanum].param;
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
+        if(strcmp(dconf->meta[metanum].param,param)==0){
             // check that the type is correct
             if(dconf->meta[metanum].type!=LC_MT_FLT){
-                print_warning("GET_META_FLT: param %s is not a float.\n", param);
+                print_error("GET_META_FLT: param %s is not a float.\n", param);
                 return LC_ERROR;
             }
             *value = dconf->meta[metanum].value.fvalue;
             return LC_NOERR;
         }
-    print_error("GET_META: Failed to find meta parameter, %s\n",param);
     return LC_ERROR;
 }
 
 
-int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value){
+int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char** value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;
-        metanum<LC_MAX_META && \
-        dconf->meta[metanum].param[0] != '\0';
+        metanum<LC_MAX_META && dconf->meta[metanum].param;
         metanum++)
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
+        if(strcmp(dconf->meta[metanum].param,param)==0){
             // check that the type is correct
             if(dconf->meta[metanum].type!=LC_MT_STR){
-                print_warning("GET_META_STR: param %s is not a string.\n", param);
+                print_error("GET_META_STR: param %s is not a string.\n", param);
                 return LC_ERROR;
             }
-            strncpy(value, dconf->meta[metanum].value.svalue, LC_MAX_STR_VALUE);
+            *value = dconf->meta[metanum].value.svalue;
             return LC_NOERR;
         }
-    print_error("GET_META: Failed to find meta parameter, %s\n",param);
     return LC_ERROR;
 }
 
@@ -3227,11 +3251,10 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
     // Scan through the meta list
     // stop if end-of-list or empty entry
     for(metanum=0;
-        metanum<LC_MAX_META && \
-        dconf->meta[metanum].param[0] != '\0';
+        metanum<LC_MAX_META && dconf->meta[metanum].param;
         metanum++){
         // If the parameter matches, return the value
-        if(strncmp(dconf->meta[metanum].param,param,LC_MAX_STR_PARAM)==0){
+        if(strcmp(dconf->meta[metanum].param,param)==0){
             switch(dconf->meta[metanum].type){
             case LC_MT_FLT:
                 *value = dconf->meta[metanum].value.fvalue;
@@ -3247,20 +3270,31 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
             }
         }
     }
-    print_error("GET_META: Failed to find meta parameter, %s\n",param);
     return LC_ERROR;
 }
 
 
 int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value){
-    int metanum;
+    int metanum, plen;
+    // Test the parameter string length
+    if((plen=strlen(param)) > LC_MAX_STR_PARAM){
+        print_error("PUT_META: Parameters must be fewer than %d characters\n", LC_MAX_STR_PARAM);
+        print_error("          Found: %s\n", param);
+        return LC_ERROR;
+    }
     for(metanum=0; metanum<LC_MAX_META; metanum++){
-        if(dconf->meta[metanum].param[0] == '\0'){
-            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM);
+        // If this is a new parameter
+        if(!dconf->meta[metanum].param){
+            // Assign memory for the parameter name
+            dconf->meta[metanum].param = malloc((plen+1) * sizeof(char));
+            strcpy(dconf->meta[metanum].param, param);
             dconf->meta[metanum].value.ivalue = value;
             dconf->meta[metanum].type = LC_MT_INT;
             return LC_NOERR;
         }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM)==0){
+            // If it is a string, free the existing memory
+            if(dconf->meta[metanum].type == LC_MT_STR)
+                free(dconf->meta[metanum].value.svalue);
             dconf->meta[metanum].value.ivalue = value;
             dconf->meta[metanum].type = LC_MT_INT;
             return LC_NOERR;
@@ -3272,14 +3306,27 @@ int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value){
 
 
 int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
-    int metanum;
+    int metanum, plen;
+    // Test the parameter string length
+    if((plen=strlen(param)) > LC_MAX_STR_PARAM){
+        print_error("PUT_META: Parameters must be fewer than %d characters\n", LC_MAX_STR_PARAM);
+        print_error("          Found: %s\n", param);
+        return LC_ERROR;
+    }
     for(metanum=0; metanum<LC_MAX_META; metanum++){
-        if(dconf->meta[metanum].param[0] == '\0'){
-            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM);
+        // If this is a new parameter
+        if(!dconf->meta[metanum].param){
+            // Assign memory for the parameter name
+            dconf->meta[metanum].param = malloc((plen+1) * sizeof(char));
+            strcpy(dconf->meta[metanum].param, param);
             dconf->meta[metanum].value.fvalue = value;
             dconf->meta[metanum].type = LC_MT_FLT;
             return LC_NOERR;
-        }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM)==0){
+        // If this is an existing parameter
+        }else if(strcmp(dconf->meta[metanum].param, param)==0){
+            // If it is a string, free the existing memory
+            if(dconf->meta[metanum].type == LC_MT_STR)
+                free(dconf->meta[metanum].value.svalue);
             dconf->meta[metanum].value.fvalue = value;
             dconf->meta[metanum].type = LC_MT_FLT;
             return LC_NOERR;
@@ -3291,21 +3338,37 @@ int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
 
 
 int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value){
-    int metanum;
+    int metanum, plen, vlen;
+    // Test the parameter string length
+    if((plen=strlen(param)) > LC_MAX_STR_PARAM){
+        print_error("PUT_META: Parameters must be fewer than %d characters\n", LC_MAX_STR_PARAM);
+        print_error("          Found: %s\n", param);
+        return LC_ERROR;
+    }
     // Test the value length
-    if(strlen(value) >= LC_MAX_STR_VALUE){
+    if((vlen=strlen(value)) >= LC_MAX_STR_VALUE){
         print_error("PUT_META: String meta values must be fewer than %d characters.\n", LC_MAX_STR_VALUE);
         print_error("          Found: %s\n", value);
         return LC_ERROR;
     }
     for(metanum=0; metanum<LC_MAX_META; metanum++){
-        if(dconf->meta[metanum].param[0] == '\0'){
-            strncpy(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM);
-            strncpy(dconf->meta[metanum].value.svalue, value, LC_MAX_STR_VALUE);
+        // If this is a new parameter
+        if(!dconf->meta[metanum].param){
+            // Allocate memory for the parameter name
+            dconf->meta[metanum].param = malloc((plen+1) * sizeof(char));
+            strcpy(dconf->meta[metanum].param, param);
+            // Allocate memory for the string
+            dconf->meta[metanum].value.svalue = malloc((vlen+1) * sizeof(char));
+            strcpy(dconf->meta[metanum].value.svalue, value);
             dconf->meta[metanum].type = LC_MT_STR;
             return LC_NOERR;
+        // If this is an existing parameter
         }else if(strncmp(dconf->meta[metanum].param, param, LC_MAX_STR_PARAM)==0){
-            strncpy(dconf->meta[metanum].value.svalue, value, LC_MAX_STR_VALUE);
+            // If it is a string, free the existing memory
+            if(dconf->meta[metanum].type == LC_MT_STR)
+                free(dconf->meta[metanum].value.svalue);
+            dconf->meta[metanum].value.svalue = malloc( (length+1) * sizeof(char) );    
+            strcpy(dconf->meta[metanum].value.svalue, value);
             dconf->meta[metanum].type = LC_MT_STR;
             return LC_NOERR;
         }
@@ -3615,7 +3678,7 @@ int lc_stream_stop(lc_devconf_t* dconf){
     //clean_buffer(&dconf->RB);
     
     if(err){
-        print_error("LCONFIG: Error stopping a data stream.\n");
+        print_error("STREAM_STOP: Error stopping a data stream.\n");
         LJM_ErrorToString(err, err_str);
         print_error("%s\n",err_str);
         return LC_ERROR;

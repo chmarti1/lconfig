@@ -42,7 +42,7 @@
 
 
 #define destruct(){\
-    for(ii=0;ii<ndev;ii++){lc_close(&dconf[ii]);}\
+    for(ii=0;ii<ndev;ii++){lc_stream_stop(&dconf[ii]);lc_close(&dconf[ii]);lc_clean(&dconf[ii]);}\
     lct_finish_keypress();\
     if(working){free(working); working=NULL;}\
     if(values){free(values); values=NULL;}\
@@ -393,7 +393,7 @@ int main(int argc, char *argv[]){
                     printf("\n");
                 }
             }
-            printf("\nPress \"Q\" to exit.\n");
+            printf("\nPress 'Q' to exit.\n");
         }
         
         // Service the data connections

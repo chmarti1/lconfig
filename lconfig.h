@@ -212,6 +212,11 @@ with init_data_file() and write_data_file() utilities.
 - Rewrote lc_datafile_write() to require a separate call to lc_stream_read()
   This change in call signature is to allow file write operations while also
   gaining access to the data in the application.
+- Shifted to dynamic memory allocation for meta parameter and string values
+  to reduce the memory cost of high meta parameter quantities.
+- Increased maximum number of meta parameters to 256
+- Implemented different maximum string lengths for IP, LABEL, NAME, PARAM, 
+  SERIAL, and VALUE for more efficient use of memory.
 */
 
 #define TWOPI 6.283185307179586
@@ -223,7 +228,7 @@ with init_data_file() and write_data_file() utilities.
 #define LC_MAX_STR_IP   16          // longest IP address allowed
 #define LC_MAX_STR_PARAM 49         // longest meta parameter string
 #define LC_MAX_STR_VALUE LC_MAX_STR // longest meta value string
-#define LC_MAX_META     32          // how many meta parameters should we allow?
+#define LC_MAX_META     256         // how many meta parameters should we allow?
 #define LC_MAX_STCH     LC_MAX_AICH + LC_MAX_AOCH + 1 // Maximum streaming channels
 #define LC_MAX_AOCH     1           // maximum analog output channel number allowed
 #define LC_MAX_NAOCH    2           // maximum analog output channels to allow
@@ -280,8 +285,8 @@ typedef struct __lc_aiconf_t__ {
     unsigned int    resolution;  // resolution index (0-8) see T7 docs
     double          calslope;   // calibration slope
     double          calzero;    // calibration offset
-    char            calunits[LC_MAX_STR];   // calibration units
-    char            label[LC_MAX_STR_LABEL];   // channel label
+    char            calunits[LC_MAX_STR_LABEL+1];   // calibration units
+    char            label[LC_MAX_STR_LABEL+1];   // channel label
 } lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
 
@@ -296,7 +301,7 @@ typedef struct __lc_aoconf_t__ {
     double          offset;       // What is the mean value?
     double          duty;         // Duty cycle for a square wave or triangle wave
                                   // duty=1 results in all-high square and an all-rising triangle (sawtooth)
-    char            label[LC_MAX_STR_LABEL];   // Output channel label
+    char            label[LC_MAX_STR_LABEL+1];   // Output channel label
 } lc_aoconf_t;
 
 
@@ -352,7 +357,7 @@ typedef struct __lc_efconf_t__ {
 //
 typedef struct __lc_comconf_t__ {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
-    char label[LC_MAX_STR_LABEL];
+    char label[LC_MAX_STR_LABEL+1];
     double rate;                // Data rate in bits/sec
     int pin_in;                 // Physical input DIO pin
     int pin_out;                // Physical output DIO pin
@@ -383,9 +388,9 @@ typedef enum __lc_metatype_t__ {
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
 typedef struct __lc_meta_t__ {
-    char param[LC_MAX_STR_PARAM];      // parameter name
+    char *param;                    // parameter name
     union {
-        char svalue[LC_MAX_STR_VALUE];
+        char *svalue;
         int ivalue;
         double fvalue;
     } value;                        // union for flexible data types
@@ -443,11 +448,11 @@ typedef struct __lc_devconf_t__ {
     lc_con_t connection_act;             // actual connection type index
     lc_dev_t device;                     // The requested device type index
     lc_dev_t device_act;                 // The actual device type
-    char ip[LC_MAX_STR_IP];         // ip address string
-    char gateway[LC_MAX_STR_IP];    // gateway address string
-    char subnet[LC_MAX_STR_IP];     // subnet mask string
-    char serial[LC_MAX_STR_IP];     // serial number string
-    char name[LC_MAX_STR_NAME];      // device name string
+    char ip[LC_MAX_STR_IP+1];         // ip address string
+    char gateway[LC_MAX_STR_IP+1];    // gateway address string
+    char subnet[LC_MAX_STR_IP+1];     // subnet mask string
+    char serial[LC_MAX_STR_IP+1];     // serial number string
+    char name[LC_MAX_STR_NAME+1];      // device name string
     int handle;                     // device handle
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
@@ -1032,6 +1037,12 @@ Closes the connection to device DCONF.
 */
 int lc_close(lc_devconf_t* dconf);
 
+/* CLEAN
+Always call CLEAN at the end of execution.  This frees dynamic memory
+assigned to the stream ring buffer and dynamic memory assigned to string
+meta data.
+*/
+int lc_clean(lc_devconf_t* dconf);
 
 /*UPLOAD_CONFIG
 Presuming that the connection has already been opened by open_config(), this
@@ -1079,6 +1090,7 @@ have also been cleared.  DEL_META will clear them and print a warning.
 */
 int lc_del_meta(lc_devconf_t *dconf, const char* param);
 
+
 /*GET_META_XXX
 Retrieve a meta parameter of the specified type.
 If the type is called incorrectly, the function will still return a value, but it will
@@ -1089,10 +1101,14 @@ with their type prefixes.  For example, a parameter declared in a config file as
 can be referenced by 
     int year;
     get_meta_int(&dconf,"year",&year);
+    
+As of version 5.0, GET_META_STR returns a pointer to the dynamically allocated meta
+string instead of copying the string.  In applications where the meta values might
+be overwritten, the application should make a copy to avoid segfault errors.
 */
 int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value);
 int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value);
-int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value);
+int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char** value);
 
 /*GET_META_NUM
 Retireve a meta parameter and convert it into a double float.  If it is
@@ -1110,6 +1126,8 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value);
 Write to the meta array.  If the parameter already exists, the old data will be overwritten.
 If the parameter does not exist, a new meta entry will be created.  If the meta array is
 full, put_meta_XXX will return an error.
+
+As of version 5.0, PUT_META_STR allocates dynamic memory before copying the data
 */
 int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value);
 int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value);
@@ -1316,17 +1334,6 @@ Halt an active stream on device devnum.
 */
 int lc_stream_stop(lc_devconf_t* dconf);
 
-/*STREAM_CLEAR
-Empty the buffer without deallocating any memory.  This doesn't reset any
-of the buffer status registers, but it 
-*/
-
-/*STREAM_CLEAN
-De-allocates the memory assigned to the internal ring-buffer.  This is 
-not automatically done by LC_STREAM_STOP so that data will be available
-after the collection process has completed.
- */
-int lc_stream_clean(lc_devconf_t* dconf);
 
 /*
 .
