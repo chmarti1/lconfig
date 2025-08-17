@@ -49,8 +49,11 @@ $(LCRUN_B): $(ALL_O) lcrun.c
 $(LCBURST_B): $(ALL_O) lcburst.c
 	gcc $(ALL_O) lcburst.c $(LINK) -o $(LCBURST_B)
 	chmod $(BIN_CHMOD) $(LCBURST_B)
+
+binaries: $(ALL_B)
+
 clean:
-	rm -f $(BUILD)
+	rm -rf $(BUILD)
 
 install: $(ALL_B)
 	cp -f $(LCRUN_B) $(LCRUN)

@@ -108,7 +108,10 @@ int main(int argc, char *argv[]){
     lc_devconf_t dconf[MAX_DEV];
     time_t start;
     FILE* dfile[MAX_DEV];
-    
+    // Streaming data
+    double *data;
+    unsigned int channels, samples_per_read;
+    // Utility
     lct_idle_t idle;
 
 // TO DO:
@@ -286,7 +289,8 @@ int main(int argc, char *argv[]){
             // If data came in
             if(!lc_stream_isempty(&dconf[devnum])){
                 fflush(stdout);
-                lc_datafile_write(&dconf[devnum], dfile[devnum]);
+                lc_stream_read(&dconf[devnum], &data, &channels, &samples_per_read);
+                lc_datafile_write(&dconf[devnum], dfile[devnum], data, channels, samples_per_read);
             }
         }
         // Test for exit conditions

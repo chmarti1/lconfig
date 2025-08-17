@@ -2729,17 +2729,17 @@ void lc_show_config(lc_devconf_t* dconf){
         printf(LC_FONT_YELLOW LC_FONT_BOLD "\nMeta Parameters: %d\n" LC_FONT_NULL,metacnt);
     for(metanum=0; metanum<metacnt; metanum++)
         switch(dconf->meta[metanum].type){
-            case 'i':
+            case LC_MT_INT:
                 printf(SHOW_PARAM LC_FONT_BOLD "%d\n" LC_FONT_NULL,
                     dconf->meta[metanum].param,
                     dconf->meta[metanum].value.ivalue);
             break;
-            case 'f':
+            case LC_MT_FLT:
                 printf(SHOW_PARAM LC_FONT_BOLD "%f\n" LC_FONT_NULL,
                     dconf->meta[metanum].param,
                     dconf->meta[metanum].value.fvalue);
             break;
-            case 's':
+            case LC_MT_STR:
                 printf(SHOW_PARAM LC_FONT_BOLD "%s\n" LC_FONT_NULL,
                     dconf->meta[metanum].param,
                     dconf->meta[metanum].value.svalue);
@@ -3263,10 +3263,12 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
                 *value = (double) dconf->meta[metanum].value.ivalue;
                 return LC_NOERR;
             case LC_MT_STR:
-                ii = sscanf(dconf->meta[metanum].value.svalue, "%f", value);
+                ii = sscanf(dconf->meta[metanum].value.svalue, "%lf", value);
                 if(ii == 1)
                     return LC_NOERR;
                 return -LC_ERROR;
+            default:
+                // Do nothing
             }
         }
     }
@@ -3710,7 +3712,7 @@ int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
 
 int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data, 
         unsigned int channels, unsigned int samples_per_read){
-    int err,index,row;
+    int index,row,ainum;
     float ftemp;
 
     if(data){
