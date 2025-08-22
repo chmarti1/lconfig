@@ -1,7 +1,7 @@
 [back to API](api.md)
 
-Version 4.08  
-April 2023  
+Version 5.00  
+April 2025  
 Christopher R. Martin  
 
 
@@ -22,27 +22,37 @@ Christopher R. Martin
 
 Many useful binaries can be written without ever using `lctools.h` or `lcmap.h`.  The core functionality is all contained in `lconfig.h`.
 
-The most complicated (and the most common) application for the LConfig system is streaming data.  The typical steps for writing an applicaiton that uses LConfig to stream data are: <br>
-** (1) Load a configuration file ** with `lc_load_config()`.  The configuration file will completely define the data acquisition operation by specifying which channels should be configured, how much data should be streamed at what rate, and how software triggering should be done.
-** (2) Open the device ** with `lc_open()`.  After loading the configuration file, the device configuration struct will contain all the information needed to find the correct device.
-** (3) Upload the configuration ** with `lc_upload_config()`.  Most (but not all) of the directives in the configuration file are enforced in this step.  AI resolution, analog output streaming, and trigger settings are not enforced until a stream is started.
-** (4) Start a data stream ** with `lc_stream_start()`.  This enforces the last of the configuration parameters and initiates the stream of data.
-** (5) Service the data stream ** with `lc_stream_service()`.  This is a non-blocking function that checks for and retrieves data from a device.  When it is called, available data (if any) are moved into a ring buffer and (if so configured) scans for a software trigger event.  This funciton is responsible for maintaining the trigger state registers in the device configuration struct.
-** (6) Read data ** with `lc_stream_read()`.  When data are available in the local buffer (thanks to ca call to `lc_stream_service()`), this funciton returns a pointer into the ring buffer, where the next block of data may be read.  If no data are available, either because a trigger has not occurred or because the service function has not yet completed, the pointer is NULL.  Separating service and read operations permits applications to quckly stream lots of data and read it later for speed.
-** (7) Stop the stream ** with `lc_stream_stop()`.  This halts the data collection process, but does NOT free the data buffer.  Some applications (like `lcburst`) may want to quickly stream data to memory and read it later when the acquisition process is done.  This allows steps 7 and 6 to be reversed without consequence.
-** (8) Close the device connection ** with `lc_close()`.  Closing a connection automatically calls `clear_buffer()`, which frees the ring buffer memory and dumps any data not read.
+The most complicated (and the most common) application for the LConfig system is streaming data.  The typical steps for writing an applicaiton that uses LConfig to stream data are:  
+
+**(1) Load a configuration file** with `lc_load_config()`.  The configuration file will completely define the data acquisition operation by specifying which channels should be configured, how much data should be streamed at what rate, and how software triggering should be done.  
+
+**(2) Open the device** with `lc_open()`.  After loading the configuration file, the device configuration struct will contain all the information needed to find the correct device. The connection should be closed by `lc_close()` at the end of the operation.  
+
+**(3) Upload the configuration** with `lc_upload_config()`.  Most (but not all) of the directives in the configuration file are enforced in this step.  AI resolution, analog output streaming, and trigger settings are not enforced until a stream is started.  
+
+**(4) Start a data stream** with `lc_stream_start()`.  This enforces the last of the configuration parameters and initiates the stream of data. This function also allocates memory to a ring buffer that will be used by the `lc_stream_service()` and `lc_stream_read()` functions to manage the data stream.  This memory needs to be freed by `lc_clean()` at the end of the operation.  
+
+**(5) Service the data stream** with `lc_stream_service()`.  This is a non-blocking function that checks for and retrieves data from a device.  When it is called, available data (if any) are moved into a ring buffer and (if so configured) scanned for a software trigger event.  This function is responsible for maintaining the trigger state registers in the device configuration struct.  
+
+**(6) Check stream status** with `lc_stream_status()`. Some applications will not need this step, but it is extremely useful for checking the progress of data acquisition. The function returns the number of samples that have been streamed, read, and the number waiting to be read. In particular, this can be useful to determine whether a trigger has occurred.
+
+**(7) Read data** with `lc_stream_read()`.  When data are available in the local buffer (thanks to a call to `lc_stream_service()`), this function returns a pointer into the ring buffer, where the next block of data may be read.  If no data are available, either because a trigger has not occurred or because the service function has not yet completed, the pointer is NULL.  Separating service and read operations permits applications to quickly stream lots of data and read it later for speed.  
+
+**(8) Stop the stream** with `lc_stream_stop()`.  This halts the data collection process, but does NOT free the data buffer.  Some applications (like `lcburst`) may want to quickly stream data to memory and read it later when the acquisition process is done.  This allows steps 7 and 8 to be reversed without consequence.  
+
+**(9) Clean up** with `lc_close()` and `lc_clean()`.  These close the connection to the device and free dynamically allocated memory respectively.  In addition to freeing the stream buffer, `lc_clean()` also frees memory allocated to meta data parameters read from the configuration file.
 
 ## <a name='config'></a> Interacting with configuration files
 
 ```C
-int lc_load_config(       lc_devconf_t* dconf, 
+int lc_load(       lc_devconf_t* dconf, 
                 const unsigned int devmax, 
                        const char* filename);
 ```
-`lc_load_config` loads a configuration file into an array of `lc_devconf_t` structures.  Each instance of the `connection` parameter signals the configuration a new device.  `dconf` is an array of `lc_devconf_t` structs with `devmax` elements that will contain the configuration parameters found in the data file, `filename`.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
+`lc_load_config` loads a configuration file into an array of `lc_devconf_t` structures.  Each instance of the `connection` parameter signals the configuration a new device.  `dconf` is an array of `lc_devconf_t` structs with `devmax` elements that will contain the configuration parameters found in the data file, `filename`.  The function returns either `LC_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 ```C
-void lc_write_config(     lc_devconf_t* dconf, 
+void lc_write(     lc_devconf_t* dconf, 
                              FILE* ff);
 ```
 `write_config` writes a configuration stanza to an open file, `ff`, for the parameters of device configuration struct pointed to by `dconf`.  A `lc_devconf_t` structure written by `lc_write_config` should result in an identical structure after being read by `lc_load_config`.
@@ -56,17 +66,17 @@ Rather than accept file names, `lc_write_config` accepts an open file pointer so
 ```C
 int lc_open( lc_devconf_t* dconf );
 ```
-`lc_open_config` opens a connection to the device pointed to by `dconf`.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
+`lc_open_config` opens a connection to the device pointed to by `dconf`.  The function returns either `LC_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 ```C
 int lc_close( lc_devconf_t* dconf );
 ```
-`lc_close_config` closes a connection to the device pointed to by `dconf`.  If a ringbuffer is still allocated to the device, it is freed, so it is important NOT to call `lc_close_config` before data is read from the buffer.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
+`lc_close_config` closes a connection to the device pointed to by `dconf`.  If a ringbuffer is still allocated to the device, it is freed, so it is important NOT to call `lc_close_config` before data is read from the buffer.  The function returns either `LC_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 ```C
-int lc_upload_config( lc_devconf_t* dconf );
+int lc_upload( lc_devconf_t* dconf );
 ```
-`lc_upload_config` writes to the relevant modbus registers to assert the parameters in the `dconf` configuration struct.  The function returns either `LCONF_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
+`lc_upload_config` writes to the relevant modbus registers to assert the parameters in the `dconf` configuration struct.  The function returns either `LC_ERROR` or `LCONF_NOERR` depending on whether an error was raised during execution.
 
 [top](#top)
 
@@ -83,9 +93,9 @@ int lc_nostream( lc_devconf_t* dconf );
 The `lc_ndev` returns the number of devices configured in the `dconf` array, returning a number no greater than `devmax`.  `lc_nistream` and `lc_nostream` return the number of input and ouptut stream channels configured.  The input stream count is especially helpful since it includes non-analog input streams (like digital input streams).
 
 ```C
-void lc_show_config( lc_devconf_t* dconf );
+void lc_show( lc_devconf_t* dconf );
 ```
-The `lc_show_config` function prints a detailed list of parameters specified by the `dconf` configuraiton struct.  The format of the printout is varied based on what is configured so that unconfigured features are not summarized.
+The `lc_show` function prints a detailed list of parameters specified by the `dconf` configuraiton struct.  The format of the printout is varied based on what is configured so that unconfigured features are not summarized.
 
 Once the T4 was introduced to LabJack's product offerings, it became necessary to be able to write code that was sensitive to the different valid channel ranges of the different devices.
 
@@ -119,9 +129,6 @@ int lc_stream_read(     lc_devconf_t* dconf,
                          unsigned int *samples_per_read);
 
 int lc_stream_stop(     lc_devconf_t* dconf);
-
-int lc_stream_clean(    lc_devconf_t* dconf);
-                
 ```
 ### `lc_stream_start()`
 `lc_stream_start` initializes a local buffer for the stream and starts the data acquisition process on the device identified by the `dconf` pointer.  When `samples_per_read` is positive, it sets the number of samples per channel in each _block_.  Otherwise, the default of 64 is used.  The buffer size is set to contain more than `nsample` (set in the configuration file) samples per channel.  
@@ -150,7 +157,7 @@ while(True){
     ... establish some break condition ...
 }
 lc_stream_stop(&dconf);
-lc_stream_clean(&dconf);
+lc_clean(&dconf);
 ```
 
 In this example, the service function is called as frequently as the processor can execute the loop.  It has nothing to do with how long it is likely to be between available data packets.
@@ -166,19 +173,19 @@ while(True){
     lct_idle(&idle);
 }
 lc_stream_stop(&dconf);
-lc_stream_clean(&dconf);
+lc_clean(&dconf);
 ```
 This example deliberately inserts idle time that frees the processor.  Even greater gains can be made by introducing a long idle time (see the [lctools](lctools_h.md) documentation) once per loop and then a series of shorter idle times in an inner loop.  This has the effect of causing the service function to be called much more frequently when data are more likely to be available.
 
 ### `lc_stream_read()`
 
-If no attempt to read data out of the LCONFIG device buffer, it just fills up until new samples begin to overwrite older ones.  Calling the `lc_stream_read` function returns a pointer into the buffer and "consumes" these samples permanently from the buffer.  
+Without an attempt to read data out of the LCONFIG device buffer, data accumulate until new samples begin to overwrite older ones.  Calling the `lc_stream_read` function returns a pointer into the buffer and assumes that the application is making good use of them.  From that moment forward, those data are considered "consumed."  
 
 The pointer, `data`, should be interpreted as a 2D double precision array with  a single block of data (`samples_per_read` x `channels` array elements).  The `s` sample of `c` channel can be retrieved by `data[s*channels + c]`.  
 
-If there are no data available, then `data` will be returned as `NULL`.  Alternately, see the [stream diagnostic](#datadiag) functions to query the state of the buffer.  
+If there are no data available, then `data` will be returned as `NULL` and the function returns `LC_ERROR`.  Alternately, see the [stream diagnostic](#datadiag) functions to query the state of the buffer.  
 
-Once data are returned by `lc_stream_read()`, they must be copied into a safe location or otherwise used immediately, because the data at that location will eventually be overwritten.  The data are safe so long as no additional calls to `lc_stream_service()` are made while the data are being used or if the buffer has been deliberately sized to ensure no data overruns.  
+Once data are returned by `lc_stream_read()`, they must be copied into a safe location or otherwise used immediately, because the data at that location will eventually be overwritten.  The data are safe until the next call to `lc_stream_service()`, after which it will be possible for the data to be overwritten.  
 
 See the [data file](#datafile) functions below or the `lct_stat` functions included in [lctools](lctools_h.md) for ways to quickly handle data for common tasks.
 
@@ -188,34 +195,31 @@ A read operation is not required between each stream operation.  In fact, the `l
 
 The data acquisition process is halted by the `lc_stream_stop()` function, but the buffer is left intact.  Once this function is called, no new samples will become available to the `lc_stream_service()` and it _should_ raise an error if it is called on an inactive stream.  However, the same is not true of `lc_stream_read()`.  Even though new data are no longer being added to the buffer, the data already there can still be read by successive calls to `lc_stream_read()`.
 
-### `lc_stream_clean()`
-
-Before a new stream process can be started, the `clean_data_stream` function should be called to free the buffer.  In applications where only one stream operation will be executed, it may be easier to allow `lc_close()` to clean up the buffer instead.
-
 ## <a name="datafile"></a> Writing data files
 
 LCONFIG includes tools for automatically writing data files from the data stream.  They accept a file pointer from an open `iostream` file.  
 
 ```C
 int lc_datafile_init(    lc_devconf_t* dconf, 
-                const unsigned int devnum,
-                             FILE* FF);
+                        FILE* FF);
                         
-int lc_datafile_write(     lc_devconf_t* dconf, 
-                const unsigned int devnum,
-                             FILE* FF);
+int lc_datafile_write(lc_devconf_t *dconf, 
+			FILE *FF, 
+			double *data, 
+        		unsigned int channels, 
+        		unsigned int samples_per_read);
 
 ```
 
 ### `lc_datafile_init()`
 
-`lc_datafile_init` writes a configuration file header to the data file.  It also adds a timestamp indicating the date and time that `lc_datafile_init` was executed.  It should be emphasized that (especially where triggers are involved) substantial time can pass between this timestamp and the availability of data.  Care should be taken if precise absolute time values are needed.
+`lc_datafile_init()` calls `lc_write()` to writes a configuration file header to the data file.  It also adds a timestamp indicating the date and time that `lc_datafile_init()` was executed.  It should be emphasized that (especially where triggers are involved) substantial time can pass between this timestamp and the availability of data.  When authoring applications where the timestamp is intended to mark the time of the first row, `lc_datafile_init()` should be called immediately before the first call to `lc_datafile_write()`.
 
 ### `lc_datafile_write()`
 
-`lc_datafile_write` calls `lc_stream_read` and prints an ascii formatted data array into the open file provided.  
+`lc_datafile_write()` accepts the values provided by `lc_stream_read()` and writes data to the file provided.  `lc_datafile_write()` honors the `dataformat` parameter, automatically writing in ASCII or binary as directed.
 
-Note that the applicaiton still needs to call `lc_stream_start` to begin the data acquisition process and `lc_stream_service` to stream in data, but in this mode of operation, `lc_datafile_write` takes the place of the `lc_stream_read` function.
+Note that the application still needs to call `lc_stream_start()` to begin the data acquisition process and `lc_stream_service()` to stream in data, but in this mode of operation, `lc_datafile_write()` takes the place of the `lc_stream_read()` function.
 
 
 ##<a name="datadiag"></a> Stream diagnostic functions
@@ -277,44 +281,52 @@ Experiments are about more than just data rates and analog input ranges.  What w
 These have been absolutely essential for me.
 
 ```C
-int lc_get_meta_int(          lc_devconf_t* dconf, 
+int lc_meta_get_int(          lc_devconf_t* dconf, 
                         const char* param, 
                                int* value);
                                
-int lc_get_meta_flt(          lc_devconf_t* dconf, 
+int lc_meta_get_flt(          lc_devconf_t* dconf, 
                         const char* param, 
                             double* value);
 
-int lc_get_meta_str(          lc_devconf_t* dconf, 
+int lc_meta_get_str(          lc_devconf_t* dconf, 
                         const char* param, 
                               char* value);
 ```
-The `lc_get_meta_XXX` functions retrieve meta parameters from the `devnum` element of the `dconf` array by their name, `param`. The values are written to target of the `value` pointer. If the parameter does not exist or if it is of the incorrect type, these functions return `LCONF_ERROR`, and the value is not changed.
+The `lc_meta_get_XXX` functions retrieve meta parameters from `dconf` by their name, `param`. The values are written to `value`. If the parameter does not exist or if it is of the incorrect type, these functions return `LC_ERROR`, and value is not changed.  If the type is incorrect, a warning is also printed, so the user is made aware of the reason for the problem.  If the value does not exist, the function exits quietly, so it is up to the application to decide whether an error is warranted.
+
+```C
+int lc_meta_get_num(          lc_devconf_t* dconf, 
+                        const char* param, 
+                              double* value);
+```
+
+Often, the behavior of an application may depend on a number, and we don't really care how the user specified it in the configuration file.  `lc_meta_get_num()` attempts to convert integer or string values to a double precision number.  If the parameter does not exist, `lc_meta_get_num()` returns `LC_ERROR`.  If conversion from string to float fails, a warning is printed, and `-LC_ERROR` is returned.
 
 ```c
-lc_metatype_t lc_get_meta_type( lc_devconf_t* dconf,
+lc_metatype_t lc_meta_get_type( lc_devconf_t* dconf,
 							const char* param);
 ```
-In cases where it is unclear which data type a meta parameter might have, the `lc_get_meta_type` function checks it by returning the enumerated meta types: `LC_MT_INT`, `LC_MT_FLT`, or `LC_MT_STR`.  This function is also a convenient way to silently (without error messages) check for existance of a parameter.  If the parameter does not exist, it returns `LC_MT_NONE`. 
+In cases where it is unclear which data type a meta parameter might have, the `lc_meta_get_type` function checks it by returning the enumerated meta types: `LC_MT_INT`, `LC_MT_FLT`, or `LC_MT_STR`.  This function is also a convenient way to silently (without error messages) check for existance of a parameter.  If the parameter does not exist, it returns `LC_MT_NONE`. 
 
 
 ```C
-int lc_put_meta_int(          lc_devconf_t* dconf, 
+int lc_meta_put_int(          lc_devconf_t* dconf, 
                         const char* param, 
                                 int value);
                                 
-int lc_put_meta_flt(          lc_devconf_t* dconf, 
+int lc_meta_put_flt(          lc_devconf_t* dconf, 
                         const char* param, 
                              double value);
 
-int lc_put_meta_str(          lc_devconf_t* dconf, 
+int lc_meta_put_str(          lc_devconf_t* dconf, 
                         const char* param, 
                               char* value);
 ```
-The `lc_put_meta_XXX` functions write to the meta parameters.  If the meta parameter does not already exist, a new one is created with the appropriate type.  If a parameter with the same name already exists, its value will be overwritten and (if necessary) its type will be changed appropriately.  `lc_put_meta_XXX` only fails if the memory allocated to meta data is full.
+The `lc_meta_put_XXX` functions write to the meta parameters.  If the meta parameter does not already exist, a new one is created with the appropriate type.  If a parameter with the same name already exists, its value will be overwritten and (if necessary) its type will be changed appropriately.  `lc_meta_put_XXX` only fails if the memory allocated to meta data is full.
 
 ```c
-int lc_del_meta(			lc_devconf_t *dconf,
+int lc_meta_del(			lc_devconf_t *dconf,
 						const char* param);
 ```
 
@@ -365,3 +377,5 @@ The `lc_com_read` function reads from the COM receive buffer into the `rxbuffer`
 A session of digital communication requires at least the use of `lc_com_start`, `lc_com_stop`, and either `lc_com_read` or `lc_com_write` or both.  The `lc_communicate` function implements all of these steps in a single function.  In this order, it calls `lc_com_start`, `lc_com_write`, `lc_com_read`, and `lc_com_stop`.  The write and read steps may be skipped by setting the `txlength` or `rxlength` arguments to zero.
 
 [top](#top)
+
+***

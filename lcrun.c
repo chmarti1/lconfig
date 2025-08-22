@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
 
     // Load the configuration
     printf("Loading configuration file...");
-    if(lc_load_config(dconf, MAX_DEV, config_file)){
+    if(lc_load(dconf, MAX_DEV, config_file)){
         printf("FAILED\n");
         fprintf(stderr, "LCRUN failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]){
             }
             printf("flt:%s = %lf\n",param,ftemp);
             for(devnum=0;devnum<ndev;devnum++){
-                if (lc_put_meta_flt(&dconf[devnum], param, ftemp))
+                if (lc_meta_put_flt(&dconf[devnum], param, ftemp))
                     fprintf(stderr, "LCRUN: failed to set device %d parameter %s to %lf\n", devnum, param, ftemp);
             }
         break;
@@ -198,7 +198,7 @@ int main(int argc, char *argv[]){
             }
             printf("int:%s = %d\n",param,itemp);
             for(devnum=0;devnum<ndev;devnum++){
-                if (lc_put_meta_int(&dconf[devnum], param, itemp))
+                if (lc_meta_put_int(&dconf[devnum], param, itemp))
                     fprintf(stderr, "LCRUN: failed to set device %d parameter %s to %d\n", devnum, param, itemp);
             }
             break;
@@ -209,7 +209,7 @@ int main(int argc, char *argv[]){
             }
             printf("str:%s = %s\n",param,stemp);
             for(devnum=0;devnum<ndev;devnum++){
-                if (lc_put_meta_str(&dconf[devnum], param, stemp))
+                if (lc_meta_put_str(&dconf[devnum], param, stemp))
                     fprintf(stderr, "LCRUN: failed to set device %d parameter %s to %s\n", devnum, param, stemp);
             }
             break;
@@ -240,7 +240,7 @@ int main(int argc, char *argv[]){
             return -1;
         }
         // Upload the configuration
-        if(lc_upload_config(&dconf[devnum])){
+        if(lc_upload(&dconf[devnum])){
             fprintf(stderr, "LCRUN: Failed while configuring device %d of %d.\n", devnum, ndev);
             halt();
             return -1;

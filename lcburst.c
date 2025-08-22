@@ -220,7 +220,7 @@ int main(int argc, char *argv[]){
     // Load the configuration
     printf("Loading configuration file...");
     fflush(stdout);
-    if(lc_load_config(&dconf, 1, config_file)){
+    if(lc_load(&dconf, 1, config_file)){
         fprintf(stderr, "LCBURST failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
     }else
@@ -246,7 +246,7 @@ int main(int argc, char *argv[]){
                 return -1;
             }
             printf("flt:%s = %lf\n",param,ftemp);
-            if (lc_put_meta_flt(&dconf, param, ftemp))
+            if (lc_meta_put_flt(&dconf, param, ftemp))
                 fprintf(stderr, "LCBURST failed to set parameter %s to %lf\n", param, ftemp);            
             break;
         case 'i':
@@ -255,7 +255,7 @@ int main(int argc, char *argv[]){
                 return -1;
             }
             printf("int:%s = %d\n",param,itemp);
-            if (lc_put_meta_int(&dconf, param, itemp))
+            if (lc_meta_put_int(&dconf, param, itemp))
                 fprintf(stderr, "LCBURST failed to set parameter %s to %d\n", param, itemp);
             break;
         case 's':
@@ -264,7 +264,7 @@ int main(int argc, char *argv[]){
                 return -1;
             }
             printf("str:%s = %s\n",param,stemp);
-            if (lc_put_meta_str(&dconf, param, stemp))
+            if (lc_meta_put_str(&dconf, param, stemp))
                 fprintf(stderr, "LCBURST failed to set parameter %s to %s\n", param, stemp);
             break;
         // Escape condition
@@ -318,7 +318,7 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "LCBURST failed to open the device.\n");
         return -1;
     }
-    if(lc_upload_config(&dconf)){
+    if(lc_upload(&dconf)){
         fprintf(stderr, "LCBURST failed while configuring the device.\n");
         lc_close(&dconf);
         return -1;

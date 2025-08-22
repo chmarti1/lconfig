@@ -593,7 +593,7 @@ void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max){
 ......................................*/
 
 
-int lc_load_config(lc_devconf_t* dconf, const unsigned int devmax, const char* filename){
+int lc_load(lc_devconf_t* dconf, const unsigned int devmax, const char* filename){
     int devnum=-1, ainum=-1, aonum=-1, efnum=-1, comnum=-1;
     int itemp, itemp2, itemp3, itemp4;
     float ftemp;
@@ -1413,25 +1413,25 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
         // META integer configuration
         }else if(strncmp(param,"int:",4)==0){
             sscanf(value,"%d",&itemp);
-            lc_put_meta_int(dconf, &param[4], itemp);
+            lc_meta_put_int(dconf, &param[4], itemp);
         // META float configuration
         }else if(strncmp(param,"flt:",4)==0){
             sscanf(value,"%f",&ftemp);
-            lc_put_meta_flt(dconf, &param[4], ftemp);
+            lc_meta_put_flt(dconf, &param[4], ftemp);
         // META string configuration
         }else if(strncmp(param,"str:",4)==0){
-            lc_put_meta_str(dconf, &param[4], value);
+            lc_meta_put_str(dconf, &param[4], value);
         //
         // META values defined in a stanza
         //
         }else if(metatype == 'i'){
             sscanf(value,"%d",&itemp);
-            lc_put_meta_int(dconf, param, itemp);
+            lc_meta_put_int(dconf, param, itemp);
         }else if(metatype == 'f'){
             sscanf(value,"%f",&ftemp);
-            lc_put_meta_flt(dconf, param, ftemp);
+            lc_meta_put_flt(dconf, param, ftemp);
         }else if(metatype == 's'){
-            lc_put_meta_str(dconf, param, value);
+            lc_meta_put_str(dconf, param, value);
         // Deal gracefully with empty cases; usually EOF.
         }else if(   strncmp(param,"",LC_MAX_STR_PARAM)==0 &&
                     strncmp(value,"",LC_MAX_STR_VALUE)==0){
@@ -1450,7 +1450,7 @@ even channels they serve.  (e.g. AI0/AI1)\n", itemp, dconf[devnum].aich[ainum].c
 
 
 
-void lc_write_config(lc_devconf_t* dconf, FILE* ff){
+void lc_write(lc_devconf_t* dconf, FILE* ff){
     int ainum,aonum, efnum, comnum, metanum;
     unsigned int ii, itemp;
     char mflt, mint, mstr;
@@ -1802,7 +1802,7 @@ int lc_clean(lc_devconf_t* dconf){
 }
 
 
-int lc_upload_config(lc_devconf_t* dconf){
+int lc_upload(lc_devconf_t* dconf){
     // integers for interacting with the device
     int err,handle;
     // Registers for holding register addresses and memory type
@@ -2550,7 +2550,7 @@ int lc_upload_config(lc_devconf_t* dconf){
 
 
 
-void lc_show_config(lc_devconf_t* dconf){
+void lc_show(lc_devconf_t* dconf){
     int ainum,aonum,efnum,comnum,metanum,metacnt, itemp, ii;
     char value1[LC_MAX_STR];
 
@@ -2753,7 +2753,7 @@ void lc_show_config(lc_devconf_t* dconf){
 
 
 
-int lc_update_ef(lc_devconf_t* dconf){
+int lc_ef_update(lc_devconf_t* dconf){
     int handle, channel, efnum, itemp1, itemp2;
     double ftemp, ftemp1, ftemp2;
     char stemp[LC_MAX_STR];
@@ -3089,7 +3089,7 @@ int lc_com_read(lc_devconf_t* dconf, const unsigned int comchannel,
 }
 
 
-lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param){
+lc_metatype_t lc_meta_get_type(lc_devconf_t *dconf, const char* param){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
@@ -3104,7 +3104,7 @@ lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param){
 }
 
 
-int lc_del_meta(lc_devconf_t *dconf, const char* param){
+int lc_meta_del(lc_devconf_t *dconf, const char* param){
     int metanum;
     char inlist_f;
     // Scan through the meta list
@@ -3171,7 +3171,7 @@ int lc_del_meta(lc_devconf_t *dconf, const char* param){
 
 
 
-int lc_get_meta_int(lc_devconf_t *dconf, const char* param, int* value){
+int lc_meta_get_int(lc_devconf_t *dconf, const char* param, int* value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
@@ -3192,7 +3192,7 @@ int lc_get_meta_int(lc_devconf_t *dconf, const char* param, int* value){
 }
 
 
-int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value){
+int lc_meta_get_flt(lc_devconf_t* dconf, const char* param, double* value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
@@ -3214,7 +3214,7 @@ int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value){
 }
 
 
-int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char** value){
+int lc_meta_get_str(lc_devconf_t* dconf, const char* param, char** value){
     int metanum;
     // Scan through the meta list
     // stop if end-of-list or empty entry
@@ -3245,7 +3245,7 @@ Returns LC_NOERR on success.
 Returns LC_ERROR if the parameter does not exist.
 Returns -LC_ERROR if the conversion fails.
  */
-int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
+int lc_meta_get_num(lc_devconf_t* dconf, const char* param, double* value){
     int metanum;
     int ii;
     // Scan through the meta list
@@ -3266,6 +3266,8 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
                 ii = sscanf(dconf->meta[metanum].value.svalue, "%lf", value);
                 if(ii == 1)
                     return LC_NOERR;
+                print_warning("META_GET_NUM: Failed to convert \"%s\" to a number: %s\n", 
+                    param, dconf->meta[metanum].value.svalue);
                 return -LC_ERROR;
             default:
                 // Do nothing
@@ -3276,7 +3278,7 @@ int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value){
 }
 
 
-int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value){
+int lc_meta_put_int(lc_devconf_t* dconf, const char* param, int value){
     int metanum, plen;
     // Test the parameter string length
     if((plen=strlen(param)) > LC_MAX_STR_PARAM){
@@ -3307,7 +3309,7 @@ int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value){
 }
 
 
-int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
+int lc_meta_put_flt(lc_devconf_t* dconf, const char* param, double value){
     int metanum, plen;
     // Test the parameter string length
     if((plen=strlen(param)) > LC_MAX_STR_PARAM){
@@ -3339,7 +3341,7 @@ int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value){
 }
 
 
-int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value){
+int lc_meta_put_str(lc_devconf_t* dconf, const char* param, char* value){
     int metanum, plen, vlen;
     // Test the parameter string length
     if((plen=strlen(param)) > LC_MAX_STR_PARAM){
@@ -3689,17 +3691,11 @@ int lc_stream_stop(lc_devconf_t* dconf){
 }
 
 
-int lc_stream_clean(lc_devconf_t* dconf){
-    clean_buffer(&dconf->RB);
-    return LC_NOERR;
-}
-
-
 int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
     time_t now;
 
     // Write the configuration header
-    lc_write_config(dconf,FF);
+    lc_write(dconf,FF);
     // Log the time
     time(&now);
     fprintf(FF, "#: %s", ctime(&now));

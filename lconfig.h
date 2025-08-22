@@ -22,7 +22,7 @@
 /*
 Use the commands below to compile your code in a *nix environment
 You're on your own in Windows.  If you're in Windows, just about
-everything should work, but the show_config() function may give
+everything should work, but the show() function may give
 strange results, and start_data_stream() may need some tweaking.
 
 $gcc -c lconfig.c -o lconfig.o
@@ -217,6 +217,10 @@ with init_data_file() and write_data_file() utilities.
 - Increased maximum number of meta parameters to 256
 - Implemented different maximum string lengths for IP, LABEL, NAME, PARAM, 
   SERIAL, and VALUE for more efficient use of memory.
+- Renamed meta functions (e.g. from lc_get_meta_XXX to lc_meta_get_XXX)
+- Renamed lc_update_ef() to lc_ef_update()
+- Renamed lc_load, lc_upload, lc_show, and lc_write
+
 */
 
 #define TWOPI 6.283185307179586
@@ -502,7 +506,7 @@ Return the number of configured device connections in a lc_devconf_t array.
 Counts until it finds a device with a connection index less than 0 (indicating
 that it was never configured) or until the devmax limit is reached.  That means
 that LC_NDEV will be fooled if lc_devconf_t elements are not configured 
-sequentially.  Fortunately, load_config always works sequentially.
+sequentially.  Fortunately, load always works sequentially.
 */
 int lc_ndev(lc_devconf_t* dconf, // Array of device configuration structs
                 const unsigned int devmax); // maximum number of devices allowed
@@ -602,7 +606,7 @@ The following parameters are recognized:
 .   Identifies the device by its serial number.  Devices can be identified by
 .   their serial number, NAME, or IP address.  When multiples of these are
 .   defined simultaneously, the device is queried to be certain they are all
-.   consistent.  Contradictions will result in an error from open_config().
+.   consistent.  Contradictions will result in an error from open().
 .
 .   The precedence rules change slightly based on the conneciton type:
 .   ANY:    SERIAL, NAME
@@ -617,7 +621,7 @@ The following parameters are recognized:
 .   The static IP address to use for an ethernet connection.  If the connection
 .   is ETH, then the ip address will be used to to identify the device.  If the
 .   connection is set to USB, then the IP address will be treated like any 
-.   other parameter, and will be written to the T7 with the upload_config()
+.   other parameter, and will be written to the T7 with the upload()
 .   function.  If the connection is ANY, a non-empty IP value causes a warning
 .   and will be ignored.  See SERIAL for more about how LConfig identifies
 .   devices.
@@ -851,7 +855,7 @@ The following parameters are recognized:
 .       lc_update_ef() is called, and the counts value will be set to zero.
 .       In this way, redundant subsequent calls to lc_update_ef() have no 
 .       effect until the count member is rewritten.  The duty and phase are
-.       written by lc_upload_config() and will not be updated unless it is
+.       written by lc_upload() and will not be updated unless it is
 .       called again.  
 .
 .       The LJM interface presumes that the resting state for the pulse 
@@ -1003,12 +1007,12 @@ The following parameters are recognized:
 .   three-letter prefix and a colon.  For exmaple, an integer parameter named
 .   "year" would be declared by
 .       int:year 2016
-.   Once established, it can be accessed using the get_meta_int or put_meta_int
+.   Once established, it can be accessed using the meta_get_int or meta_put_int
 .   functions.
         int year;
-.       get_meta_int(dconf,"year",&year);
+.       meta_get_int(dconf,"year",&year);
 */
-int lc_load_config(lc_devconf_t* dconf,         // array of device configuration structs
+int lc_load(lc_devconf_t* dconf,         // array of device configuration structs
                 const unsigned int devmax, // maximum number of devices to load
                 const char* filename);  // name of the file to read
 
@@ -1019,12 +1023,12 @@ file identified by filename.  The append flag indicates whether the file should
 be overwritten or appended with the parameters.  In order to save multiple
 device configurations to the same file, the append flag should be set.
 */
-void lc_write_config(lc_devconf_t* dconf, FILE* ff);
+void lc_write(lc_devconf_t* dconf, FILE* ff);
 
 
 
 /* OPEN_CONFIG
-When dconf is an array of device configurations loaded by load_config().  DCONF
+When dconf is an array of device configurations loaded by load().  DCONF
 is a pointer to the device configuration struct corresponding to the device 
 connection to open.
 */
@@ -1045,17 +1049,17 @@ meta data.
 int lc_clean(lc_devconf_t* dconf);
 
 /*UPLOAD_CONFIG
-Presuming that the connection has already been opened by open_config(), this
+Presuming that the connection has already been opened by open(), this
 function uploads the appropriate parameters to the respective registers of 
 device devnum in the dconf array.
 */
-int lc_upload_config(lc_devconf_t* dconf);
+int lc_upload(lc_devconf_t* dconf);
 
 
 /*SHOW_CONFIG
 Prints a display of the parameters configured in DCONF.
 */
-void lc_show_config(lc_devconf_t* dconf);
+void lc_show(lc_devconf_t* dconf);
 
 
 
@@ -1066,7 +1070,7 @@ to be used to detect whether the parameter exists, so it does not print
 error or warning messages if the parameter is not found.  Instead it returns
 LC_MT_NONE (or zero), so it can be used conveniently in an if() statement:
 
-    if(lc_get_meta_type(&dconf, "myparam"))
+    if(lc_meta_get_type(&dconf, "myparam"))
     {
         ... parameter exists ...
     }else{
@@ -1074,9 +1078,9 @@ LC_MT_NONE (or zero), so it can be used conveniently in an if() statement:
     }
 
 */
-lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param);
+lc_metatype_t lc_meta_get_type(lc_devconf_t *dconf, const char* param);
 
-/*DEL_META
+/*META_DEL
 Delete an existing meta parameter.
 If the parameter is not found, returns LC_ERROR, and prints an error message to
 stderr.  Otherwise, the parameter is removed from the meta parameter list.
@@ -1088,29 +1092,29 @@ is possible for meta parameters to remain past the end of the list.  They will a
 to have been deleted for the purposes of GET_META and PUT_META, but they should
 have also been cleared.  DEL_META will clear them and print a warning.
 */
-int lc_del_meta(lc_devconf_t *dconf, const char* param);
+int lc_meta_del(lc_devconf_t *dconf, const char* param);
 
 
-/*GET_META_XXX
+/*META_GET_XXX
 Retrieve a meta parameter of the specified type.
 If the type is called incorrectly, the function will still return a value, but it will
 be the giberish data that you get when you pull from a union.
-If the parameter is not found, get_meta_XXX will return an error.  Parameters are not called
+If the parameter is not found, meta_get_XXX will return an error.  Parameters are not called
 with their type prefixes.  For example, a parameter declared in a config file as 
     int:year 2016
 can be referenced by 
     int year;
-    get_meta_int(&dconf,"year",&year);
+    meta_get_int(&dconf,"year",&year);
     
 As of version 5.0, GET_META_STR returns a pointer to the dynamically allocated meta
 string instead of copying the string.  In applications where the meta values might
 be overwritten, the application should make a copy to avoid segfault errors.
 */
-int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value);
-int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value);
-int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char** value);
+int lc_meta_get_int(lc_devconf_t* dconf, const char* param, int* value);
+int lc_meta_get_flt(lc_devconf_t* dconf, const char* param, double* value);
+int lc_meta_get_str(lc_devconf_t* dconf, const char* param, char** value);
 
-/*GET_META_NUM
+/*META_GET_NUM
 Retireve a meta parameter and convert it into a double float.  If it is
 already a FLT parameter, no conversion is necessary.  If it is an integer,
 the conversion is trivial.  If it is a string, we will attempt to convert
@@ -1120,30 +1124,30 @@ Returns LC_NOERR on success.
 Returns LC_ERROR if the parameter does not exist.
 Returns -LC_ERROR if the conversion fails.
  */
-int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value);
+int lc_meta_get_num(lc_devconf_t* dconf, const char* param, double* value);
 
-/*PUT_META_XXX
+/*META_PUT_XXX
 Write to the meta array.  If the parameter already exists, the old data will be overwritten.
 If the parameter does not exist, a new meta entry will be created.  If the meta array is
-full, put_meta_XXX will return an error.
+full, meta_put_XXX will return an error.
 
 As of version 5.0, PUT_META_STR allocates dynamic memory before copying the data
 */
-int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value);
-int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value);
-int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value);
+int lc_meta_put_int(lc_devconf_t* dconf, const char* param, int value);
+int lc_meta_put_flt(lc_devconf_t* dconf, const char* param, double value);
+int lc_meta_put_str(lc_devconf_t* dconf, const char* param, char* value);
 
 
-/*UPDATE_EF
+/*EF_UPDATE
 Refresh the extended features registers.  All lc_devconf_t EF parameters will be 
 rewritten to their respective registers and measurements will be downloaded into
 the appropriate EF channel member variables.
 
 The clock frequency will NOT be updated.  To change the EFfrequency parameter,
-upload_config() should be re-called.  This will halt acquisition and re-start 
+upload() should be re-called.  This will halt acquisition and re-start 
 it.
 */
-int lc_update_ef(lc_devconf_t* dconf);
+int lc_ef_update(lc_devconf_t* dconf);
 
 /*COMMUNICATE
 Executes a read/write operation on a digital communication channel.  The 

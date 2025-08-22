@@ -3,11 +3,11 @@
 Headers and utilities for laboratory measurements and machine control with the [LabJack T4 and T7](https://labjack.com/products)
 
 By Christopher R. Martin  
-Assistant Professor of Mechanical Engineering  
+Associate Professor of Mechanical Engineering  
 Penn State University  
  [crm28@psu.edu](mailto:crm28@psu.edu)  
 
-Version 4.05
+Version 5.00
 
 ### Foreword
 
