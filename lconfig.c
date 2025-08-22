@@ -1588,7 +1588,7 @@ void lc_write(lc_devconf_t* dconf, FILE* ff){
     // First, detect whether and which meta parameters there are
     mflt = 0; mint = 0; mstr = 0;
     for(metanum=0; metanum<LC_MAX_META && \
-            dconf->meta[metanum].param[0]!='\0'; metanum++){
+            dconf->meta[metanum].param; metanum++){
         if(dconf->meta[metanum].type==LC_MT_INT)
             mint = 1;
         else if(dconf->meta[metanum].type==LC_MT_FLT)
@@ -1604,7 +1604,7 @@ void lc_write(lc_devconf_t* dconf, FILE* ff){
     if(mint){
         fprintf(ff,"\nmeta integer\n");
         for(metanum=0; metanum<LC_MAX_META && \
-                dconf->meta[metanum].param[0]!='\0'; metanum++)
+                dconf->meta[metanum].param; metanum++)
             if(dconf->meta[metanum].type==LC_MT_INT)
                 fprintf(ff,"%s %d\n",
                     dconf->meta[metanum].param,
@@ -1615,7 +1615,7 @@ void lc_write(lc_devconf_t* dconf, FILE* ff){
     if(mflt){
         fprintf(ff,"\nmeta float\n");
         for(metanum=0; metanum<LC_MAX_META && \
-                dconf->meta[metanum].param[0]!='\0'; metanum++)
+                dconf->meta[metanum].param; metanum++)
             if(dconf->meta[metanum].type==LC_MT_FLT)
                 fprintf(ff,"%s %f\n",
                     dconf->meta[metanum].param,
@@ -1626,7 +1626,7 @@ void lc_write(lc_devconf_t* dconf, FILE* ff){
     if(mstr){
         fprintf(ff,"\nmeta string\n");
         for(metanum=0; metanum<LC_MAX_META && \
-                dconf->meta[metanum].param[0]!='\0'; metanum++)
+                dconf->meta[metanum].param; metanum++)
             if(dconf->meta[metanum].type==LC_MT_STR)
                 fprintf(ff,"%s %s\n",
                     dconf->meta[metanum].param,
@@ -3124,7 +3124,7 @@ int lc_meta_del(lc_devconf_t *dconf, const char* param){
                 free(dconf->meta[metanum].value.svalue);
                 dconf->meta[metanum].value.svalue = NULL;
             }
-            dconf->meta[metanum].type = LC_MT_NONE:
+            dconf->meta[metanum].type = LC_MT_NONE;
             // Now, shift all remaining data forward
             // The "inlist" flag is used to identify any parameters that
             // were not already forward shifted - they will also be
@@ -3158,7 +3158,7 @@ int lc_meta_del(lc_devconf_t *dconf, const char* param){
                     dconf->meta[metanum].param = NULL;
                     if(dconf->meta[metanum].type == LC_MT_STR){
                         free(dconf->meta[metanum].value.svalue);
-                        dconf->meta[metanum].svalue = NULL;
+                        dconf->meta[metanum].value.svalue = NULL;
                     }
                     dconf->meta[metanum].type = LC_MT_NONE;
                 }
@@ -3371,7 +3371,7 @@ int lc_meta_put_str(lc_devconf_t* dconf, const char* param, char* value){
             // If it is a string, free the existing memory
             if(dconf->meta[metanum].type == LC_MT_STR)
                 free(dconf->meta[metanum].value.svalue);
-            dconf->meta[metanum].value.svalue = malloc( (length+1) * sizeof(char) );    
+            dconf->meta[metanum].value.svalue = malloc( (vlen+1) * sizeof(char) );    
             strcpy(dconf->meta[metanum].value.svalue, value);
             dconf->meta[metanum].type = LC_MT_STR;
             return LC_NOERR;
@@ -3728,9 +3728,9 @@ int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data,
                 fwrite(&ftemp, sizeof(ftemp), 1, FF);
             }
         }
-        return 0;
+        return LC_NOERR;
     }
-    return -1;
+    return LC_ERROR;
 }
 
 

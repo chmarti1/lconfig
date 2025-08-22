@@ -32,18 +32,6 @@
 #define MAXSTR          128
 
 
-/*...................
-.   Global Options
-...................*/
-
-
-/*....................
-. Prototypes
-.....................*/
-// Parse the command-line options strings
-// Modifies the globals appropriately
-int parse_options(int argc, char*argv[]);
-
 /*....................
 . Help text
 .....................*/
@@ -343,6 +331,7 @@ int main(int argc, char *argv[]){
             fprintf(stderr, "\nLCBURST failed while servicing the T7 connection!\n");
             lc_stream_stop(&dconf);
             lc_close(&dconf);
+            lc_clean(&dconf);
             return -1;            
         }
         
@@ -354,6 +343,7 @@ int main(int argc, char *argv[]){
     if(lc_stream_stop(&dconf)){
         fprintf(stderr, "\nLCBURST failed to halt preliminary data collection!\n");
         lc_close(&dconf);
+        lc_clean(&dconf);
         return -1;
     }
     printf("DONE\n");
@@ -367,9 +357,9 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "LCBURST failed to open the data file \"%s\"\n", data_file);
         return -1;
     }
-
     // Write the configuration header
     lc_datafile_init(&dconf,dfile);
+
     // Write the samples
     while(!lc_stream_isempty(&dconf)){
         lc_stream_read(&dconf, &data, &channels, &samples_per_read);

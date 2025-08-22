@@ -78,9 +78,9 @@ The ASCII column order is determined by the channels configured.
 - Extended feature channels in `stream` mode in the order they are configured  
 - Digital input stream  
 
-In binary format, after the timestamp (which is still encoded in ASCII characters), each data element is represented sequentially in the double precision floating point used by the system.  In many systems, this will be IEEE 754 big endian single-precision (32-bit) floating point number.  This means that each sample for each channel will occupy four bytes.  
+In binary format, the header is still printed in ASCII characters, so it will still be human readable.  However, many text editors will see the following binary data and misinterpret the file encoded in UTF-16, and the header does not display correctly.  To correctly view the headers of binary files, be sure to open in Gedit, nano, vim, Notepad++, or some other editor that allows you to force UTF-8 encoding.  The editor may throw an error that the file contains illegal characters; that's OK.
 
-The binary data order are identical to the ASCII data order, but they are sequential without separators or row breaks.  This is the same format used by the internal ring buffer, and it is understood by utilities like `lct_data()`.
+After the timestamp (which is still encoded in ASCII characters), binary files store each sample represented sequentially in the single-precision floating point used by the system.  In many systems, this will be IEEE 754 big endian single-precision (32-bit) floating point number.  This means that each sample for each channel will occupy four bytes.  The binary data order are identical to the ASCII data order, but they are sequential without separators or row breaks.  This is the same format used by the internal ring buffer, and it is understood by utilities like `lct_data()`.
 
 As of version 5.00, all digital data are streamed as 16-bit unsigned integers, so 32-bit data is lost.  In the example above, the digital input stream returned a value 65,504 or 0b1111111111100000.  Only two digital inputs were configured (DIO4 and DIO5).  In these data, DIO4 was 0 and DIO5 was 1.  
 
