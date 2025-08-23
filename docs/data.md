@@ -69,7 +69,7 @@ The first line of the data also appears like a comment.  It always begins with `
 
 ### <a name="data"></a> The data
 
-LConfig supports saving data in binary or ascii formats based on the `dataformat` configuration parameter value.  Regardless, the header will always be encoded in plain ascii encoding, so it will be human readable using even the simplest command-line utilities.  Ironically, more sophisticated text editors will often try to determine the character encoding automatically, and will be confused by the appearance of binary data later in the file.
+LConfig supports saving data in binary or ascii formats based on the `dataformat` configuration parameter value.  Regardless, the header will always be encoded in plain ascii, so it will be human readable using even the simplest command-line utilities.  Ironically, more sophisticated text editors will often try to determine the character encoding automatically, and will be confused by the appearance of binary data later in the file.  To correctly view the headers of binary files, be sure to open in Gedit, nano, vim, Notepad++, or some other editor that allows you to force UTF-8 encoding.  The editor may throw an error that the file contains illegal characters; that's OK.
 
 ASCII data are in exponential floating point tab-separated columns.  The data are formatted in exponential notation with seven significant figures (`%.6e` format) regardless of their source.  The end of a row is marked by a newline, `\n`.  
 
@@ -77,8 +77,6 @@ The ASCII column order is determined by the channels configured.
 - Analog inputs in the order they are configured  
 - Extended feature channels in `stream` mode in the order they are configured  
 - Digital input stream  
-
-In binary format, the header is still printed in ASCII characters, so it will still be human readable.  However, many text editors will see the following binary data and misinterpret the file encoded in UTF-16, and the header does not display correctly.  To correctly view the headers of binary files, be sure to open in Gedit, nano, vim, Notepad++, or some other editor that allows you to force UTF-8 encoding.  The editor may throw an error that the file contains illegal characters; that's OK.
 
 After the timestamp (which is still encoded in ASCII characters), binary files store each sample represented sequentially in the single-precision floating point used by the system.  In many systems, this will be IEEE 754 big endian single-precision (32-bit) floating point number.  This means that each sample for each channel will occupy four bytes.  The binary data order are identical to the ASCII data order, but they are sequential without separators or row breaks.  This is the same format used by the internal ring buffer, and it is understood by utilities like `lct_data()`.
 

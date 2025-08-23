@@ -96,7 +96,7 @@ const char help_text[] = \
 "  specified, then LCBURST will collect one packet worth of data.\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017-2022 C.Martin\n";
+"(c)2017-2025 C.Martin\n";
 
 
 /*....................

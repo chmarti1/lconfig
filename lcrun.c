@@ -47,8 +47,8 @@
 . Help text
 .....................*/
 const char help_text[] = \
-"lcrun [-h] [-r PREFILE] [-p POSTFILE] [-d DATAFILE] [-c CONFIGFILE] \n"\
-"     [-f|i|s param=value]\n"\
+"lcrun [-h] [-d DATAFILE] [-c CONFIGFILE] [-n MAXREAD] [-f|i|s param=value]\n"\
+"\n"\
 "  Runs a data acquisition job until the user exists with a keystroke.\n"\
 "\n"\
 "-c CONFIGFILE\n"\
@@ -60,7 +60,7 @@ const char help_text[] = \
 "\n"\
 "-d DATAFILE\n"\
 "  This option overrides the default continuous data file name\n"\
-"  \"YYYYMMDDHHmmSS_lcrun.dat\"\n"\
+"  \"YYYYMMDDHHmmSS.dat\"\n"\
 "     $ lcrun -d mydatafile\n"\
 "  For configurations with only one device, a .dat is automatically\n"\
 "  appended.  For configurations with multiple devices, a data file\n"\
@@ -82,7 +82,7 @@ const char help_text[] = \
 "     $ lcrun -f height=5.25 -i temperature=22 -s day=Monday\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2017-2022 C.Martin\n";
+"(c)2017-2025 C.Martin\n";
 
 
 /*....................
@@ -277,7 +277,7 @@ int main(int argc, char *argv[]){
     }
 
     go = 1;
-    lct_idle_init(&idle, 100, 5);
+    lct_idle_init(&idle, 1000, 50);
     while(go){
         for(devnum=0; devnum<ndev; devnum++){
             if(lc_stream_service(&dconf[devnum])){

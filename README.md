@@ -11,7 +11,7 @@ Version 5.00
 
 ### Foreword
 
-This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder: [General Documentation](docs/documentation.md)  
+This README is a preliminary introduciton intended to help users decide if LConfig is right for them and to get started.  The detailed documentation is contained in the `docs` folder: [Detailed Documentation](docs/documentation.md)  
 
 ---
 
@@ -108,6 +108,7 @@ $ cd lconfig
 $ sudo make install	# Installs binaries to /usr/local/bin
 $ lcrun -h   # Prints help
 $ lcburst -h
+$ lcstat -h
 ```
 `lcrun` and `lcburst` are binaries built on the LCONFIG system.  `lcrun` continuously streams data to a file, but the read/write times for most hard drives prevents realizing the full speed of the T7.  `lcburst` collects a high speed burst of data and then writes it to a file.  Both executables use the LCONFIG library to load a configuration file, open the appropriate device connections, initiate the data transfer, and write data files automatically.
 
@@ -160,9 +161,9 @@ ailabel "Ambient Temperature"
 aiunits "degC"
 
 ##
-Configuration files end when the file ends or when the load_config() 
+Configuration files end when the file ends or when the load() 
 function encounters ##.  This text isn't commented because
-it will never be read by load_config()
+it will never be read by load()
 ```
 
 ## <a name="data"></a> Anatomy of a data file
@@ -203,10 +204,12 @@ airesolution 0
 ```
 ## Future Improvements
 
-Some of the parameters have not been thoroughly tested; especailly the extended features.  I have done some basic testing, but I would not be surprised to learn that there are bugs that need attention there.  Please contact me if you find any!
+There is still no support for the T8.  I have one ready for development, but it just has not been a priority yet.
 
-As of version 4.00, only the UART digital COM interface is implemented.  It is not currently a high priority to implement the other interfaces, but one day...
+One day, I'd like to extend the calibration configuration directives to support more sophisticated calibrations.  In particular, I'm thinking of thermocouple (with cold junction compensation), RTD, thermistor, polynomial, etc.  So far, I have always implemented these in application-specific binaries/scripts.  I do it often enough, it makes sense to embed it in the configuration itself.
+
+
 
 ## Known Bugs
 
-No persisting known bugs.
+The `lcrun` binary has a documented option, `-n MAXREAD`, that is currently ignored.  The intention is to support this option, but it will need to wait.

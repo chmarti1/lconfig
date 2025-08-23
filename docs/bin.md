@@ -1,10 +1,15 @@
-[back](documentation.md)
+[back to Documentation](documentation.md)
 
-Version 4.06
-January 2022
+Version 5.00  
+August 2025  
 Chris Martin  
 
-## Binaries
+## <a name="bin"></a> Binaries  
+  
+- [lcrun](#lcrun)  
+- [lcburst](#lcburst)  
+- [lcstat](#lcstat)  
+---
 
 The core of the LConfig system is a set of functions and structs that handle the complicated job of configuring an experiment automatically.  The binaries are the top-level code that actually do the job.  Which binary you want depends on what job is being done.
 
@@ -29,16 +34,17 @@ $ lcburst -h | less
 $ lcstat -h | less
 ```
 
-### lcrun
+### <a name="lcrun"></a> lcrun
 
 The **L**aboratory **C**onfiguration **RUN** utility, `lcrun`, streams data from up to 8 devices directly to [data files](data.md).  This means it is well suited to long tests that involve big data sets, but the maximum data rate will be limited by the write speed to the hard drive.  For high-speed applications, look at `lcburst`.
+
+*NOTE* As of version 5.00, the `-n MAXREAD` option is ignored.  There are plans to restore this feature, but they will need to wait.  
 
 `lcrun` ignores the `nsample` parameter.
 
 ```bash
 $ lcrun -h
-lcrun [-h] [-r PREFILE] [-p POSTFILE] [-d DATAFILE] [-c CONFIGFILE] 
-     [-f|i|s param=value]
+lcrun [-h] [-d DATAFILE] [-c CONFIGFILE] [-n MAXREAD] [-f|i|s param=value]
   Runs a data acquisition job until the user exists with a keystroke.
 
 -c CONFIGFILE
@@ -69,10 +75,11 @@ lcrun [-h] [-r PREFILE] [-p POSTFILE] [-d DATAFILE] [-c CONFIGFILE]
      $ lcrun -f height=5.25 -i temperature=22 -s day=Monday
 
 GPLv3
-(c)2017-2022 C.Martin
+(c)2017-2025 C.Martin
 ```
+[top](#bin)
 
-### lcburst
+### <a name="lcburst"></a> lcburst
 
 The **L**aboratory **C**onfiguration **BURST** utility is intended for high speed streaming for a known duration.  The command-line options can be used to override the configured `nsample`, and otherwise, `nsample` determines the number of samples per channel that should be collected.
 
@@ -138,11 +145,12 @@ lcburst [-h] [-c CONFIGFILE] [-n SAMPLES] [-t DURATION] [-d DATAFILE]
   specified, then LCBURST will collect one packet worth of data.
 
 GPLv3
-(c)2017-2022 C.Martin
+(c)2017-2025 C.Martin
 
 ```
+[top](#bin)
 
-### lcstat
+### <a name="lcstat"></a> lcstat
 
 The **L**aboratory **C**onfiguration **STAT**us utility is intended to provide a quick and convenient real time display of signal statistics for the configured device.  This can be handy for monitoring an experiment or just for debugging.
 
@@ -201,6 +209,7 @@ lcstat [-dhmpr] [-c CONFIGFILE] [-n SAMPLES] [-u UPDATE_SEC]
   display updates.
 
 GPLv3
-(c)2020-2022 C.Martin
+(c)2020-2025 C.Martin
 
 ```
+[top](#bin)

@@ -1,7 +1,7 @@
 [back to Documentation](documentation.md)
 
-Version 4.06  
-September 2022  
+Version 5.00  
+August 2025  
 Chris Martin  
 
 ## <a name="compiling"></a> Compiling
@@ -32,19 +32,38 @@ To compile the built-in `lcrun` and `lcburst` binaries and automatically place t
 $ cd /path/to/lconfig
 $ sudo make install
 ```
-Alternately, this can be done step-by-step
+
+The output of the build process is stored in the `build` sub-directory.  This includes the following:  
+- `build/lcrun.bin`  
+- `build/lcburst.bin`  
+- `build/lcstat.bin`  
+- `build/lconfig.o`  
+- `build/lctools.o`  
+- `build/lcmap.o`  
+
+These binaries and object files can be destroyed by
 ```bash
 $ make clean
-$ make lconfig.o
-$ make lctools.o
-$ make lcburst.bin
-$ make lcrun.bin
-$ sudo make install
 ```
+For users that would like to test these binaries prior to installation,
+```bash
+$ make binaries
+```
+will create the `build` directory and compile the binaries, but it will not install them in the system.  To compile from scratch, 
+```bash
+$ make clean
+```
+removes the `build` directory and its contents.  
 
-### Writing your own binaries
+### Installation and uninstallation
 
-User applications that use the LConfig system should include the `lconfig.h` header.  There are also tools for interacting with data and for building simple terminal interfaces in the `lctools.h` header.  Somewhere at the top of your c-file, the line below should appear.  
+The `make install` command finishes by placing files in `/usr/local/bin`, and forcing their `chmod` permissions to 755.  To change this behavior, edit the `TODIR` and `BIN_CHMOD` variables in `makefile`.  
+
+The `make uninstall` command uses the same `TODIR` variable to locate prior installed binaries and remove them.  
+
+### Compiler commands
+
+Applications that use the LConfig system should include the `lconfig.h` header.  There are also tools for interacting with data and for building simple terminal interfaces in the `lctools.h` header.  Somewhere at the top of your c-file, the line below should appear.  
 
 ```C
 #include "lconfig.h"

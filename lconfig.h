@@ -223,7 +223,7 @@ with init_data_file() and write_data_file() utilities.
 
 */
 
-#define TWOPI 6.283185307179586
+#define TWOPI 6.283185307179586     // REALLY comes in handy for signal generation
 
 #define LC_MAX_STR      80          // longest supported string (no strong may be longer)
 #define LC_MAX_STR_NAME 49          // longest device name allowed
@@ -251,18 +251,18 @@ with init_data_file() and write_data_file() utilities.
 #define LC_SAMPLES_PER_READ 64      // Data read/write block size
 #define LC_TRIG_EFOFFSET 2000       // Offset in trigger channel number for hardware trigger
 
-#define LC_SE_NCH 199    // single-ended negative channel number
+#define LC_SE_NCH 199               // single-ended negative channel number
 
-#define LC_DEF_NSAMPLE 64
-#define LC_DEF_AI_NCH LC_SE_NCH
-#define LC_DEF_AI_RANGE 10.
-#define LC_DEF_AI_RES 0
-#define LC_DEF_AO_AMP 1.
-#define LC_DEF_AO_OFF 2.5
-#define LC_DEF_AO_DUTY 0.5
-#define LC_DEF_EF_TIMEOUT 1000
+#define LC_DEF_NSAMPLE 64           // Default nsample value
+#define LC_DEF_AI_NCH LC_SE_NCH     // Default ainegative value (single-ended)
+#define LC_DEF_AI_RANGE 10.         // Default airange value
+#define LC_DEF_AI_RES 0             // Default resolution index
+#define LC_DEF_AO_AMP 1.            // Default aoamplitude value
+#define LC_DEF_AO_OFF 2.5           // Default aooffset value
+#define LC_DEF_AO_DUTY 0.5          // Default aoduty value
+#define LC_DEF_EF_TIMEOUT 1000      // Default timeout for extended feature com
 
-#define LC_NOERR 0
+#define LC_NOERR 0                  // Universal error values
 #define LC_ERROR -1
 
 
@@ -354,7 +354,7 @@ typedef struct __lc_efconf_t__ {
     double duty;        // PWM duty cycle (0-1)
     double phase;       // Phase parameters (degrees)
     unsigned int counts; // Pulse count
-    char label[LC_MAX_STR_LABEL];
+    char label[LC_MAX_STR_LABEL+1];
 } lc_efconf_t;
 
 // Digital Communications Configuration Structure
