@@ -1274,6 +1274,10 @@ DATA pointer into a buffer that contains data ready for use.  The amount of data
 available is indicated by the CHANNELS and SAMPLES_PER_READ integers.  The total
 length of the data array will be CHANNELS * SAMPLES_PER_READ.
 
+On success, the return value is LC_NOERR.  If no data are available, the DATA
+pointer is set to NULL and the LC_STREAM_READ returns LC_ERROR.  In this way,
+LC_STREAM_READ is a non-blocking function.
+
 The measurements of each scan are arranged in data[] by channel number.  When 
 three channels are included in each measurement, the data array would appear 
 something like this
@@ -1284,6 +1288,16 @@ data[3]     sample1, channel0
 data[4]     sample1, channel1
 data[5]     sample1, channel2
 ... 
+
+The implied 2D array contains a row for every time sample with an interval 
+specified by the SAMPLEHZ parameter.  Each column corresponds to one of the 
+configured channels.  If they are configured, the channels always appear in
+the order:
+
+  [ Analog Channels ][ EF Stream Channels ][ DISTREAM ]
+
+Within each group, the channels appear in the order they are configured in the
+configuration header.
 
 Once READ_DATA_STREAM has been called, the lc_devconf_t struct updates its internal
 pointers, and the next call's DATA register will either point to the next 
