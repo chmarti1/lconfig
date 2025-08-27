@@ -115,6 +115,7 @@ static const lcm_map_t lcm_ef_signal[] = {
 static const lcm_map_t lcm_ef_direction[] = {
     {.value=LC_EF_INPUT, .message="Input", .config="input"},
     {.value=LC_EF_OUTPUT, .message="Output", .config="output"},
+    {.value=LC_EF_STREAM, .message="Stream", .config="stream"},
     {.value=-1}
 };
 
