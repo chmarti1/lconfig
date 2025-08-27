@@ -1,8 +1,8 @@
 [back](documentation.md)
 
-Version 4.08<br>
-April 2023<br>
-Chris Martin<br>
+Version 5.00  
+August 2025  
+Chris Martin  
 
 This is a handy quick-reference for functions and configuration options, but the authoritative and up-to-date documentation on the api and configuration interface is always in the `lconfig.h` and `lctools.h` headers themselves.
 
@@ -99,17 +99,17 @@ typedef struct __lc_devconf_t__ {
     lc_con_t connection_act;             // actual connection type index
     lc_dev_t device;                     // The requested device type index
     lc_dev_t device_act;                 // The actual device type
-    char ip[LCONF_MAX_STR];         // ip address string
-    char gateway[LCONF_MAX_STR];    // gateway address string
-    char subnet[LCONF_MAX_STR];     // subnet mask string
-    char serial[LCONF_MAX_STR];     // serial number string
-    char name[LCONF_MAX_NAME];      // device name string
+    char ip[LC_MAX_STR_IP+1];         // ip address string
+    char gateway[LC_MAX_STR_IP+1];    // gateway address string
+    char subnet[LC_MAX_STR_IP+1];     // subnet mask string
+    char serial[LC_MAX_STR_IP+1];     // serial number string
+    char name[LC_MAX_STR_NAME+1];      // device name string
     int handle;                     // device handle
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
     unsigned int nsample;           // *number of samples per read
     // Analog input
-    lc_aiconf_t aich[LCONF_MAX_NAICH];    // analog input configuration array
+    lc_aiconf_t aich[LC_MAX_NAICH];    // analog input configuration array
     unsigned int naich;             // number of configured analog input channels
     // Digital input streaming
     unsigned int distream;          // input stream mask
@@ -117,14 +117,14 @@ typedef struct __lc_devconf_t__ {
     unsigned int domask;            // output tristate mask
     unsigned int dovalue;           // output value mask
     // Analog output
-    lc_aoconf_t aoch[LCONF_MAX_NAOCH];   // analog output configuration array
+    lc_aoconf_t aoch[LC_MAX_NAOCH];   // analog output configuration array
     unsigned int naoch;             // number of configured analog output channels
     // Flexible Input/output
     double effrequency;            // flexible input/output frequency
-    lc_efconf_t efch[LCONF_MAX_NEFCH]; // flexible digital input/output
+    lc_efconf_t efch[LC_MAX_NEFCH]; // flexible digital input/output
     unsigned int nefch;            // how many of the EF are configured?
     // Communication
-    lc_comconf_t comch[LCONF_MAX_COMCH]; // Communication channels
+    lc_comconf_t comch[LC_MAX_COMCH]; // Communication channels
     unsigned int ncomch;            // how many of the com channels are configured?
     // Trigger
     int trigchannel;                // Which channel should be used for the trigger?
@@ -136,7 +136,7 @@ typedef struct __lc_devconf_t__ {
     // data file format
     lc_dataformat_t dataformat;
     // Meta & filestream
-    lc_meta_t meta[LCONF_MAX_META];  // *meta parameters
+    lc_meta_t meta[LC_MAX_META];  // *meta parameters
     lc_ringbuf_t RB;                  // ring buffer
 } lc_devconf_t;
 ```
@@ -156,8 +156,8 @@ typedef struct __lc_aiconf_t__ {
     unsigned int    resolution;  // resolution index (0-8) see T7 docs
     double          calslope;   // calibration slope
     double          calzero;    // calibration offset
-    char            calunits[LCONF_MAX_STR];   // calibration units
-    char            label[LCONF_MAX_STR];   // channel label
+    char            calunits[LC_MAX_STR_LABEL+1];   // calibration units
+    char            label[LC_MAX_STR_LABEL+1];   // channel label
 } lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
 ```
@@ -177,7 +177,7 @@ typedef struct __lc_aoconf_t__ {
     double          offset;       // What is the mean value?
     double          duty;         // Duty cycle for a square wave or triangle wave
                                   // duty=1 results in all-high square and an all-rising triangle (sawtooth)
-    char            label[LCONF_MAX_STR];   // Output channel label
+    char            label[LC_MAX_STR_LABEL+1];   // Output channel label
 } lc_aoconf_t;
 ```
 
@@ -189,14 +189,16 @@ Extended features configuration for a single channel
 ```C
 // Flexible Input/Output configuration struct
 // This includes everything needed to configure an extended feature EF channel
-typedef struct {
+typedef struct __lc_efconf_t__ {
     // Flexible IO mode enumerated type
     enum {  LC_EF_NONE,   // No extended features
             LC_EF_PWM,    // Pulse width modulation (input/output)
+            LC_EF_PULSE,  // One-time series of pulses (output)
             LC_EF_COUNT,  // Counter (input/output)
             LC_EF_FREQUENCY,  // Frequency (input)
             LC_EF_PHASE,  // Line-to-line phase (input)
-            LC_EF_QUADRATURE  // Encoder quadrature (input)
+            LC_EF_QUADRATURE, // Encoder quadrature (input)
+            LC_EF_TRIGGER     // Hardware trigger channel
         } signal;
 
     lc_edge_t edge;
@@ -207,15 +209,14 @@ typedef struct {
             LC_EF_DEBOUNCE_MINIMUM    // Minimum pulse width (rising, falling)
         } debounce;
 
-    enum {  LC_EF_INPUT, LC_EF_OUTPUT } direction;
+    enum {  LC_EF_INPUT, LC_EF_OUTPUT, LC_EF_STREAM } direction;
     int channel;
     double time;        // Time parameter (us)
     double duty;        // PWM duty cycle (0-1)
     double phase;       // Phase parameters (degrees)
     unsigned int counts; // Pulse count
-    char label[LCONF_MAX_STR];
+    char label[LC_MAX_STR_LABEL+1];
 } lc_efconf_t;
-
 ```
 
 [top](#ref:top)
@@ -226,9 +227,9 @@ typedef struct {
 ```C
 // Digital Communications Configuration Structure
 //
-typedef struct {
+typedef struct __lc_comconf_t__ {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
-    char label[LCONF_MAX_STR];
+    char label[LC_MAX_STR_LABEL+1];
     double rate;                // Data rate in bits/sec
     int pin_in;                 // Physical input DIO pin
     int pin_out;                // Physical output DIO pin
@@ -256,14 +257,14 @@ typedef struct {
 // relevant to the measurement.  They may be needed by the parent program
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
-typedef struct {
-    char param[LCONF_MAX_STR];      // parameter name
+typedef struct __lc_meta_t__ {
+    char *param;                    // parameter name
     union {
-        char svalue[LCONF_MAX_STR];
+        char *svalue;
         int ivalue;
         double fvalue;
     } value;                        // union for flexible data types
-    char type;                      // reminder of what type we have
+    lc_metatype_t type;             // The meta data type
 } lc_meta_t;
 ```
 [top](#ref:top)
@@ -277,7 +278,7 @@ This structure is responsible for managing the data stream behind the scenes.  T
 // Ring Buffer structure
 // The LCONF ring buffer supports reading and writing in R/W blocks that mimic
 // the T7 stream read block.  
-typedef struct {
+typedef struct __lc_ringbuf_t__ {
     unsigned int size_samples;      // length of the buffer array (NOT per channel)
     unsigned int blocksize_samples; // size of each read/write block
     unsigned int samples_per_read;  // samples per channel in each block
@@ -296,7 +297,9 @@ typedef struct {
 
 The supported LabJack connection types mapped to their LJM header values:
 ```C
-typedef enum {
+// Enumerated type for specifying a device conneciton
+// This is a mapping to the LJM constants that specify the same thing
+typedef enum __lc_con_t__ {
     LC_CON_NONE=-1,
     LC_CON_USB=LJM_ctUSB, 
     LC_CON_ANY=LJM_ctANY, 
@@ -311,7 +314,9 @@ typedef enum {
 ```
 The supported LabJack devices mapped to their LJM header values.
 ```C
-typedef enum {
+// Enumerated type for specifying a device type
+// This is a mapping to the LJM constants that specify the same thing
+typedef enum __lc_dev_t__ {
     LC_DEV_NONE=-1,
     LC_DEV_ANY=LJM_dtANY, 
     LC_DEV_T4=LJM_dtT4,
@@ -322,7 +327,13 @@ typedef enum {
 ```
 An enumerated type defining an edge type for triggering and extended features:
 ```C
-typedef enum {LC_EDGE_RISING, LC_EDGE_FALLING, LC_EDGE_ANY} lc_edge_t;
+// Edge enumerated type for specifing rising or falling edges in the
+// extended features
+typedef enum __lc_edge_t__ {
+    LC_EDGE_RISING, 
+    LC_EDGE_FALLING, 
+    LC_EDGE_ANY
+} lc_edge_t;
 ```
 A method for specifying the data format to use when writing data files:
 ```C
@@ -337,7 +348,7 @@ typedef enum __lc_dataformat_t__ {
 An enumerated integer for identifying the data type of a meta parameter:
 ```C
 typedef enum __lc_metatype_t__ {
-    LC_MT_ERR = LCONF_ERROR,
+    LC_MT_ERR = LC_ERROR,
     LC_MT_NONE = 0,
     LC_MT_INT = 1,
     LC_MT_FLT = 2,
@@ -353,14 +364,14 @@ typedef enum __lc_metatype_t__ {
 | Function | Description
 |:---:|:---
 | **Interacting with Configuration Files** ||
-|`lc_load_config` | Parses a configuration file and encodes the configuration on an array of DEVCONF structures |
-| `lc_write_config` | Writes a configuration file based on the configuration of a DEVCONF struct |
+|`lc_load` | Parses a configuration file and encodes the configuration on an array of DEVCONF structures |
+| `lc_write` | Writes a configuration file based on the configuration of a DEVCONF struct |
 | **Device Interaction** ||
 | `lc_open` | Opens a connection to the device identified in a DEVCONF configuration struct.  The handle is remembered by the DEVCONF struct. |
 | `lc_close` | Closes an open connection to the device handle in a DEVCONF configuration struct |
-| `lc_upload_config` | Perform the appropriate read/write operations to implement the DEVCONF struct settings on the T7 |
+| `lc_upload` | Perform the appropriate read/write operations to implement the DEVCONF struct settings on the T7 |
 | **Configuration Diagnostics** ||
-| `lc_show_config` | Calls download_config and automatically generates an item-by-item comparison of the T7's current settings and the settings contained in a DEVCONF structure. |
+| `lc_show` | Calls download_config and automatically generates an item-by-item comparison of the T7's current settings and the settings contained in a DEVCONF structure. |
 | `lc_ndev` | Returns the number of configured devices in a DEVCONF array |
 | `lc_nistream` | Returns the number of configured input channels in a DEVCONF device structure.  This includes analog AND digital streaming. |
 | `lc_nostream` | Returns the number of configured output channels in a DEVCONF device |
@@ -379,7 +390,7 @@ typedef enum __lc_metatype_t__ {
 | `lc_stream_iscomplete` | Returns a 1 if the number of samples streamed into the buffer is greater than or equal to the NSAMPLE configuration parameter |
 | `lc_stream_isempty` | Returns a 1 if the buffer has no samples ready to be read |
 | **Digital IO Extended Features** | |
-| `lc_update_ef` | Update all flexible I/O measurements and output parameters in the EFCONF structs |
+| `lc_ef_update` | Update all flexible I/O measurements and output parameters in the EFCONF structs |
 | **Digital Communication** ||
 | `lc_com_start` | Upload communication channel configuration and begin listening/transmitting |
 | `lc_com_stop` | Stop listening/transmitting on a digital channel |
@@ -387,9 +398,11 @@ typedef enum __lc_metatype_t__ {
 | `lc_com_read` | Obtain data (blocking or non-blocking) from a digital channel |
 | `lc_com_write` | Transmit data over a digital channel |
 | **Meta Configuration** ||
-| `lc_get_meta_int`, `lc_get_meta_flt`, `lc_get_meta_str` | Returns a meta parameter integer, floating point, or string value.  |
-| `lc_get_meta_type` | Detects whether a parameter exists, and returns an enumerated integer identifying its type. |
-| `lc_put_meta_int`, `lc_put_meta_flt`, `lc_put_meta_str` | Write an integer, floating point, or a string value to a meta parameter. |
+| `lc_meta_get_meta_int`, `lc_meta_get_flt`, `lc_meta_get_str` | Returns a meta parameter integer, floating point, or string value.  |
+| `lc_meta_get_num`  | Forces conversion of a meta parameter to a floating point. |
+| `lc_meta_get_type` | Detects whether a parameter exists, and returns an enumerated integer identifying its type. |
+| `lc_meta_put_int`, `lc_meta_put_flt`, `lc_meta_put_str` | Write an integer, floating point, or a string value to a meta parameter. |
+| `lc_meta_del` | Deletes a meta parameter. |
 
 [top](#ref:top)
 
@@ -397,31 +410,48 @@ typedef enum __lc_metatype_t__ {
 
 These are the compiler constants provided by `lconfig.h`.
 
-| Constant | Value | Description
-|--------|:-----:|-------------|
-| TWOPI  | 6.283185307179586 | 2*pi comes in handy for signal calculations
-| LCONF_VERSION | 3.06 | The floating point version number
-| LCONF_MAX_STR | 80  | The longest character string permitted when reading or writing values and parameters
-| LCONF_MAX_NAME | 49 | LJM's maximum device name length
-| LCONF_MAX_META | 32 | Maximum number of meta parameters
-| LCONF_MAX_STCH | 15     | Maximum number of stream channels (both input and output  permitted in the DEVCONF struct
-| LCONF_MAX_AOCH | 1      | Highest analog output channel number allowed
-| LCONF_MAX_NAOCH | 2     | Maximum number of analog output channels allowed
-| LCONF_MAX_AICH | 13     | Highest analog input channel number allowed
-| LCONF_MAX_NAICH | 14    | Maximum number of analog input channels allowed
-| LCONF_MAX_AIRES | 8     | Maximum resolution index allowed
-| LCONF_MAX_AOBUFFER | 512 | Maximum analog output buffer for repeating functions
-| LCONF_BACKLOG_THRESHOLD | 1024 | Raise a warning if LJM reports a stream backlog greater than this value
-| LCONF_CLOCK_MHZ | 80.0 | The T7 clock frequency in MHz
-| LCONF_SAMPLES_PER_READ | 64 | The default samples_per_read value in streaming operations
-| LCONF_DEF_NSAMPLE | 64 | Default value for the `nsample` parameter; used when it is unspecified
-| LCONF_DEF_AI_NCH | 199 | Default value for the `ainegative` parameter
-| LCONF_DEF_AI_RANGE | 10. | Default value for the `airange` parameter
-| LCONF_DEF_AI_RES | 0. | Default value for the `airesolution` parameter
-| LCONF_DEF_AO_AMP | 1. | Default value for the `aoamplitude` parameter
-| LCONF_DEF_AO_OFF | 2.5 | Default value for the `aooffset` parameter
-| LCONF_DEF_AO_DUTY | 0.5 | Default value for the `aoduty` parameter
-| LCONF_NOERR | 0 | Value returned on successful exit
-| LCONF_ERROR | 1 | Value returned on unsuccessful exit
+```C
+#define TWOPI 6.283185307179586     // REALLY comes in handy for signal generation
+
+#define LC_MAX_STR      80          // longest supported string (no strong may be longer)
+#define LC_MAX_STR_NAME 49          // longest device name allowed
+#define LC_MAX_STR_SERIAL 10        // longest device serial number allowed
+#define LC_MAX_STR_LABEL LC_MAX_STR // longest channel label
+#define LC_MAX_STR_IP   16          // longest IP address allowed
+#define LC_MAX_STR_PARAM 49         // longest meta parameter string
+#define LC_MAX_STR_VALUE LC_MAX_STR // longest meta value string
+#define LC_MAX_META     256         // how many meta parameters should we allow?
+#define LC_MAX_STCH     LC_MAX_AICH + LC_MAX_AOCH + 1 // Maximum streaming channels
+#define LC_MAX_AOCH     1           // maximum analog output channel number allowed
+#define LC_MAX_NAOCH    2           // maximum analog output channels to allow
+#define LC_MAX_AICH     14          // highest analog input channel number allowed
+#define LC_MAX_NAICH    15          // maximum analog input channels to allow
+#define LC_MAX_AIRES    8           // maximum resolution index
+#define LC_MAX_NDEV     32          // catch runaway cases if the user passes junk to devmax
+#define LC_MAX_EFCH     22          // Highest flexible IO channel
+#define LC_MAX_NEFCH    8           // maximum flexible IO channels to allow
+#define LC_MAX_COMCH    22          // Highest digital communications channel
+#define LC_MAX_UART_BAUD 38400      // Highest COMRATE setting when in UART mode
+#define LC_MAX_NCOMCH   4           // maximum com channels to allow
+#define LC_MAX_AOBUFFER 512         // Maximum number of buffered analog outputs
+#define LC_BACKLOG_THRESHOLD 1024   // raise a warning if the backlog exceeds this number.
+#define LC_CLOCK_MHZ    80.0        // Clock frequency in MHz
+#define LC_SAMPLES_PER_READ 64      // Data read/write block size
+#define LC_TRIG_EFOFFSET 2000       // Offset in trigger channel number for hardware trigger
+
+
+
+#define LC_DEF_NSAMPLE 64           // Default nsample value
+#define LC_DEF_AI_NCH LC_SE_NCH     // Default ainegative value (single-ended)
+#define LC_DEF_AI_RANGE 10.         // Default airange value
+#define LC_DEF_AI_RES 0             // Default resolution index
+#define LC_DEF_AO_AMP 1.            // Default aoamplitude value
+#define LC_DEF_AO_OFF 2.5           // Default aooffset value
+#define LC_DEF_AO_DUTY 0.5          // Default aoduty value
+#define LC_DEF_EF_TIMEOUT 1000      // Default timeout for extended feature com
+
+#define LC_NOERR 0                  // Universal error values
+#define LC_ERROR -1
+```
 
 [top](#ref:top)

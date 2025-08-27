@@ -1,12 +1,21 @@
 [back](documentation.md)
 
-Version 4.06  
-January 2022  
+Version 5.00  
+August 2025  
 Chris Martin  
 
 ## Data files
 
+- [Example data file](#ex)
+- [The header](#head)
+- [The data](#data)
+- [Data file sizes](#size)
+- [Calibrations](#cal)
+---
+
 LConfig includes two functions for creating data files: `lc_datafile_init()` and `lc_datafile_write()` described in the [api](api.md).  They are used in both the `lcburst` and `lcrun` [binaries](bin.md) to produce a standardized human-readable data file that embeds the configuration in a header.
+
+### <a name="ex"></a> Example data file
 
 A data file begins with the device configuration, ended by a `##`, followed by a time stamp, followed by the data.  This is an example of an ascii or text formatted data file.
 
@@ -52,15 +61,34 @@ str:note0 "This is a note I added later."
 1.419444e+00	6.550400e+04
 ```
 
+### <a name="head"></a> The header
+
 The header is just a standard [configuration](config.md) terminated by the first appearance of `##`.  This gives a human reader or a post-processing code enough information to interpret the data that follow.  Meta parameters like `note0` can either be configured before data are collected, but the intent is also for users to be able to easily interject their own comments manually.  This makes it easier to keep notes on the fly while taking data.
 
 The first line of the data also appears like a comment.  It always begins with `#:` and a space.  The following timestamp is a standard 24-character [time stamp](https://www.gnu.org/software/libc/manual/html_node/Formatting-Calendar-Time.html#Formatting-Calendar-Time).  It takes the form `DDD MMM dd hh:mm:ss YYYY` when D is the abbreviated day of the week, M is the abbreviated month, d is the calendar day of the month, h is the 24-hour clock hour, m is the minute, s is the second, and Y is the 4-digit year.
 
-LConfig supports saving data in binary or ascii formats based on the `dataformat` configuration parameter value.  Regardless, the header will always be encoded in plain ascii encoding, so it will be human readable using even the simplest command-line utilities.  Ironically, more sophisticated text editors will often try to determine the character encoding automatically, and will be confused by the appearance of binary data later in the file.
+### <a name="data"></a> The data
 
-These data are in exponential floating point tab-separated columns.  Currently, the data are formatted in exponential notation with seven significant figures (%.6e format).  First, the analog inputs are listed in the order they were configured, then any streamable extended feature channels are listed in the order they were configured, then, finally, the DI stream value appears if it was configured.  Note that the digital input stream is also written using the same format, but the value it represents is 65,504 or 0b1111111111100000.  Only two digital inputs were configured (DIO16 and DIO32).  In these data, DIO16 was 0 and DIO32 was 1.
+LConfig supports saving data in binary or ascii formats based on the `dataformat` configuration parameter value.  Regardless, the header will always be encoded in plain ascii, so it will be human readable using even the simplest command-line utilities.  Ironically, more sophisticated text editors will often try to determine the character encoding automatically, and will be confused by the appearance of binary data later in the file.  To correctly view the headers of binary files, be sure to open in Gedit, nano, vim, Notepad++, or some other editor that allows you to force UTF-8 encoding.  The editor may throw an error that the file contains illegal characters; that's OK.
 
-In binary format, each floating point measurement or digital value is encoded as an IEEE 754 big endian floating point number.  This means that each sample for each channel will occupy four bytes.  In ASCII format, a single sample will occupy more than three times that space. For this reason, binary may be preferable for large datasets.
+ASCII data are in exponential floating point tab-separated columns.  The data are formatted in exponential notation with seven significant figures (`%.6e` format) regardless of their source.  The end of a row is marked by a newline, `\n`.  
+
+The ASCII column order is determined by the channels configured.  
+- Analog inputs in the order they are configured  
+- Extended feature channels in `stream` mode in the order they are configured  
+- Digital input stream  
+
+After the timestamp (which is still encoded in ASCII characters), binary files store each sample represented sequentially in the single-precision floating point used by the system.  In many systems, this will be IEEE 754 big endian single-precision (32-bit) floating point number.  This means that each sample for each channel will occupy four bytes.  The binary data order are identical to the ASCII data order, but they are sequential without separators or row breaks.  This is the same format used by the internal ring buffer, and it is understood by utilities like `lct_data()`.
+
+As of version 5.00, all digital data are streamed as 16-bit unsigned integers, so 32-bit data is lost.  In the example above, the digital input stream returned a value 65,504 or 0b1111111111100000.  Only two digital inputs were configured (DIO4 and DIO5).  In these data, DIO4 was 0 and DIO5 was 1.  
+
+### <a name="size"></a> Data file sizes
+
+In ASCII format, a single sample from a single channel requires 13 characters (7 mantissa + 1 radix + 'e' + 3 exponent + 1 separator).  By contrast, binary needs only 32 bits for each data element, equivalent to only 4 characters.  Binary files are faster and obviously more efficient with space, but because their encoding may depend on the local system floating point implementation, ASCII has big advantages for archival value.  It is up to the user to decide which is more important.  
+
+A compromise may be to use ASCII format and then use a separate file compression utility for long-term storage.  In practice, significant compression ratios can be achieved for ASCII-encoded files, because they are highly patterned.  
+
+### <a name="cal"></a> Calibrations
 
 In this example, the analog input configuration includes a calibration.  Calibrations are interpreted as being a conversion from volts to some unit (in this case, psi).  The data in the data file are always in volts as measured by the LabJack device.  It is up to post processing software to apply the calibration or not.  This has the advantage of making it easier to correct the data if the calibration turns out to be flawed.  Here, it looks like the pressure being measured is about (1.42 - 0.4)x20 = 20.4psi.
 

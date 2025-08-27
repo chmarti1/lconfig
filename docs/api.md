@@ -1,17 +1,18 @@
 [back to Documentation](documentation.md)
 
-Version 4.08  
-April 2023  
+Version 5.00  
+April 2025  
 Christopher R. Martin  
 
 ##  <a name='top'></a> The LConfig API
 If you want to use the LConfig system, but you don't just want to use the canned `lcrun`, `lcburst`, or `lcstat` codes, you'll need to know the LConfig API.  The API is exposed through three headers that provide hooks into their respective object files.
 
-Follow these links for detailed documentation on each:
-[Introduction](#intro)
-- [lconfig.h](lconfig_h.md) The core LConfig API
-- [lctools.h](lctools_h.md) High level data and UI tools
-- [lcmap.h](#lcmap_h.md) Tools for configuration and message mapping
+Follow these links for detailed documentation on each:  
+[Introduction](#intro)  
+- [lconfig.h](lconfig_h.md) The core LConfig API  
+- [lctools.h](lctools_h.md) High level data and UI tools  
+- [lcmap.h](lcmap_h.md) Tools for configuration and message mapping  
+
 The authoritative documentation for each element of the interface is ALWAYS found in the comments of each header file, while these doc files are intended to help users understand the top-level design of the lconfig system.
 
 ## <a name=intro></a>Introduction

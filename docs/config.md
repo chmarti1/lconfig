@@ -1,6 +1,6 @@
 [back](documentation.md)
 
-Version 4.09  
+Version 5.00  
 July 2025  
 Christopher R. Martin  
 
@@ -88,7 +88,7 @@ name "This is a Name"
 
 ### <a name="scope"></a> Parameter scope
 
-So far, all of the parameters we have been discussing are applied to the device being configured, but some parameters are applied more narrowly.  For example, parameters that describe an analog input will not apply to the entire device, but only to a single analog input channel.  This limited range of influence is called the parameter's *scope*.  Global parameters are applied to the entire device.  Other scopes include analog input, analog output, and flexible IO.  Parameters with these scopes only apply to a single channel of each of those types.
+So far, all of the parameters we have been discussing are applied to the device being configured, but some parameters are applied more narrowly.  For example, parameters that describe an analog input will not apply to the entire device, but only to a single analog input channel.  This limited range of influence is called the parameter's *scope*.  Global parameters are applied to the entire device.  Other scopes include analog input, analog output, and flexible IO.  Parameters with these scopes only apply to a single channel of each of those types.  
 
 [top](#config)
 
@@ -96,11 +96,13 @@ So far, all of the parameters we have been discussing are applied to the device 
 
 In addition to the parameters used to identify the device, there are several important parameters that define the behavior of the device.  Perhaps the most important is `samplehz`, which indicates the number of times per second each channel will be sampled in a stream.  
 
-`nsample` is an integer sample count whose behavior depends on the application.  Nominally, `nsample` tells the  `iscomplete_data_stream()` function when to declare that the data acquisition process is complete, but it's entirely up to the application whether or not to keep going.  For example, `lcrun` utterly ignores `nsample` and just waits for a user keystroke.  However, `lcburst` uses `nsample` to determine the duration of the entire measurement when none is specified at the command line.
+`nsample` is an integer sample count whose behavior depends on the application.  Nominally, `nsample` tells the  `iscomplete_data_stream()` function when to declare that the data acquisition process is complete, but it's entirely up to the application whether or not to keep going.  For example, `lcrun` utterly ignores `nsample` and just waits for a user keystroke.  However, `lcburst` uses `nsample` to determine the duration of the entire measurement when none is specified at the command line.  
 
-The `dataformat` parameter is used to determine how data files will be constructed.  It accepts `ascii` or `text` to specify a tab-delimited text file, and `bin` or `binary` to specify a file of 32-bit floats.  When [data files](data.md) are written in binary mode, the configuration header still appears as plain text, so the data file can always be parsed in the same way.
+It is important to keep in mind that, regardless of the binary, `nsample` is _always_ used to size the internal data buffer.  LConfig uses a ring buffer to hold data.  When `lc_stream_start()` is called, the buffer is initialized to hold _at least_ `nsample` measurements from each
 
-Especially for high-output-impedance sensors like thermocouples, the `settleus` parameter can be extremely useful in achieving clean measurements.  This specifies the time (in microseconds) for each signal to "settle" before a measurement occures.  Each time a device switches channels in a stream operation, there is some time required for the internal circuitry to settle in to the new value.  Read about [multiplexers](https://en.wikipedia.org/wiki/Multiplexer) or [ghosting](https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z0000019KzzSAE) for more information.
+The `dataformat` parameter is used to determine how data files will be constructed.  It accepts `ascii` or `text` to specify a tab-delimited text file, and `bin` or `binary` to specify a file of 32-bit floats.  When [data files](data.md) are written in binary mode, the configuration header still appears as plain text, so the data file can always be parsed in the same way.  
+
+Especially for high-output-impedance sensors like thermocouples, the `settleus` parameter can be extremely useful in achieving clean measurements.  This specifies the time (in microseconds) for each signal to "settle" before a measurement occures.  Each time a device switches channels in a stream operation, there is some time required for the internal circuitry to settle in to the new value.  Read about [multiplexers](https://en.wikipedia.org/wiki/Multiplexer) or [ghosting](https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z0000019KzzSAE) for more information.  
 
 Trigger configuration is also a global process, but there is a separate section devoted to configuring triggers [below](#trigger).
 
@@ -271,9 +273,9 @@ See below for more extended feature channel options.
 
 Digital input-output extended features can be configured just like an analog input or output.  An extended feature channel is created by the `EFCHANNEL` parameter, which accepts a single integer digital pin number on which the channel is to be configured.  Like the analog channels, extended features can be given a string label using the `EFLABEL` parameter.  
 
-The function of the channel is determined jointly by the `EFSIGNAL` and `EFDIRECTION` parameters.  The signal indicates what kind of extended feature is to be used, accepting keywords: `pwm`, `counter`, `pulse`, `frequency`, `phase`, `quadrature`, or `trigger`.  The direction specifies whether the channel should be used as an `output`, `input` or `stream` (input stream).
+The function of the channel is determined jointly by the `EFSIGNAL` and `EFDIRECTION` parameters.  The signal indicates what kind of extended feature is to be used, accepting keywords: `pwm`, `counter`, `pulse`, `frequency`, `phase`, `quadrature`, or `trigger`.  The direction specifies whether the channel should be used as an `output`, `input` or `stream`.  The `stream` setting causes the extended feature's result register, `DIOx_EF_READ_A`, to be added to the input stream data.  
 
-Channels that are configured as normal EF inputs or outputs force the user to interact directly with the `efch` struct within the `lc_devconf_t` struct.  Unfortunately, this layer is only well documented in the `lconfig.h` header file.  On the other hand, streaming data automatically captures the `DIO#_EF_READ_A` 16-bit register as a channel of streamed data.
+Channels that are configured as normal EF inputs or outputs force the user to interact directly with the `efch` struct within the `lc_devconf_t` struct.  Unfortunately, this layer is only well documented in the `lconfig.h` header file.  On the other hand, streaming data automatically captures the `DIO#_EF_READ_A` 16-bit register as a channel of streamed data.  
 
 ```C
 lc_devconf_t dconf;
@@ -294,7 +296,7 @@ lc_update_ef(&dconf);
 printf("Current count: %d\n", dconf.efch[1].counts);
 ```
 
-Because of the way LabJacks manage the internal timing for the extended features, all extended feature output signals share a single global `EFFREQUENCY` parameter that defines their repetition rate.  For example, the following example configures two pulse-width-modulated outputs with one signal phase-shifted relative to the first.  Both signals will share the same 1000Hz frequency.
+Because of the way LabJacks manage the internal timing for the extended features, all extended feature output signals share a single global `EFFREQUENCY` parameter that defines their repetition rate.  For example, the following example configures two pulse-width-modulated outputs with one signal phase-shifted relative to the first.  Both signals will share the same 1000Hz frequency.  
 
 ```bash
 effrequency 1000

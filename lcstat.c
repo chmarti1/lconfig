@@ -42,7 +42,7 @@
 
 
 #define destruct(){\
-    for(ii=0;ii<ndev;ii++){lc_close(&dconf[ii]);}\
+    for(ii=0;ii<ndev;ii++){lc_stream_stop(&dconf[ii]);lc_close(&dconf[ii]);lc_clean(&dconf[ii]);}\
     lct_finish_keypress();\
     if(working){free(working); working=NULL;}\
     if(values){free(values); values=NULL;}\
@@ -109,7 +109,7 @@ const char help_text[] = \
 "  display updates.\n"\
 "\n"\
 "GPLv3\n"\
-"(c)2020-2022 C.Martin\n";
+"(c)2020-2025 C.Martin\n";
 
 
 /*....................
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]){
     // Load the configuration
     // This will also enforce that no more than MAXDEV devices are configured
     printf("Loading configuration file...\n");
-    if(lc_load_config(dconf, MAXDEV, config_file)){
+    if(lc_load(dconf, MAXDEV, config_file)){
         fprintf(stderr, "LCSTAT failed while loading the configuration file \"%s\"\n", config_file);
         return -1;
     }else
@@ -259,7 +259,7 @@ int main(int argc, char *argv[]){
             destruct();
             return -1;
         // Upload the configurations
-        }else if(lc_upload_config(&dconf[ii])){
+        }else if(lc_upload(&dconf[ii])){
             fprintf(stderr, "LCSTAT failed to configure device %d in configuration file %s\n", ii, config_file);
             destruct();
             return -1;
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]){
             // If there are any extended feature channels, update them before
             // beginning the redraw
             if(dconf[ii].nefch)
-                lc_update_ef(&dconf[ii]);
+                lc_ef_update(&dconf[ii]);
             
             // Start fresh
             lct_clear_terminal();
@@ -393,7 +393,7 @@ int main(int argc, char *argv[]){
                     printf("\n");
                 }
             }
-            printf("\nPress \"Q\" to exit.\n");
+            printf("\nPress 'Q' to exit.\n");
         }
         
         // Service the data connections

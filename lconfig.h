@@ -22,7 +22,7 @@
 /*
 Use the commands below to compile your code in a *nix environment
 You're on your own in Windows.  If you're in Windows, just about
-everything should work, but the show_config() function may give
+everything should work, but the show() function may give
 strange results, and start_data_stream() may need some tweaking.
 
 $gcc -c lconfig.c -o lconfig.o
@@ -212,9 +212,18 @@ with init_data_file() and write_data_file() utilities.
 - Rewrote lc_datafile_write() to require a separate call to lc_stream_read()
   This change in call signature is to allow file write operations while also
   gaining access to the data in the application.
+- Shifted to dynamic memory allocation for meta parameter and string values
+  to reduce the memory cost of high meta parameter quantities.
+- Increased maximum number of meta parameters to 256
+- Implemented different maximum string lengths for IP, LABEL, NAME, PARAM, 
+  SERIAL, and VALUE for more efficient use of memory.
+- Renamed meta functions (e.g. from lc_get_meta_XXX to lc_meta_get_XXX)
+- Renamed lc_update_ef() to lc_ef_update()
+- Renamed lc_load, lc_upload, lc_show, and lc_write
+
 */
 
-#define TWOPI 6.283185307179586
+#define TWOPI 6.283185307179586     // REALLY comes in handy for signal generation
 
 #define LC_MAX_STR      80          // longest supported string (no strong may be longer)
 #define LC_MAX_STR_NAME 49          // longest device name allowed
@@ -223,7 +232,7 @@ with init_data_file() and write_data_file() utilities.
 #define LC_MAX_STR_IP   16          // longest IP address allowed
 #define LC_MAX_STR_PARAM 49         // longest meta parameter string
 #define LC_MAX_STR_VALUE LC_MAX_STR // longest meta value string
-#define LC_MAX_META     32          // how many meta parameters should we allow?
+#define LC_MAX_META     256         // how many meta parameters should we allow?
 #define LC_MAX_STCH     LC_MAX_AICH + LC_MAX_AOCH + 1 // Maximum streaming channels
 #define LC_MAX_AOCH     1           // maximum analog output channel number allowed
 #define LC_MAX_NAOCH    2           // maximum analog output channels to allow
@@ -242,18 +251,18 @@ with init_data_file() and write_data_file() utilities.
 #define LC_SAMPLES_PER_READ 64      // Data read/write block size
 #define LC_TRIG_EFOFFSET 2000       // Offset in trigger channel number for hardware trigger
 
-#define LC_SE_NCH 199    // single-ended negative channel number
+#define LC_SE_NCH 199               // single-ended negative channel number
 
-#define LC_DEF_NSAMPLE 64
-#define LC_DEF_AI_NCH LC_SE_NCH
-#define LC_DEF_AI_RANGE 10.
-#define LC_DEF_AI_RES 0
-#define LC_DEF_AO_AMP 1.
-#define LC_DEF_AO_OFF 2.5
-#define LC_DEF_AO_DUTY 0.5
-#define LC_DEF_EF_TIMEOUT 1000
+#define LC_DEF_NSAMPLE 64           // Default nsample value
+#define LC_DEF_AI_NCH LC_SE_NCH     // Default ainegative value (single-ended)
+#define LC_DEF_AI_RANGE 10.         // Default airange value
+#define LC_DEF_AI_RES 0             // Default resolution index
+#define LC_DEF_AO_AMP 1.            // Default aoamplitude value
+#define LC_DEF_AO_OFF 2.5           // Default aooffset value
+#define LC_DEF_AO_DUTY 0.5          // Default aoduty value
+#define LC_DEF_EF_TIMEOUT 1000      // Default timeout for extended feature com
 
-#define LC_NOERR 0
+#define LC_NOERR 0                  // Universal error values
 #define LC_ERROR -1
 
 
@@ -280,8 +289,8 @@ typedef struct __lc_aiconf_t__ {
     unsigned int    resolution;  // resolution index (0-8) see T7 docs
     double          calslope;   // calibration slope
     double          calzero;    // calibration offset
-    char            calunits[LC_MAX_STR];   // calibration units
-    char            label[LC_MAX_STR_LABEL];   // channel label
+    char            calunits[LC_MAX_STR_LABEL+1];   // calibration units
+    char            label[LC_MAX_STR_LABEL+1];   // channel label
 } lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
 
@@ -296,7 +305,7 @@ typedef struct __lc_aoconf_t__ {
     double          offset;       // What is the mean value?
     double          duty;         // Duty cycle for a square wave or triangle wave
                                   // duty=1 results in all-high square and an all-rising triangle (sawtooth)
-    char            label[LC_MAX_STR_LABEL];   // Output channel label
+    char            label[LC_MAX_STR_LABEL+1];   // Output channel label
 } lc_aoconf_t;
 
 
@@ -345,14 +354,14 @@ typedef struct __lc_efconf_t__ {
     double duty;        // PWM duty cycle (0-1)
     double phase;       // Phase parameters (degrees)
     unsigned int counts; // Pulse count
-    char label[LC_MAX_STR_LABEL];
+    char label[LC_MAX_STR_LABEL+1];
 } lc_efconf_t;
 
 // Digital Communications Configuration Structure
 //
 typedef struct __lc_comconf_t__ {
     enum {LC_COM_NONE, LC_COM_UART, LC_COM_1WIRE, LC_COM_SPI, LC_COM_I2C, LC_COM_SBUS} type;
-    char label[LC_MAX_STR_LABEL];
+    char label[LC_MAX_STR_LABEL+1];
     double rate;                // Data rate in bits/sec
     int pin_in;                 // Physical input DIO pin
     int pin_out;                // Physical output DIO pin
@@ -383,9 +392,9 @@ typedef enum __lc_metatype_t__ {
 // they could hold calibration information, or they may simply be a way
 // to make notes about the experiment.
 typedef struct __lc_meta_t__ {
-    char param[LC_MAX_STR_PARAM];      // parameter name
+    char *param;                    // parameter name
     union {
-        char svalue[LC_MAX_STR_VALUE];
+        char *svalue;
         int ivalue;
         double fvalue;
     } value;                        // union for flexible data types
@@ -443,11 +452,11 @@ typedef struct __lc_devconf_t__ {
     lc_con_t connection_act;             // actual connection type index
     lc_dev_t device;                     // The requested device type index
     lc_dev_t device_act;                 // The actual device type
-    char ip[LC_MAX_STR_IP];         // ip address string
-    char gateway[LC_MAX_STR_IP];    // gateway address string
-    char subnet[LC_MAX_STR_IP];     // subnet mask string
-    char serial[LC_MAX_STR_IP];     // serial number string
-    char name[LC_MAX_STR_NAME];      // device name string
+    char ip[LC_MAX_STR_IP+1];         // ip address string
+    char gateway[LC_MAX_STR_IP+1];    // gateway address string
+    char subnet[LC_MAX_STR_IP+1];     // subnet mask string
+    char serial[LC_MAX_STR_IP+1];     // serial number string
+    char name[LC_MAX_STR_NAME+1];      // device name string
     int handle;                     // device handle
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
@@ -497,7 +506,7 @@ Return the number of configured device connections in a lc_devconf_t array.
 Counts until it finds a device with a connection index less than 0 (indicating
 that it was never configured) or until the devmax limit is reached.  That means
 that LC_NDEV will be fooled if lc_devconf_t elements are not configured 
-sequentially.  Fortunately, load_config always works sequentially.
+sequentially.  Fortunately, load always works sequentially.
 */
 int lc_ndev(lc_devconf_t* dconf, // Array of device configuration structs
                 const unsigned int devmax); // maximum number of devices allowed
@@ -597,7 +606,7 @@ The following parameters are recognized:
 .   Identifies the device by its serial number.  Devices can be identified by
 .   their serial number, NAME, or IP address.  When multiples of these are
 .   defined simultaneously, the device is queried to be certain they are all
-.   consistent.  Contradictions will result in an error from open_config().
+.   consistent.  Contradictions will result in an error from open().
 .
 .   The precedence rules change slightly based on the conneciton type:
 .   ANY:    SERIAL, NAME
@@ -612,7 +621,7 @@ The following parameters are recognized:
 .   The static IP address to use for an ethernet connection.  If the connection
 .   is ETH, then the ip address will be used to to identify the device.  If the
 .   connection is set to USB, then the IP address will be treated like any 
-.   other parameter, and will be written to the T7 with the upload_config()
+.   other parameter, and will be written to the T7 with the upload()
 .   function.  If the connection is ANY, a non-empty IP value causes a warning
 .   and will be ignored.  See SERIAL for more about how LConfig identifies
 .   devices.
@@ -846,7 +855,7 @@ The following parameters are recognized:
 .       lc_update_ef() is called, and the counts value will be set to zero.
 .       In this way, redundant subsequent calls to lc_update_ef() have no 
 .       effect until the count member is rewritten.  The duty and phase are
-.       written by lc_upload_config() and will not be updated unless it is
+.       written by lc_upload() and will not be updated unless it is
 .       called again.  
 .
 .       The LJM interface presumes that the resting state for the pulse 
@@ -998,12 +1007,12 @@ The following parameters are recognized:
 .   three-letter prefix and a colon.  For exmaple, an integer parameter named
 .   "year" would be declared by
 .       int:year 2016
-.   Once established, it can be accessed using the get_meta_int or put_meta_int
+.   Once established, it can be accessed using the meta_get_int or meta_put_int
 .   functions.
         int year;
-.       get_meta_int(dconf,"year",&year);
+.       meta_get_int(dconf,"year",&year);
 */
-int lc_load_config(lc_devconf_t* dconf,         // array of device configuration structs
+int lc_load(lc_devconf_t* dconf,         // array of device configuration structs
                 const unsigned int devmax, // maximum number of devices to load
                 const char* filename);  // name of the file to read
 
@@ -1014,12 +1023,12 @@ file identified by filename.  The append flag indicates whether the file should
 be overwritten or appended with the parameters.  In order to save multiple
 device configurations to the same file, the append flag should be set.
 */
-void lc_write_config(lc_devconf_t* dconf, FILE* ff);
+void lc_write(lc_devconf_t* dconf, FILE* ff);
 
 
 
 /* OPEN_CONFIG
-When dconf is an array of device configurations loaded by load_config().  DCONF
+When dconf is an array of device configurations loaded by load().  DCONF
 is a pointer to the device configuration struct corresponding to the device 
 connection to open.
 */
@@ -1032,19 +1041,25 @@ Closes the connection to device DCONF.
 */
 int lc_close(lc_devconf_t* dconf);
 
+/* CLEAN
+Always call CLEAN at the end of execution.  This frees dynamic memory
+assigned to the stream ring buffer and dynamic memory assigned to string
+meta data.
+*/
+int lc_clean(lc_devconf_t* dconf);
 
 /*UPLOAD_CONFIG
-Presuming that the connection has already been opened by open_config(), this
+Presuming that the connection has already been opened by open(), this
 function uploads the appropriate parameters to the respective registers of 
 device devnum in the dconf array.
 */
-int lc_upload_config(lc_devconf_t* dconf);
+int lc_upload(lc_devconf_t* dconf);
 
 
 /*SHOW_CONFIG
 Prints a display of the parameters configured in DCONF.
 */
-void lc_show_config(lc_devconf_t* dconf);
+void lc_show(lc_devconf_t* dconf);
 
 
 
@@ -1055,7 +1070,7 @@ to be used to detect whether the parameter exists, so it does not print
 error or warning messages if the parameter is not found.  Instead it returns
 LC_MT_NONE (or zero), so it can be used conveniently in an if() statement:
 
-    if(lc_get_meta_type(&dconf, "myparam"))
+    if(lc_meta_get_type(&dconf, "myparam"))
     {
         ... parameter exists ...
     }else{
@@ -1063,9 +1078,9 @@ LC_MT_NONE (or zero), so it can be used conveniently in an if() statement:
     }
 
 */
-lc_metatype_t lc_get_meta_type(lc_devconf_t *dconf, const char* param);
+lc_metatype_t lc_meta_get_type(lc_devconf_t *dconf, const char* param);
 
-/*DEL_META
+/*META_DEL
 Delete an existing meta parameter.
 If the parameter is not found, returns LC_ERROR, and prints an error message to
 stderr.  Otherwise, the parameter is removed from the meta parameter list.
@@ -1077,24 +1092,29 @@ is possible for meta parameters to remain past the end of the list.  They will a
 to have been deleted for the purposes of GET_META and PUT_META, but they should
 have also been cleared.  DEL_META will clear them and print a warning.
 */
-int lc_del_meta(lc_devconf_t *dconf, const char* param);
+int lc_meta_del(lc_devconf_t *dconf, const char* param);
 
-/*GET_META_XXX
+
+/*META_GET_XXX
 Retrieve a meta parameter of the specified type.
 If the type is called incorrectly, the function will still return a value, but it will
 be the giberish data that you get when you pull from a union.
-If the parameter is not found, get_meta_XXX will return an error.  Parameters are not called
+If the parameter is not found, meta_get_XXX will return an error.  Parameters are not called
 with their type prefixes.  For example, a parameter declared in a config file as 
     int:year 2016
 can be referenced by 
     int year;
-    get_meta_int(&dconf,"year",&year);
+    meta_get_int(&dconf,"year",&year);
+    
+As of version 5.0, GET_META_STR returns a pointer to the dynamically allocated meta
+string instead of copying the string.  In applications where the meta values might
+be overwritten, the application should make a copy to avoid segfault errors.
 */
-int lc_get_meta_int(lc_devconf_t* dconf, const char* param, int* value);
-int lc_get_meta_flt(lc_devconf_t* dconf, const char* param, double* value);
-int lc_get_meta_str(lc_devconf_t* dconf, const char* param, char* value);
+int lc_meta_get_int(lc_devconf_t* dconf, const char* param, int* value);
+int lc_meta_get_flt(lc_devconf_t* dconf, const char* param, double* value);
+int lc_meta_get_str(lc_devconf_t* dconf, const char* param, char** value);
 
-/*GET_META_NUM
+/*META_GET_NUM
 Retireve a meta parameter and convert it into a double float.  If it is
 already a FLT parameter, no conversion is necessary.  If it is an integer,
 the conversion is trivial.  If it is a string, we will attempt to convert
@@ -1104,28 +1124,30 @@ Returns LC_NOERR on success.
 Returns LC_ERROR if the parameter does not exist.
 Returns -LC_ERROR if the conversion fails.
  */
-int lc_get_meta_num(lc_devconf_t* dconf, const char* param, double* value);
+int lc_meta_get_num(lc_devconf_t* dconf, const char* param, double* value);
 
-/*PUT_META_XXX
+/*META_PUT_XXX
 Write to the meta array.  If the parameter already exists, the old data will be overwritten.
 If the parameter does not exist, a new meta entry will be created.  If the meta array is
-full, put_meta_XXX will return an error.
+full, meta_put_XXX will return an error.
+
+As of version 5.0, PUT_META_STR allocates dynamic memory before copying the data
 */
-int lc_put_meta_int(lc_devconf_t* dconf, const char* param, int value);
-int lc_put_meta_flt(lc_devconf_t* dconf, const char* param, double value);
-int lc_put_meta_str(lc_devconf_t* dconf, const char* param, char* value);
+int lc_meta_put_int(lc_devconf_t* dconf, const char* param, int value);
+int lc_meta_put_flt(lc_devconf_t* dconf, const char* param, double value);
+int lc_meta_put_str(lc_devconf_t* dconf, const char* param, char* value);
 
 
-/*UPDATE_EF
+/*EF_UPDATE
 Refresh the extended features registers.  All lc_devconf_t EF parameters will be 
 rewritten to their respective registers and measurements will be downloaded into
 the appropriate EF channel member variables.
 
 The clock frequency will NOT be updated.  To change the EFfrequency parameter,
-upload_config() should be re-called.  This will halt acquisition and re-start 
+upload() should be re-called.  This will halt acquisition and re-start 
 it.
 */
-int lc_update_ef(lc_devconf_t* dconf);
+int lc_ef_update(lc_devconf_t* dconf);
 
 /*COMMUNICATE
 Executes a read/write operation on a digital communication channel.  The 
@@ -1330,17 +1352,6 @@ Halt an active stream on device devnum.
 */
 int lc_stream_stop(lc_devconf_t* dconf);
 
-/*STREAM_CLEAR
-Empty the buffer without deallocating any memory.  This doesn't reset any
-of the buffer status registers, but it 
-*/
-
-/*STREAM_CLEAN
-De-allocates the memory assigned to the internal ring-buffer.  This is 
-not automatically done by LC_STREAM_STOP so that data will be available
-after the collection process has completed.
- */
-int lc_stream_clean(lc_devconf_t* dconf);
 
 /*
 .
