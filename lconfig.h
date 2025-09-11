@@ -645,12 +645,19 @@ The following parameters are recognized:
 .   the T7 to select a settling time automatically.  For applications where 
 .   synchronous data sampling isn't important, long settling times are good.
 -NSAMPLE
-.   Number of samples to be collected per read in AI streaming.  Here, we use 
-.   the word "sample" in the same way LabJack uses the word "scan".  In multi-
-.   channel configurations NSAMPLE * NAICH individual data points will be read.
+.   LCONFIG uses NSAMPLE to size the ring buffer used for holding data while
+.   waiting for application to call lc_stream_read().  The buffer will 
+.   always be sized to hold _at_least_ NSAMPLE * lc_nistream() measurements.
+.   Additional buffer space may be allotted to ensure the TRIGPRE parameter
+.   can be honored, or to ensure that there is always room for at least two
+.   "blocks" of data.   
 .
-.   Unlike most parameters, the NSAMPLE value defaults to LC_DEF_NSAMPLE 
-.   (64), which is intended to be a quasi-reasonable value in most cases.  This 
+.   NSAMPLE is also used as the criterion for "complete" data collection by 
+.   the lc_stream_iscomplete() function.  However, the actual impact on the 
+.   number of data collected is entirely up to the application.
+.
+.   Unlike most parameters, the NSAMPLE value defaults to LC_DEF_NSAMPLE (64),
+.   which is intended to be a quasi-reasonable value in most cases.  This 
 .   is so users shouldn't need to set the parameter unless they want to.
 -AICHANNEL
 .   Short for Analog Input CHannel, this specifies one of the analog inputs
