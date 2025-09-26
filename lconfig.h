@@ -35,9 +35,10 @@ $chmod a+x your_exec.bin
 
 #include <stdio.h>
 #include <LabJackM.h>
+#include "lcfilter.h"
 
 
-#define LC_VERSION 5.00   // Track modifications in the header
+#define LC_VERSION 5.01   // Track modifications in the header
 /*
 These change logs follow the convention below:
 **LC_VERSION
@@ -221,6 +222,10 @@ with init_data_file() and write_data_file() utilities.
 - Renamed lc_update_ef() to lc_ef_update()
 - Renamed lc_load, lc_upload, lc_show, and lc_write
 
+** 5.01
+9/2025
+- Added DOWNSAMPLE parameter
+- Added lcfilter.c and lcfilter.h to support the digital downsample filtering.
 */
 
 #define TWOPI 6.283185307179586     // REALLY comes in handy for signal generation
@@ -246,10 +251,28 @@ with init_data_file() and write_data_file() utilities.
 #define LC_MAX_UART_BAUD 38400      // Highest COMRATE setting when in UART mode
 #define LC_MAX_NCOMCH   4           // maximum com channels to allow
 #define LC_MAX_AOBUFFER 512         // Maximum number of buffered analog outputs
+#define LC_MAX_DOWNSAMPLE 197       // Maximum downsample count
 #define LC_BACKLOG_THRESHOLD 1024   // raise a warning if the backlog exceeds this number.
 #define LC_CLOCK_MHZ    80.0        // Clock frequency in MHz
 #define LC_SAMPLES_PER_READ 64      // Data read/write block size
 #define LC_TRIG_EFOFFSET 2000       // Offset in trigger channel number for hardware trigger
+/* Downsample pre-filter cutoff frequency
+ * The 5th-order butterworth filters should be tuned to have a 0.1 magnitude
+ * at the downsampled nyquist frequency.  A 5th-order butterworth filter has 
+ * magnitude 0.1 at w/wc = 1.5833011217497763.  If the sample rate is fs and 
+ * the downsample number is N, the new sample rate is 
+ *      fs' = fs / (1+N).
+ * The Nyquist frequency is
+ *      wn = pi fs / (1+N)
+ * If wn/wc = 1.5833011217497763, then
+ *      wc = 0.6315917965717448 pi fs / (1+N)
+ * The parameter required by the tf_butterworth() function is wc * ts or
+ *      wc / fs = 0.6315917965717448 pi / (1+N) = 1.9842041481773725 / (1+N)
+ * Excessive downsampling can cause powers of this number to be very small.  The 
+ * LC_MAX_DOWNSAMPLE parameter establishes a maximum value for N.
+ */   
+#define LC_FILTER_WC    1.9842041481773725
+#define LC_FILTER_ORDER 5
 
 #define LC_SE_NCH 199               // single-ended negative channel number
 
@@ -291,6 +314,7 @@ typedef struct __lc_aiconf_t__ {
     double          calzero;    // calibration offset
     char            calunits[LC_MAX_STR_LABEL+1];   // calibration units
     char            label[LC_MAX_STR_LABEL+1];   // channel label
+    tf_t            filter;
 } lc_aiconf_t;
 //  The calibration and zero parameters are used by the aical function
 
@@ -461,6 +485,8 @@ typedef struct __lc_devconf_t__ {
     double samplehz;                // *sample rate in Hz
     double settleus;                // *settling time in us
     unsigned int nsample;           // *number of samples per read
+    unsigned int downsample;        // number of samples to reject per sample to keep
+    unsigned int dscount;           // Downsample count (persistent state)
     // Analog input
     lc_aiconf_t aich[LC_MAX_NAICH];    // analog input configuration array
     unsigned int naich;             // number of configured analog input channels
@@ -491,6 +517,7 @@ typedef struct __lc_devconf_t__ {
     // Meta & filestream
     lc_meta_t meta[LC_MAX_META];  // *meta parameters
     lc_ringbuf_t RB;                  // ring buffer
+    float *dilast;                 // Digital input history array (dynamic)
 } lc_devconf_t;
 
 
@@ -638,7 +665,28 @@ The following parameters are recognized:
 -SAMPLEHZ
 .   This parameter is not explicitly used to configure the T7.  It is intended
 .   to specify the sample rate in Hz for streaming applications run by the 
-.   application.
+.   application.  
+.
+.   After calling lc_upload(), the value in the devconf_t struct is altered
+.   to reflect the actual sample rate, which will be as close to the requested
+.   as the LabJack hardware will allow.
+-DOWNSAMPLE
+.   Downsampling is the process of digitally filtering and then discarding
+.   analog samples.  Provided there is adequate analog anti-aliasing at the 
+.   for the original sample rate, this can effectively allow digital anti-
+.   aliasing filtering at a reduced sample rate.  Downsampling is usually only
+.   useful for long tests where saving the high-sample-rate data would be 
+.   impractical.
+.
+.   The integer value assigned to DOWNSAMPLE indicates the number of samples
+.   to discard for every sample to keep.  Prior to down-sampling a 5th-order
+.   Butterworth filter is applied with a cutoff frequency 0.31 of the new
+.   effective (reduced) sample rate.  This results in 20dB attenuation at the
+.   new Nyquist frequency.  
+.
+.   Digital channels (DISTREAM or EFCHANNEL) are not filtered.  Instead, 
+.   changes in any of the digital channels is registered with a sample number.
+.   See the data file documentation for more information.
 -SETTLEUS
 .   Settling time to be used during AI streaming, specified in microseconds.  
 .   The minimum settling time supported is > 5us.  Any value <= 5us will prompt

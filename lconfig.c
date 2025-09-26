@@ -264,50 +264,53 @@ void read_param(FILE *source, char *param){
 void init_config(lc_devconf_t* dconf){
     int ainum, aonum, metanum, efnum, comnum;
     // Global configuration
-    dconf->connection = LC_CON_NONE;
+    dconf->connection =     LC_CON_NONE;
     dconf->connection_act = LC_CON_NONE;
-    dconf->device = LC_DEV_ANY;
-    dconf->device_act = LC_DEV_NONE;
-    dconf->serial[0] = '\0';
-    dconf->name[0] = '\0';
-    dconf->ip[0] = '\0';
-    dconf->gateway[0] = '\0';
-    dconf->subnet[0] = '\0';
+    dconf->device =         LC_DEV_ANY;
+    dconf->device_act =     LC_DEV_NONE;
+    dconf->serial[0] =      '\0';
+    dconf->name[0] =        '\0';
+    dconf->ip[0] =          '\0';
+    dconf->gateway[0] =     '\0';
+    dconf->subnet[0] =      '\0';
     // Global sample settings
-    dconf->samplehz = -1.;
-    dconf->settleus = 1.;
-    dconf->nsample = LC_DEF_NSAMPLE;
-    dconf->dataformat = LC_DF_ASCII;
+    dconf->samplehz =       -1.;
+    dconf->settleus =       1.;
+    dconf->nsample =        LC_DEF_NSAMPLE;
+    dconf->downsample =     0;  // Disable downsampling
+    dconf->dscount =        0;
+    dconf->dataformat =     LC_DF_ASCII;
     // Trigger settings
-    dconf->trigchannel = -1;
-    dconf->triglevel = 0.;
-    dconf->trigpre = 0;
-    dconf->trigmem = 0;
-    dconf->trigstate = LC_TRIG_IDLE;
-    dconf->trigedge = LC_EDGE_RISING;
+    dconf->trigchannel =    -1;
+    dconf->triglevel =      0.;
+    dconf->trigpre =        0;
+    dconf->trigmem =        0;
+    dconf->trigstate =      LC_TRIG_IDLE;
+    dconf->trigedge =       LC_EDGE_RISING;
     // Metas
     for(metanum=0; metanum<LC_MAX_META; metanum++){
-        dconf->meta[metanum].param = NULL;
-        dconf->meta[metanum].type = LC_MT_NONE;
+        dconf->meta[metanum].param =    NULL;
+        dconf->meta[metanum].type =     LC_MT_NONE;
         dconf->meta[metanum].value.ivalue = 0;
     }
     // Analog Inputs
     dconf->naich = 0;
     for(ainum=0; ainum<LC_MAX_NAICH; ainum++){
-        dconf->aich[ainum].channel = -1;
-        dconf->aich[ainum].nchannel = LC_DEF_AI_NCH;
-        dconf->aich[ainum].range = LC_DEF_AI_RANGE;
+        dconf->aich[ainum].channel =    -1;
+        dconf->aich[ainum].nchannel =   LC_DEF_AI_NCH;
+        dconf->aich[ainum].range =      LC_DEF_AI_RANGE;
         dconf->aich[ainum].resolution = LC_DEF_AI_RES;
-        dconf->aich[ainum].calslope = 1.;
-        dconf->aich[ainum].calzero = 0.;
-        dconf->aich[ainum].label[0] = '\0';
+        dconf->aich[ainum].calslope =   1.;
+        dconf->aich[ainum].calzero =    0.;
+        dconf->aich[ainum].label[0] =   '\0';
+        tf_init(&dconf->aich[ainum].filter);
         strcpy(dconf->aich[ainum].calunits, "V");
     }
     // Digital input streaming
-    dconf->distream = 0;
+    dconf->distream =       0;
     // Digital outputs
-    dconf->domask = 0x0000;
-    dconf->dovalue = 0x0000;
+    dconf->domask =         0x0000;
+    dconf->dovalue =        0x0000;
     // Analog Outputs
     dconf->naoch = 0;
     for(aonum=0; aonum<LC_MAX_NAOCH; aonum++){
@@ -323,27 +326,28 @@ void init_config(lc_devconf_t* dconf){
     dconf->nefch = 0;
     dconf->effrequency = 0.;
     for(efnum=0; efnum<LC_MAX_NEFCH; efnum++){
-        dconf->efch[efnum].channel = -1;
-        dconf->efch[efnum].signal = LC_EF_NONE;
-        dconf->efch[efnum].edge = LC_EDGE_RISING;
-        dconf->efch[efnum].debounce = LC_EF_DEBOUNCE_NONE;
-        dconf->efch[efnum].direction = LC_EF_INPUT;
-        dconf->efch[efnum].time = 0.;
-        dconf->efch[efnum].duty = .5;
-        dconf->efch[efnum].phase = 0.;
-        dconf->efch[efnum].counts = 0;
-        dconf->efch[efnum].label[0] = '\0';
+        dconf->efch[efnum].channel =    -1;
+        dconf->efch[efnum].signal =     LC_EF_NONE;
+        dconf->efch[efnum].edge =       LC_EDGE_RISING;
+        dconf->efch[efnum].debounce =   LC_EF_DEBOUNCE_NONE;
+        dconf->efch[efnum].direction =  LC_EF_INPUT;
+        dconf->efch[efnum].time =       0.;
+        dconf->efch[efnum].duty =       .5;
+        dconf->efch[efnum].phase =      0.;
+        dconf->efch[efnum].counts =     0;
+        dconf->efch[efnum].label[0] =   '\0';
     }
     // Communications
     dconf->ncomch = 0;
     for(comnum=0; comnum<LC_MAX_NCOMCH; comnum++){
-        dconf->comch[comnum].type = LC_COM_NONE;
-        dconf->comch[comnum].pin_in = -1;
-        dconf->comch[comnum].pin_out = -1;
+        dconf->comch[comnum].type =     LC_COM_NONE;
+        dconf->comch[comnum].pin_in =   -1;
+        dconf->comch[comnum].pin_out =  -1;
         dconf->comch[comnum].pin_clock = -1;
-        dconf->comch[comnum].rate = -1;
+        dconf->comch[comnum].rate =     -1;
     }
-    dconf->RB.buffer=NULL;
+    dconf->RB.buffer = NULL;
+    dconf->dilast = NULL;
 }
 
 
@@ -364,6 +368,31 @@ int test_digital(lc_devconf_t *dconf){
         }else if(dconf->efch[efnum].direction == LC_EF_OUTPUT && (mask & dconf->distream)){
             fprintf(stderr, "The %d EF Channel claims channel %d, and collides with DISTREAM\n", efnum, dconf->efch[efnum].channel);
             return -1;
+        }
+    }
+    return 0;
+}
+
+
+// Tests the tf_t filter attribute of each analog channel, and if it is
+// configured, the data are filtered in-place.  The filter has its own
+// state memory, so it retains the minimum necessary history of previous
+// data filtered.
+//
+// Returns 0 on success
+int apply_filters(lc_devconf_t *dconf, double *data, 
+        const unsigned int channels,
+        const unsigned int samples_per_read){
+    
+    int sample, ainum, index;
+    for(ainum=0; ainum<dconf->naich; ainum++){
+        // If this channel's filter is configured, use it
+        if(tf_is_ready(&dconf->aich[ainum].filter)){
+            index = ainum;
+            for(sample=0; sample<samples_per_read; sample++){
+                data[index] = tf_eval(&dconf->aich[ainum].filter, data[index]);
+                index += channels;
+            }
         }
     }
     return 0;
@@ -747,10 +776,26 @@ Found \"%s\"\n", param);
             if(sscanf(value,"%d",&itemp)!=1){
                 print_error("LOAD: Illegal NSAMPLE value \"%s\".  Expected integer.\n",value);
                 loadfail();
-            }else if(itemp <= 0)
-                print_error("LOAD: **WARNING** NSAMPLE value was less than or equal to zero.\n"
-                       "      Fix this before initiating a stream!\n");
-            dconf[devnum].nsample = itemp;
+            }else if(itemp <= 0){
+                print_error("LOAD: NSAMPLE value was less than or equal to zero.\n");
+                loadfail();
+            }
+            dconf[devnum].nsample = (unsigned int) itemp;
+        //
+        // The DOWNSAMPLE parameter
+        //
+        }else if(streq(param,"downsample")){
+            if(sscanf(value,"%d",&itemp)!=1){
+                print_error("LOAD: Illegal DOWNSAMPLE value \"%s\".  Expected integer.\n",value);
+                loadfail();
+            }else if(itemp < 0){
+                print_error("LOAD: DOWNSAMPLE value was negative.\n");
+                loadfail();
+            }else if(itemp > LC_MAX_DOWNSAMPLE){
+                print_error("LOAD: DOWNSAMPLE value cannot be larger than %d. Found %d.\n", LC_MAX_DOWNSAMPLE, itemp);
+                loadfail();
+            }
+            dconf[devnum].downsample = (unsigned int) itemp;
         //
         // The DATAFORMAT parameter
         //
@@ -1474,6 +1519,7 @@ void lc_write(lc_devconf_t* dconf, FILE* ff){
     write_flt(samplehz,samplehz);
     write_flt(settleus,settleus);
     write_int(nsample,nsample);
+    write_int(downsample,downsample);
     
     fprintf(ff, "dataformat %s\n", 
             lcm_get_config(lcm_dataformat, dconf->dataformat));
@@ -1776,9 +1822,17 @@ int lc_close(lc_devconf_t* dconf){
 
 int lc_clean(lc_devconf_t* dconf){
     int metanum, inlist_f;
-    
-    // Clean up the ring buffer
+    int ainum;
+    printf("A\n");
+    // Clean the ring buffer
     clean_buffer(&dconf->RB);
+    printf("B\n");
+    // Clean analog input filters (if configured)
+    for(ainum=0; ainum<dconf->naich; ainum++){
+        printf("  %d\n",ainum);
+        tf_destruct(&dconf->aich[ainum].filter);
+    }
+    printf("C\n");
     // Clean up the meta parameters
     // Warn the user if there are "zombie" data outside the list
     inlist_f = 1;
@@ -1796,6 +1850,12 @@ int lc_clean(lc_devconf_t* dconf){
             dconf->meta[metanum].type = LC_MT_NONE;
         }else
             inlist_f = 0;
+    }
+    printf("D\n");
+    // Free the dilast array if it has been defined
+    if(dconf->dilast){
+        free(dconf->dilast);
+        dconf->dilast = NULL;
     }
     
     return LC_NOERR;
@@ -1925,12 +1985,6 @@ int lc_upload(lc_devconf_t* dconf){
         sprintf(stemp, "AIN%d_RANGE", channel);
         err = LJM_eWriteName( handle, stemp, 
                 dconf->aich[ainum].range);
-        /* Depreciated - used address instead of register name
-        err = LJM_eWriteAddress(  handle,
-                            reg_range,
-                            LJM_FLOAT32,
-                            dconf->aich[ainum].range);
-        */
         if(err){
             print_error("UPLOAD: Failed to update analog input %d, AI%d range input to %f\n", 
                     ainum, channel, dconf->aich[ainum].range);
@@ -1941,18 +1995,11 @@ int lc_upload(lc_devconf_t* dconf){
         sprintf(stemp, "AIN%d_RESOLUTION_INDEX", channel);
         err = LJM_eWriteName( handle, stemp, 
                 dconf->aich[ainum].resolution);
-        /* Depreciated - used the address instead of the register name
-        err = LJM_eWriteAddress(  handle,
-                            reg_resolution,
-                            LJM_UINT16,
-                            dconf->aich[ainum].resolution);
-        */
         if(err){
             print_error("UPLOAD: Failed to update analog input %d, AI%d resolution index to %d\n", 
                     ainum, channel, dconf->aich[ainum].resolution);
             uploadfail();
         }
-
     }
 
     // Set the digital direction based on the DISTREAM and DOSTREAM settings
@@ -1980,20 +2027,10 @@ int lc_upload(lc_devconf_t* dconf){
     
     // Set up all analog outputs
     for(aonum=0;aonum<naoch;aonum++){
-        /*
-        // Find the address of the corresponding channel number
-        // Start with DAC0 and increment by 2 for each channel number
-        LJM_NameToAddress("DAC0",&reg_temp,&type_temp);
-        channel = reg_temp + 2*dconf->aoch[aonum].channel;
-        */
         channel = dconf->aoch[aonum].channel;
         stemp[0] = '\0';
         sprintf(stemp, "DAC%d", channel);
         LJM_NameToAddress(stemp, &reg_temp, &type_temp);
-        /* Depreciated - used register address instead of name
-        // Now, get the buffer configuration registers
-        aoregisters(aonum, &reg_target, &reg_buffersize, &reg_enable, &reg_buffer, &reg_loopsize, &reg_setloop);
-        */
         // Disable the output buffer
         stemp[0] = '\0';
         sprintf(stemp, "STREAM_OUT%d_ENABLE", aonum);
@@ -3463,6 +3500,7 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     if(!flag)
         print_warning("STREAM_START::WARNING:: Used resolution index %d for all streaming channels.\n",resindex);
 
+
     // Write the configuration parameters unique to streaming.
     err=LJM_eWriteName(dconf->handle, 
             "STREAM_RESOLUTION_INDEX", resindex);
@@ -3486,6 +3524,40 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     // Add digital input streaming?
     if(dconf->distream)
         LJM_NameToAddress("FIO_EIO_STATE", &stlist[index++], &dummy);
+
+    //
+    // DOWNSAMPLE FILTERS
+    //
+    //  Before adding in the output streams, we'll use the index value
+    // to determine the number of input stream channels.
+    dconf->dscount = 0; // Reset the sample count
+    if(index && dconf->downsample){
+        // If there are streaming analog channels
+        if(dconf->naich){
+            // Initialize the filters
+            // See comments in the header macros section for the rationale for 
+            // calculating wc.  We only need to calculate the first filter -
+            // all the later ones will be copies.
+            if(tf_butterworth(&dconf->aich[0].filter, LC_FILTER_ORDER, LC_FILTER_WC / (1+dconf->downsample))){
+                print_warning("Failed to initialize the digital downsample filter. Collecting without a filter!\n");
+            }else{
+                for(ainum=1; ainum<dconf->naich; ainum++)
+                    tf_copy(&dconf->aich[0].filter, &dconf->aich[ainum].filter);
+            }
+        }
+        // The number of strictly digital channels
+        efnum = index - dconf->naich;
+        if(efnum){
+            if(dconf->dilast)
+                free(dconf->dilast);
+            // Initialize the digital input history array
+            dconf->dilast = malloc(efnum * sizeof(double));
+            // Mark the absence of prior data with NAN.
+            for(efnum--;efnum>=0;efnum--)
+                dconf->dilast[efnum] = NAN;
+        }
+    }
+
 
     // Add any analog output streams to the stream scanlist
     // This approach collects analog input BEFORE updating the outputs.
@@ -3707,30 +3779,81 @@ int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
 
 
 int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data, 
-        unsigned int channels, unsigned int samples_per_read){
-    int index,row,ainum;
-    float ftemp;
+            unsigned int channels, unsigned int samples_per_read){
+    int index, row;
+    int ainum, dinum, ndich;
+    float ftemp;    // Used to convert double to single for binary write
+    double value;
+    char flag;
 
-    if(data){
-        // Write using the ascii format
-        if(dconf->dataformat == LC_DF_ASCII){
-            index = 0;
-            // Write data one element at a time.
-            for(row=0; row<samples_per_read; row++){
-                for(ainum=0; ainum<channels-1; ainum++)
-                    fprintf(FF, "%.6e\t", data[ index++ ]);
-                fprintf(FF, "%.6e\n", data[ index++ ]);
+    // Verify that there are data to work with
+    if(!data)
+        return LC_ERROR;
+
+    // How many digital input channels are there?
+    ndich = channels - dconf->naich;
+    
+    // If configured, apply the downsample filters
+    if(dconf->downsample)
+        apply_filters(dconf, data, channels, samples_per_read);
+
+    // Loop over the samples from each channel
+    for(row=0; row<samples_per_read; row++){
+        // Update the downsample count
+        dconf->dscount = (dconf->dscount + 1)%(1+dconf->downsample);
+        // If this row is being down-sampled
+        if(dconf->dscount){
+            // If digital edge detection has been configured and has valid data waiting
+            if(dconf->dilast && dconf->dilast[0] != NAN){
+                // We need to check for a state change in the digital channels
+                // flag will signal if one of them has changed.
+                flag = 0;
+                index = row*channels + dconf->naich;
+                for(dinum=0; dinum<ndich; dinum++){
+                    // On change, update dilast and set the flag.
+                    ftemp = (float) data[index];
+                    if(dconf->dilast[dinum] != ftemp){
+                        flag = 1;
+                        dconf->dilast[dinum] = ftemp;
+                    }
+                    index++;
+                }
+                // If there was an edge detected, we need to note the
+                // dscount index of the transition
+                if(flag){
+                    // In binary mode
+                    if(dconf->dataformat == LC_DF_BIN){
+                        // Start with a NAN to signal a non-standard data entry
+                        ftemp = NAN;
+                        fwrite(&ftemp, sizeof(ftemp), 1, FF);
+                        // Write the latest digital inputs
+                        fwrite(dconf->dilast, sizeof(float), ndich, FF);
+                    // In ASCII mode
+                    }else{
+                        fprintf(FF, "D%03d\t", dconf->dscount);
+                        for(dinum=0; dinum<ndich-1; dinum++)
+                            fprintf(FF, "%.6e\t", dconf->dilast[dinum]);
+                        fprintf(FF, "%.6e\n", dconf->dilast[dinum]);
+                    }
+                }
             }
-        // Write using binary format
+        // If this row is being printed in binary
         }else if(dconf->dataformat == LC_DF_BIN){
+            // We need to convert the double buffer into a single, so go one element at a time.
             for(index=0; index<channels*samples_per_read; index++){
                 ftemp = (float) data[index];
                 fwrite(&ftemp, sizeof(ftemp), 1, FF);
             }
+        // If this row is being printed in ASCII
+        }else{
+            index = row*channels;
+            for(ainum=0; ainum<channels-1; ainum++)
+                fprintf(FF, "%.6e\t", data[ index++ ]);
+            fprintf(FF, "%.6e\n", data[ index++ ]);
         }
-        return LC_NOERR;
     }
-    return LC_ERROR;
+
+    return LC_NOERR;
 }
 
 

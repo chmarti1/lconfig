@@ -1,19 +1,16 @@
 #include <stdio.h>
-#include "lconfig.h"
+#include "lcfilter.h"
 
 int main(){
-    FILE *f;
-    float value;
-    
-    value = 123.456;
-    
-    f = fopen("test.dat", "wb");
-    
-    fprintf(f, "# This is a test\n");
-    fprintf(f, "%f\n", value);
-    fwrite(&value, sizeof(value), 1, f);
-    
-    fclose(f);
-
-    return 0;
+    int ii;
+    tf_t g;
+    tf_init(&g);
+    tf_butterworth(&g, 5, .05);
+    for(ii=0; ii<=5; ii++)
+        printf(" %.4e", g.b[ii]);
+    printf("\n");
+    for(ii=0; ii<=5; ii++)
+        printf(" %.4e", g.a[ii]);
+    printf("\n");
+    tf_destruct(&g);
 }

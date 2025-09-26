@@ -8,7 +8,8 @@ BUILD=build
 LCONFIG_O=$(BUILD)/lconfig.o
 LCTOOLS_O=$(BUILD)/lctools.o
 LCMAP_O=$(BUILD)/lcmap.o
-ALL_O=$(LCONFIG_O) $(LCTOOLS_O) $(LCMAP_O)
+LCFILTER_O=$(BUILD)/lcfilter.o
+ALL_O=$(LCONFIG_O) $(LCTOOLS_O) $(LCMAP_O) $(LCFILTER_O)
 LCSTAT_B=$(BUILD)/lcstat.bin
 LCRUN_B=$(BUILD)/lcrun.bin
 LCBURST_B=$(BUILD)/lcburst.bin
@@ -25,16 +26,20 @@ $(BUILD):
 	mkdir $(BUILD)
 
 # The LCONFIG object file
-$(LCONFIG_O): $(BUILD) lconfig.c lconfig.h lcmap.h
+$(LCONFIG_O): $(BUILD) lconfig.c lconfig.h lcmap.h lcfilter.h
 	gcc $(OPT) -c lconfig.c -o $(LCONFIG_O)
 
 # The LCTOOLS object file
-$(LCTOOLS_O): $(BUILD) lctools.c lctools.h lconfig.h lconfig.o
+$(LCTOOLS_O): $(BUILD) lctools.c lctools.h lconfig.h
 	gcc $(OPT) -c lctools.c -o $(LCTOOLS_O)
 
 # The LCMAP object file
 $(LCMAP_O): $(BUILD) lcmap.c lcmap.h lconfig.h
 	gcc $(OPT) -c lcmap.c -o $(LCMAP_O)
+
+# The LCFILTER object file
+$(LCFILTER_O): $(BUILD) lcfilter.c lcfilter.h
+	gcc $(OPT) -c lcfilter.c -o $(LCFILTER_O)
 
 # The Binaries...
 #
