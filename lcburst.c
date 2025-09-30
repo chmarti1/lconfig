@@ -363,7 +363,8 @@ int main(int argc, char *argv[]){
     // Write the samples
     while(!lc_stream_isempty(&dconf)){
         lc_stream_read(&dconf, &data, &channels, &samples_per_read);
-        lc_datafile_write(&dconf,dfile,data,channels,samples_per_read);
+        lc_stream_downsample(&dconf, data, channels, &samples_per_read);
+        lc_datafile_write(&dconf, dfile, data, channels, samples_per_read);
         printf(".");
         fflush(stdout);
     }

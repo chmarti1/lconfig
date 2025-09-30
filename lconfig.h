@@ -517,7 +517,6 @@ typedef struct __lc_devconf_t__ {
     // Meta & filestream
     lc_meta_t meta[LC_MAX_META];  // *meta parameters
     lc_ringbuf_t RB;                  // ring buffer
-    float *dilast;                 // Digital input history array (dynamic)
 } lc_devconf_t;
 
 
@@ -1098,8 +1097,13 @@ int lc_close(lc_devconf_t* dconf);
 
 /* CLEAN
 Always call CLEAN at the end of execution.  This frees dynamic memory
-assigned to the stream ring buffer and dynamic memory assigned to string
-meta data.
+assigned to:
+
+1) the ring buffer used for data streaming
+2) the analog input filters used for downsampling
+3) the meta parameters
+
+Always returns LC_NOERR
 */
 int lc_clean(lc_devconf_t* dconf);
 
@@ -1318,10 +1322,19 @@ lc_stream_service will overwrite the oldest data.  Returns a 0 otherwise.
 int lc_stream_isfull(lc_devconf_t* dconf);
 
 /* LC_STREAM_START
-Start a stream operation based on the device configuration for device devnum.
-samples_per_read can be used to override the NSAMPLE parameter in the device
-configuration.  If samples_per_read is <= 0, then the LC_SAMPLES_PER_READ
-value will be used instead.
+Start a stream operation on the device pointed to by DCONF.
+
+SAMPLES_PER_READ determines the number of samples on each configured channel
+that will be transmitted in each data block.  Data blocks are transferred from the
+LabJack during calls to LC_STREAM_SERVICE(), and are made available to the 
+application using calls to LC_STREAM_READ().
+
+LC_STREAM_START() should only be called after LC_UPLOAD().  LC_STREAM_START()
+is responsible for uploading the correct stream channel list, but it relies on
+LC_UPLOAD() to perform most of the configuration.
+
+If downsampling is configured, LC_STREAM_START() is responsible for initializing
+the anti-aliasing filters and the dilast array for digital edge detection.
 */
 int lc_stream_start(lc_devconf_t* dconf,   // Device array and number
             int samples_per_read);    // how many samples per call to read_data_stream
@@ -1342,6 +1355,9 @@ until the trigger is detected.
 Until data become available, READ_DATA_STREAM will return NULL data arrays,
 but once valid data are ready, READ_DATA_STREAM returns pointers into this
 ring buffer.
+
+Returns LC_NOERR on success even if no samples are returned
+Returns LC_ERROR if there is a communications problem with the LabJack.
 */
 int lc_stream_service(lc_devconf_t* dconf);
 
@@ -1366,15 +1382,27 @@ data[4]     sample1, channel1
 data[5]     sample1, channel2
 ... 
 
-The implied 2D array contains a row for every time sample with an interval 
-specified by the SAMPLEHZ parameter.  Each column corresponds to one of the 
-configured channels.  If they are configured, the channels always appear in
-the order:
+For example if we were to imagine the data organized into a 2D table with each
+channel occupying a column, and each row representing one sample of each channel,
+at a data rate determined by the SAMPLEHZ parameter.  See the 
+LC_STREAM_DOWNSAMPLE() function for applying the downsampling parameter.
+
+The data element corresponding to row and col is
+
+    data[row*channels + col]
+
+where
+
+    0 <= row < samples_per_read
+    0 <= col < channels
+
+If they are configured, the channel columns always appear in the order:
 
   [ Analog Channels ][ EF Stream Channels ][ DISTREAM ]
 
 Within each group, the channels appear in the order they are configured in the
-configuration header.
+configuration header.  As a result, the first EF channel always occurs at column
+NAICH, and (if configured) the digital input stream occurs at column NAICH+NEFCH.
 
 Once READ_DATA_STREAM has been called, the lc_devconf_t struct updates its internal
 pointers, and the next call's DATA register will either point to the next 
@@ -1385,22 +1413,32 @@ SAMPLES_PER_READ data elements.  The following data might be valid, but they
 also might wrap around the end of the ring buffer.  Instead, READ_DATA_STREAM
 should be called again to return a new valid data pointer.
 
-For example, the following might appear in a loop 
-
-int err;
-unsigned int channels, samples_per_read, index;
-double my_buffer[2048];
-double *pointer;
-... setup code ... 
-err = lc_stream_service(&dconf, 0);
-err = lc_stream_read(&dconf, 0, &data, &channels, &samples_per_read);
-if(data){
-    for(index=0; index<samples_per_read*channels; index++)
-        my_buffer[index] = data[index];
-}
+Returns LC_NOERR on success
+Returns LC_ERROR if there are no data available
 */
 int lc_stream_read(lc_devconf_t* dconf, double **data, 
         unsigned int *channels, unsigned int *samples_per_read);
+
+
+/* LC_STREAM_DOWNSAMPLE
+ * 
+ * If downsampling has been configured, LC_STREAM_DOWNSAMPLE() applies the
+ * digital anti-aliasing filters to the analog channels before discarding 
+ * DOWNSAMPLE (see LC_LOAD() DOWNSAMPLE parameter) measurements for every 
+ * measurement kept, effectively reducing the sample frequency to 
+ *      SAMPLEHZ / (DOWNSAMPLE+1)
+ * Digital and extended feature channels are downsampled with no filtering.
+ * 
+ * After execution, the value in SAMPLES_PER_CHANNEL is modified to indicate
+ * thea actual number of samples remaining in the data block.  
+ * 
+ * Returns LC_NOERR on normal operation
+ * Returns LC_ERROR if downsampling was not configured no action is taken.
+ * 
+ */
+int lc_stream_downsample(lc_devconf_t *dconf, double *data, 
+        const unsigned int channels,
+        unsigned int *samples_per_read);
 
 /*STOP_STREAM
 Halt an active stream on device devnum.

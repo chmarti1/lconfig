@@ -290,6 +290,7 @@ int main(int argc, char *argv[]){
             if(!lc_stream_isempty(&dconf[devnum])){
                 fflush(stdout);
                 lc_stream_read(&dconf[devnum], &data, &channels, &samples_per_read);
+                lc_stream_downsample(&dconf[devnum], data, channels, &samples_per_read);
                 lc_datafile_write(&dconf[devnum], dfile[devnum], data, channels, samples_per_read);
             }
         }

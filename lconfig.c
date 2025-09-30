@@ -347,7 +347,6 @@ void init_config(lc_devconf_t* dconf){
         dconf->comch[comnum].rate =     -1;
     }
     dconf->RB.buffer = NULL;
-    dconf->dilast = NULL;
 }
 
 
@@ -373,30 +372,6 @@ int test_digital(lc_devconf_t *dconf){
     return 0;
 }
 
-
-// Tests the tf_t filter attribute of each analog channel, and if it is
-// configured, the data are filtered in-place.  The filter has its own
-// state memory, so it retains the minimum necessary history of previous
-// data filtered.
-//
-// Returns 0 on success
-int apply_filters(lc_devconf_t *dconf, double *data, 
-        const unsigned int channels,
-        const unsigned int samples_per_read){
-    
-    int sample, ainum, index;
-    for(ainum=0; ainum<dconf->naich; ainum++){
-        // If this channel's filter is configured, use it
-        if(tf_is_ready(&dconf->aich[ainum].filter)){
-            index = ainum;
-            for(sample=0; sample<samples_per_read; sample++){
-                data[index] = tf_eval(&dconf->aich[ainum].filter, data[index]);
-                index += channels;
-            }
-        }
-    }
-    return 0;
-}
 
 
 // Initialization declares the buffer memory and initializes all
@@ -1823,16 +1798,12 @@ int lc_close(lc_devconf_t* dconf){
 int lc_clean(lc_devconf_t* dconf){
     int metanum, inlist_f;
     int ainum;
-    printf("A\n");
     // Clean the ring buffer
     clean_buffer(&dconf->RB);
-    printf("B\n");
     // Clean analog input filters (if configured)
     for(ainum=0; ainum<dconf->naich; ainum++){
-        printf("  %d\n",ainum);
         tf_destruct(&dconf->aich[ainum].filter);
     }
-    printf("C\n");
     // Clean up the meta parameters
     // Warn the user if there are "zombie" data outside the list
     inlist_f = 1;
@@ -1851,13 +1822,6 @@ int lc_clean(lc_devconf_t* dconf){
         }else
             inlist_f = 0;
     }
-    printf("D\n");
-    // Free the dilast array if it has been defined
-    if(dconf->dilast){
-        free(dconf->dilast);
-        dconf->dilast = NULL;
-    }
-    
     return LC_NOERR;
 }
 
@@ -3500,6 +3464,24 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     if(!flag)
         print_warning("STREAM_START::WARNING:: Used resolution index %d for all streaming channels.\n",resindex);
 
+    //
+    // DOWNSAMPLE FILTERS
+    //
+    dconf->dscount = 0; // Reset the sample count
+    if(dconf->naich && dconf->downsample){
+        // Initialize the filters
+        // See comments in the header macros section for the rationale for 
+        // calculating wc.  We only need to calculate the first filter -
+        // all the later ones will be copies.
+        if(tf_butterworth(&dconf->aich[0].filter, LC_FILTER_ORDER, LC_FILTER_WC / (1+dconf->downsample))){
+            print_warning("Unexpectedly failed to initialize the digital downsample filters.\nContinuing without filters!\n");
+            tf_destruct(&dconf->aich[0].filter);
+        }else{
+            for(ainum=1; ainum<dconf->naich; ainum++)
+                tf_copy(&dconf->aich[0].filter, &dconf->aich[ainum].filter);
+        }
+    }
+
 
     // Write the configuration parameters unique to streaming.
     err=LJM_eWriteName(dconf->handle, 
@@ -3524,40 +3506,6 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     // Add digital input streaming?
     if(dconf->distream)
         LJM_NameToAddress("FIO_EIO_STATE", &stlist[index++], &dummy);
-
-    //
-    // DOWNSAMPLE FILTERS
-    //
-    //  Before adding in the output streams, we'll use the index value
-    // to determine the number of input stream channels.
-    dconf->dscount = 0; // Reset the sample count
-    if(index && dconf->downsample){
-        // If there are streaming analog channels
-        if(dconf->naich){
-            // Initialize the filters
-            // See comments in the header macros section for the rationale for 
-            // calculating wc.  We only need to calculate the first filter -
-            // all the later ones will be copies.
-            if(tf_butterworth(&dconf->aich[0].filter, LC_FILTER_ORDER, LC_FILTER_WC / (1+dconf->downsample))){
-                print_warning("Failed to initialize the digital downsample filter. Collecting without a filter!\n");
-            }else{
-                for(ainum=1; ainum<dconf->naich; ainum++)
-                    tf_copy(&dconf->aich[0].filter, &dconf->aich[ainum].filter);
-            }
-        }
-        // The number of strictly digital channels
-        efnum = index - dconf->naich;
-        if(efnum){
-            if(dconf->dilast)
-                free(dconf->dilast);
-            // Initialize the digital input history array
-            dconf->dilast = malloc(efnum * sizeof(double));
-            // Mark the absence of prior data with NAN.
-            for(efnum--;efnum>=0;efnum--)
-                dconf->dilast[efnum] = NAN;
-        }
-    }
-
 
     // Add any analog output streams to the stream scanlist
     // This approach collects analog input BEFORE updating the outputs.
@@ -3586,6 +3534,8 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
     // Configure the ring buffer
     // The number of buffer R/W blocks is calculated from the pretrigger
     // buffer size plus 1.
+    // If there was already a buffer, clean it first.
+    clean_buffer(&dconf->RB);
     if(init_buffer(&dconf->RB, 
                 lc_nistream(dconf),
                 samples_per_read,
@@ -3733,16 +3683,68 @@ int lc_stream_service(lc_devconf_t* dconf){
 
 
 int lc_stream_read(lc_devconf_t* dconf,
-    double **data, unsigned int *channels, unsigned int *samples_per_read){
+        double **data, unsigned int *channels, unsigned int *samples_per_read){
     
-    (*data) = get_read_buffer(&dconf->RB);
+    double *d;
+    int row, index, ainum, dinum, ndich;
+    
+    // Deal with the read buffer
+    *data = get_read_buffer(&dconf->RB);
     service_read_buffer(&dconf->RB);
-    (*channels) = dconf->RB.channels;
-    (*samples_per_read) = dconf->RB.samples_per_read;
-    if(*data)
+    *samples_per_read = dconf->RB.samples_per_read;
+    *channels = dconf->RB.channels;
+    
+    if(data)
         return LC_NOERR;
     return LC_ERROR;
 }
+
+
+
+int lc_stream_downsample(lc_devconf_t *dconf, double *data, 
+        const unsigned int channels,
+        unsigned int *samples_per_read){
+    
+    int sample, ch, index, index2;
+    
+    if(!dconf->downsample)
+        return LC_ERROR;
+    //
+    // Apply the anti-aliasing filters
+    //
+    for(ch=0; ch<dconf->naich; ch++){
+        // If this channel's filter is configured, use it
+        if(tf_is_ready(&dconf->aich[ch].filter)){
+            index = ch;
+            for(sample=0; sample<samples_per_read; sample++){
+                data[index] = tf_eval(&dconf->aich[ch].filter, data[index]);
+                index += channels;
+            }
+        }
+    }
+    //
+    // Down-sample
+    //
+    // We'll forward shift data to overwrite the earliest samples with the 
+    // selected later samples.  index will be the forward location and index2
+    // will be the later (source) location.
+    // The first sample to be retained will be shifted by the DSCOUNT, which
+    // represents the samples remaining from the last data block.
+    index = 0
+    for(index2 = (dconf->downsample+1) - dconf->dscount; 
+                index2<samples_per_read; index2+=(dconf->downsample+1)){
+        for(ch=0;ch<channels;ch++)
+            data[index++] = data[index2+ch];
+    }
+
+    // Modify the samples_per_read to match the number of samples selected
+    *samples_per_read = (dconf->dscount + samples_per_read) / (dconf->downsample+1);
+    // Update the dscount integer for the next block
+    dconf->dscount = (dconf->dscount + samples_per_read) % (dconf->downsample+1);
+
+    return LC_NOERR;
+}
+
 
 
 int lc_stream_stop(lc_devconf_t* dconf){
@@ -3780,8 +3782,7 @@ int lc_datafile_init(lc_devconf_t* dconf, FILE* FF){
 
 int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data, 
             unsigned int channels, unsigned int samples_per_read){
-    int index, row;
-    int ainum, dinum, ndich;
+    int index, row, col;
     float ftemp;    // Used to convert double to single for binary write
     double value;
     char flag;
@@ -3790,69 +3791,24 @@ int lc_datafile_write(lc_devconf_t *dconf, FILE* FF, double *data,
     if(!data)
         return LC_ERROR;
 
-    // How many digital input channels are there?
-    ndich = channels - dconf->naich;
-    
-    // If configured, apply the downsample filters
-    if(dconf->downsample)
-        apply_filters(dconf, data, channels, samples_per_read);
-
-    // Loop over the samples from each channel
-    for(row=0; row<samples_per_read; row++){
-        // Update the downsample count
-        dconf->dscount = (dconf->dscount + 1)%(1+dconf->downsample);
-        // If this row is being down-sampled
-        if(dconf->dscount){
-            // If digital edge detection has been configured and has valid data waiting
-            if(dconf->dilast && dconf->dilast[0] != NAN){
-                // We need to check for a state change in the digital channels
-                // flag will signal if one of them has changed.
-                flag = 0;
-                index = row*channels + dconf->naich;
-                for(dinum=0; dinum<ndich; dinum++){
-                    // On change, update dilast and set the flag.
-                    ftemp = (float) data[index];
-                    if(dconf->dilast[dinum] != ftemp){
-                        flag = 1;
-                        dconf->dilast[dinum] = ftemp;
-                    }
-                    index++;
-                }
-                // If there was an edge detected, we need to note the
-                // dscount index of the transition
-                if(flag){
-                    // In binary mode
-                    if(dconf->dataformat == LC_DF_BIN){
-                        // Start with a NAN to signal a non-standard data entry
-                        ftemp = NAN;
-                        fwrite(&ftemp, sizeof(ftemp), 1, FF);
-                        // Write the latest digital inputs
-                        fwrite(dconf->dilast, sizeof(float), ndich, FF);
-                    // In ASCII mode
-                    }else{
-                        fprintf(FF, "D%03d\t", dconf->dscount);
-                        for(dinum=0; dinum<ndich-1; dinum++)
-                            fprintf(FF, "%.6e\t", dconf->dilast[dinum]);
-                        fprintf(FF, "%.6e\n", dconf->dilast[dinum]);
-                    }
-                }
-            }
-        // If this row is being printed in binary
-        }else if(dconf->dataformat == LC_DF_BIN){
-            // We need to convert the double buffer into a single, so go one element at a time.
-            for(index=0; index<channels*samples_per_read; index++){
-                ftemp = (float) data[index];
-                fwrite(&ftemp, sizeof(ftemp), 1, FF);
-            }
-        // If this row is being printed in ASCII
-        }else{
-            index = row*channels;
-            for(ainum=0; ainum<channels-1; ainum++)
-                fprintf(FF, "%.6e\t", data[ index++ ]);
-            fprintf(FF, "%.6e\n", data[ index++ ]);
+    // Case out binary versus ASCII data formats
+    if(dconf->dataformat == LC_DF_BIN){
+        // borrow col to represent the number of samples
+        col = channels*samples_per_read;
+        // Convert each of the doubles into a single and write it to the file
+        // No need to track columns and rows
+        for(index=0; index<col; index++){
+            ftemp = (float) data[index];
+            fwrite(&ftemp, sizeof(ftemp), 1, FF);
+        }
+    }else{
+        index = 0;
+        for(row=0; row<samples_per_read; row++){
+            for(col=0; col<channels-1; col++)
+                fprintf(FF, "%.6e\t", data[index++]);
+            fprintf(FF, "%.6e\n", data[index++]);
         }
     }
-
     return LC_NOERR;
 }
 
