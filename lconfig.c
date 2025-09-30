@@ -3567,7 +3567,6 @@ int lc_stream_start(lc_devconf_t* dconf, int samples_per_read){
 int lc_stream_service(lc_devconf_t* dconf){
     int dev_backlog, ljm_backlog, size, err;
     int index, this;
-    double ftemp;
     double *write_data;
 
     // Retrieve the write buffer pointer
@@ -3685,9 +3684,6 @@ int lc_stream_service(lc_devconf_t* dconf){
 int lc_stream_read(lc_devconf_t* dconf,
         double **data, unsigned int *channels, unsigned int *samples_per_read){
     
-    double *d;
-    int row, index, ainum, dinum, ndich;
-    
     // Deal with the read buffer
     *data = get_read_buffer(&dconf->RB);
     service_read_buffer(&dconf->RB);
@@ -3716,7 +3712,7 @@ int lc_stream_downsample(lc_devconf_t *dconf, double *data,
         // If this channel's filter is configured, use it
         if(tf_is_ready(&dconf->aich[ch].filter)){
             index = ch;
-            for(sample=0; sample<samples_per_read; sample++){
+            for(sample=0; sample<(*samples_per_read); sample++){
                 data[index] = tf_eval(&dconf->aich[ch].filter, data[index]);
                 index += channels;
             }
@@ -3730,17 +3726,18 @@ int lc_stream_downsample(lc_devconf_t *dconf, double *data,
     // will be the later (source) location.
     // The first sample to be retained will be shifted by the DSCOUNT, which
     // represents the samples remaining from the last data block.
-    index = 0
+    index = 0;
     for(index2 = (dconf->downsample+1) - dconf->dscount; 
-                index2<samples_per_read; index2+=(dconf->downsample+1)){
-        for(ch=0;ch<channels;ch++)
+                index2<*samples_per_read; index2+=(dconf->downsample+1)){
+        for(ch=0;ch<channels;ch++){
             data[index++] = data[index2+ch];
+        }
     }
 
     // Modify the samples_per_read to match the number of samples selected
-    *samples_per_read = (dconf->dscount + samples_per_read) / (dconf->downsample+1);
+    *samples_per_read = (dconf->dscount + *samples_per_read) / (dconf->downsample+1);
     // Update the dscount integer for the next block
-    dconf->dscount = (dconf->dscount + samples_per_read) % (dconf->downsample+1);
+    dconf->dscount = (dconf->dscount + *samples_per_read) % (dconf->downsample+1);
 
     return LC_NOERR;
 }
