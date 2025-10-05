@@ -31,6 +31,8 @@ typedef struct __tf_t__ {
     double *b;      // Numerator coefficients
     double *x;      // Input history
     double *y;      // Output history
+    double ymax;    // Maximum allowed output
+    double ymin;    // Minimum allowed output
     unsigned int order; // Order
 } tf_t;
 

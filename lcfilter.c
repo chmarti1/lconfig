@@ -72,6 +72,8 @@ int tf_init(tf_t *g){
     g->b = NULL;
     g->x = NULL;
     g->y = NULL;
+    g->ymax = INFINITY;
+    g->ymin = -INFINITY;
 }
 
 
@@ -327,10 +329,15 @@ double tf_eval(tf_t *g, double x){
     // Zero the new output and read in the new input
     g->x[g->order] = x;
     g->y[g->order] = 0.0;
+    // Cycle through the lower coefficients
     for(ii=0; ii<g->order; ii++)
         g->y[g->order] += g->b[ii] * g->x[ii] - g->a[ii] * g->y[ii];
+    // Add the new value and divide by the highest y coefficient
     g->y[g->order] += g->b[g->order] * g->x[g->order];
     g->y[g->order] /= g->a[g->order];
+    // Assert the maximum and minimum limits
+    g->y[g->order] = g->y[g->order] > g->ymax ? g->ymax : g->y[g->order];
+    g->y[g->order] = g->y[g->order] < g->ymin ? g->ymin : g->y[g->order];
     return g->y[g->order];
 }
 
