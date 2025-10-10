@@ -347,6 +347,8 @@ void init_config(lc_devconf_t* dconf){
         dconf->comch[comnum].rate =     -1;
     }
     dconf->RB.buffer = NULL;
+    // Initialize the downselect counter
+    dconf->dscount = 0;
 }
 
 
@@ -3701,7 +3703,7 @@ int lc_stream_downsample(lc_devconf_t *dconf, double *data,
         const unsigned int channels,
         unsigned int *samples_per_read){
     
-    int sample, ch, index, index2;
+    int sample, ch, index, index2, stop, increment;
     
     if(!dconf->downsample)
         return LC_ERROR;
@@ -3727,18 +3729,21 @@ int lc_stream_downsample(lc_devconf_t *dconf, double *data,
     // The first sample to be retained will be shifted by the DSCOUNT, which
     // represents the samples remaining from the last data block.
     index = 0;
-    for(index2 = (dconf->downsample+1) - dconf->dscount; 
-                index2<*samples_per_read; index2+=(dconf->downsample+1)){
+    index2 = (dconf->downsample + 1 - dconf->dscount) * channels;
+    stop = (*samples_per_read) * channels;
+    increment = (dconf->downsample+1) * channels;
+    for(;index2<stop; index2+=increment){
         for(ch=0;ch<channels;ch++){
             data[index++] = data[index2+ch];
         }
     }
 
-    // Modify the samples_per_read to match the number of samples selected
-    *samples_per_read = (dconf->dscount + *samples_per_read) / (dconf->downsample+1);
     // Update the dscount integer for the next block
     dconf->dscount = (dconf->dscount + *samples_per_read) % (dconf->downsample+1);
 
+    // Modify the samples_per_read to match the number of samples selected
+    *samples_per_read = (dconf->dscount + *samples_per_read) / (dconf->downsample+1);
+    
     return LC_NOERR;
 }
 
