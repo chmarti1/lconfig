@@ -1,7 +1,7 @@
 [back](documentation.md)
 
-Version 5.00  
-July 2025  
+Version 5.01  
+October 2025  
 Christopher R. Martin  
 
 ## <a name="config"></a> Writing configuration files
@@ -97,6 +97,8 @@ So far, all of the parameters we have been discussing are applied to the device 
 In addition to the parameters used to identify the device, there are several important parameters that define the behavior of the device.  Perhaps the most important is `samplehz`, which indicates the number of times per second each channel will be sampled in a stream.   
 
 `nsample` is an integer sample count whose behavior depends on the application.  Nominally, `nsample` tells the  `lc_stream_iscomplete()` function when to declare that the data acquisition process is complete, but it's entirely up to the application whether or not to keep going.  For example, `lcrun` ignores `nsample` and just waits for a user keystroke.  However, `lcburst` uses `nsample` to determine the duration of the entire measurement when none is specified at the command line.   
+
+The input stream can be modified by the `downsample` parameter, which specifies an integer number of samples to discard for every sample kept.  Downsampling is useful for reducing the data rate while still allowing high frequency data acquisition for analog outputs or for better high frequency noise rejection.   The `lc_stream_downsample()` function is responsible for applying digital anti-aliasing filters prior to discarding samples.
 
 It is important to keep in mind that, regardless of the binary, `nsample` is _always_ used to size the internal data buffer.  LConfig uses a ring buffer to hold data.  When `lc_stream_start()` is called, the buffer is initialized to hold _at least_ `nsample` measurements from each channel.  Additional samples might be allocated to ensure there is room to comply with the `trigpre` or to ensure there are _at least_ two "blocks" of data in the buffer.   
 

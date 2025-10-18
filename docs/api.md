@@ -1,7 +1,7 @@
 [back to Documentation](documentation.md)
 
-Version 5.00  
-April 2025  
+Version 5.01  
+October 2025  
 Christopher R. Martin  
 
 ##  <a name='top'></a> The LConfig API

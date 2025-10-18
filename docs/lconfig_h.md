@@ -1,7 +1,7 @@
 [back to API](api.md)
 
-Version 5.00  
-April 2025  
+Version 5.01  
+October 2025  
 Christopher R. Martin  
 
 
@@ -38,9 +38,13 @@ The most complicated (and the most common) application for the LConfig system is
 
 **(7) Read data** with `lc_stream_read()`.  When data are available in the local buffer (thanks to a call to `lc_stream_service()`), this function returns a pointer into the ring buffer, where the next block of data may be read.  If no data are available, either because a trigger has not occurred or because the service function has not yet completed, the pointer is NULL.  Separating service and read operations permits applications to quickly stream lots of data and read it later for speed.  
 
-**(8) Stop the stream** with `lc_stream_stop()`.  This halts the data collection process, but does NOT free the data buffer.  Some applications (like `lcburst`) may want to quickly stream data to memory and read it later when the acquisition process is done.  This allows steps 7 and 8 to be reversed without consequence.  
+**(8) Downsample data** by calling `lc_stream_downsample()`.  Calls to `lc_stream_read()` return all raw data prior to downsampling so the application has access prior to filtering and discarding.  If the application does not require access to the raw data, `lc_stream_downsample()` can be called immediately after every call to `lc_stream_read()`.
 
-**(9) Clean up** with `lc_close()` and `lc_clean()`.  These close the connection to the device and free dynamically allocated memory respectively.  In addition to freeing the stream buffer, `lc_clean()` also frees memory allocated to meta data parameters read from the configuration file.
+**(9) Repeat** by returning to step 5 (servicing the data stream).  
+
+**(10) Stop the stream** with `lc_stream_stop()`.  This halts the data collection process, but does NOT free the data buffer.  Some applications (like `lcburst`) may want to quickly stream data to memory and read it later when the acquisition process is done.  This allows steps 7 and 8 to be reversed without consequence.  
+
+**(11) Clean up** with `lc_close()` and `lc_clean()`.  These close the connection to the device and free dynamically allocated memory respectively.  In addition to freeing the stream buffer, `lc_clean()` also frees memory allocated to meta data parameters read from the configuration file.
 
 ## <a name='config'></a> Interacting with configuration files
 
@@ -128,6 +132,11 @@ int lc_stream_read(     lc_devconf_t* dconf,
                          unsigned int *channels, 
                          unsigned int *samples_per_read);
 
+int lc_stream_downsample(lc_devconf_t *dconf, 
+                               double *data, 
+                   const unsigned int channels,
+                         unsigned int *samples_per_read);
+
 int lc_stream_stop(     lc_devconf_t* dconf);
 ```
 ### `lc_stream_start()`
@@ -190,6 +199,12 @@ Once data are returned by `lc_stream_read()`, they must be copied into a safe lo
 See the [data file](#datafile) functions below or the `lct_stat` functions included in [lctools](lctools_h.md) for ways to quickly handle data for common tasks.
 
 A read operation is not required between each stream operation.  In fact, the `lcburst` binary streams its data directly to the buffer and makes no attempt to read it until the streaming process is complete.  This decision is made for performance, so the process of handling the data does not slow down the application.
+
+### `lc_stream_downsample()`
+
+Downsampling is performed in a separate step after reading raw data.  In this way, the application has an opportunity to access all data before they are filtered and discarded.  The `lc_stream_downsample()` function is responsible for applying anti-aliasing filters to each of the analog input channels and then discarding the number of samples indicated by the `downsample` configuration parameter.  Streamed digital input and extended feature channels are not filtered, and samples are simply discarded.  As a result, momentary transitions can be lost if they are not analyzed prior to downsampling.
+
+The `samples_per_read` parameter is modified to indicate the number of samples actually remaining in the data after downsampling is complete.  The number of samples remaining in each data block can change depending on how they are distributed in the data set, so applications should always be sensitive to the possibility that `samples_per_read` can change with every read cycle.
 
 ### `lc_stream_stop()`
 

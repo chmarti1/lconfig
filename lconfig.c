@@ -160,43 +160,6 @@ int array_address(const char* root_address, unsigned int channel){
     return reg;
 }
 
-/* Depreciated - moved away from explicit addressing
-void airegisters(const unsigned int channel, int *reg_negative, int *reg_range, int *reg_resolution){
-    int reg_temp, type_temp;
-    LJM_NameToAddress("AIN0_NEGATIVE_CH",&reg_temp,&type_temp);
-    *reg_negative = reg_temp + channel;
-    LJM_NameToAddress("AIN0_RANGE",&reg_temp,&type_temp);
-    *reg_range = reg_temp + 2*channel;
-    LJM_NameToAddress("AIN0_RESOLUTION_INDEX",&reg_temp,&type_temp);
-    *reg_resolution = reg_temp + channel;
-}
-
-void aoregisters(const unsigned int buffer,     // The output stream number (not the DAC number)
-                int *reg_target,                // STREAM_OUT#_TARGET (This should point to the DAC register) 
-                int *reg_buffersize,            // STREAM_OUT#_BUFFER_SIZE (The memory to allocate to the buffer)
-                int *reg_enable,                // STREAM_OUT#_ENABLE (Is the output stream enabled?)
-                int *reg_buffer,               // STREAM_OUT#_BUFFER_F32 (This is the destination for floating point data)
-                int *reg_loopsize,              // STREAM_OUT#_LOOP_SIZE (The number of samples in the loop)
-                int *reg_setloop){              // STREAM_OUT#_SET_LOOP (how to interact with the loop; should be 1)
-    
-    int dummy;
-    LJM_NameToAddress("STREAM_OUT0_TARGET",reg_target,&dummy);
-    (*reg_target)+=2*buffer;
-    LJM_NameToAddress("STREAM_OUT0_BUFFER_SIZE",reg_buffersize,&dummy);
-    (*reg_buffersize)+=2*buffer;
-    LJM_NameToAddress("STREAM_OUT0_ENABLE",reg_enable,&dummy);
-    (*reg_enable)+=2*buffer;
-    LJM_NameToAddress("STREAM_OUT0_BUFFER_F32",reg_buffer,&dummy);
-    (*reg_buffer)+=2*buffer;
-    LJM_NameToAddress("STREAM_OUT0_LOOP_SIZE",reg_loopsize,&dummy);
-    (*reg_loopsize)+=2*buffer;
-    LJM_NameToAddress("STREAM_OUT0_SET_LOOP",reg_setloop,&dummy);
-    (*reg_setloop)+=2*buffer;
-}
-
-*/
-
-
 
 void read_param(FILE *source, char *param){
     int length, quote;
@@ -588,6 +551,10 @@ void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max){
         *min = 0;
         *max = 22;
     }
+}
+
+double lc_downsamplehz(const lc_devconf_t *dconf){
+    return dconf->samplehz / (dconf->downsample+1);
 }
 
 

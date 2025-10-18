@@ -223,9 +223,11 @@ with init_data_file() and write_data_file() utilities.
 - Renamed lc_load, lc_upload, lc_show, and lc_write
 
 ** 5.01
-9/2025
+10/2025
 - Added DOWNSAMPLE parameter
 - Added lcfilter.c and lcfilter.h to support the digital downsample filtering.
+- Added LC_STREAM_DOWNSAMPLE() to implement downsampling
+- Added LC_DOWNSAMPLEHZ() to calculate effective stream rate after downsampling.
 */
 
 #define TWOPI 6.283185307179586     // REALLY comes in handy for signal generation
@@ -526,6 +528,11 @@ typedef struct __lc_devconf_t__ {
 .
 */
 
+/*********************************************************************
+ * 1. DIAGNOSTIC FUNCTIONS
+ *  These functions return information about the LC_DEVCONF_T without
+ *  changing it or the device.
+ *********************************************************************/
 
 /* LC_NDEV
 Return the number of configured device connections in a lc_devconf_t array.
@@ -557,6 +564,12 @@ of columns of data discovered in the data when streaming.
 */
 int lc_nostream(lc_devconf_t* dconf);
 
+
+/* LC_DOWNSAMPLEHZ
+Returns the sample rate in Hz after downsampling is applied (if configured).
+If no downsampling is configured, simply returns dconf.samplehz.
+*/
+double lc_downsamplehz(lc_devconf_t *dconf);
 
 /* LC_AICHANNELS
 Determine the range of valid analog input channels for the current device 
@@ -590,6 +603,11 @@ of any recognized devices.
 */
 void lc_diochannels(const lc_devconf_t* dconf, int *min, int *max);
 
+/***********************************************************************
+ * 2. CONFIGURATION FUNCTIONS
+ *  These functions interact with configuration files, manage the device
+ *  connection, and the device's configuration.
+ ***********************************************************************/
 
 /* LC_LOAD_CONFIG
 Load a file by its file name.
@@ -675,7 +693,8 @@ The following parameters are recognized:
 .   for the original sample rate, this can effectively allow digital anti-
 .   aliasing filtering at a reduced sample rate.  Downsampling is usually only
 .   useful for long tests where saving the high-sample-rate data would be 
-.   impractical.
+.   impractical, but high data rates are necessary for filtering high frequency
+.   noise.
 .
 .   The integer value assigned to DOWNSAMPLE indicates the number of samples
 .   to discard for every sample to keep.  Prior to down-sampling a 5th-order
@@ -683,9 +702,11 @@ The following parameters are recognized:
 .   effective (reduced) sample rate.  This results in 20dB attenuation at the
 .   new Nyquist frequency.  
 .
-.   Digital channels (DISTREAM or EFCHANNEL) are not filtered.  Instead, 
-.   changes in any of the digital channels is registered with a sample number.
-.   See the data file documentation for more information.
+.   Digital channels (DISTREAM or EFCHANNEL) are discarded without filtering.
+.   The LC_STREAM_READ() function returns the full data set to allow the 
+.   application access prior to calling LC_STREAM_DOWNSAMPLE().  This is 
+.   especially useful for the digital channels, which may have high-frequency
+.   information that will be lost otherwise.
 -SETTLEUS
 .   Settling time to be used during AI streaming, specified in microseconds.  
 .   The minimum settling time supported is > 5us.  Any value <= 5us will prompt
@@ -1121,6 +1142,13 @@ Prints a display of the parameters configured in DCONF.
 void lc_show(lc_devconf_t* dconf);
 
 
+/***********************************************************************
+ * 3. META PARAMETER FUNCTIONS
+ *  These functions interact with meta parameters.  Meta parameters do 
+ *  directly affect the configuration system, but allow users and other
+ *  application to embed specialized data into the configuration and 
+ *  data files.
+ ***********************************************************************/
 
 /*GET_META_TYPE
 Detect the data type of a meta parameter.
@@ -1196,6 +1224,12 @@ int lc_meta_put_int(lc_devconf_t* dconf, const char* param, int value);
 int lc_meta_put_flt(lc_devconf_t* dconf, const char* param, double value);
 int lc_meta_put_str(lc_devconf_t* dconf, const char* param, char* value);
 
+/***********************************************************************
+ * 4. DIGITAL EXTENDED FEATURE FUNCTIONS
+ *  The EF_UPDATE() function is responsible for applying changes in the
+ *  extended feature channels' configuration to the device and retrieving
+ *  the current input extended features' states.
+ ***********************************************************************/
 
 /*EF_UPDATE
 Refresh the extended features registers.  All lc_devconf_t EF parameters will be 
@@ -1207,6 +1241,13 @@ upload() should be re-called.  This will halt acquisition and re-start
 it.
 */
 int lc_ef_update(lc_devconf_t* dconf);
+
+
+/***********************************************************************
+ * 5. DIGITAL COMMUNICATION FUNCTIONS
+ *  Communication functions are responsible for executing transmit,
+ *  receive, and bidirectional operations over a configured com channel.
+ ***********************************************************************/
 
 /*COMMUNICATE
 Executes a read/write operation on a digital communication channel.  The 
@@ -1281,6 +1322,13 @@ int lc_com_write(lc_devconf_t* dconf, const unsigned int comchannel,
 int lc_com_read(lc_devconf_t* dconf, const unsigned int comchannel,
         char *rxbuffer, const unsigned int rxlength, int timeout_ms);
 
+
+/***********************************************************************
+ * 6. DATA STREAM DIAGNOSTIC FUNCTIONS
+ *  Stream diagnostic functions return information about a running data
+ *  stream without affecting it.  See also 7. DATA STREAM FUNCTIONS.
+ ***********************************************************************/
+
 /*LC_STREAM_STATUS
 Report on a data stream's status
 CHANNELS - number of analog input channels streaming
@@ -1320,6 +1368,13 @@ Returns 1 to indicate that the buffer is full and that further calls to
 lc_stream_service will overwrite the oldest data.  Returns a 0 otherwise.
 */
 int lc_stream_isfull(lc_devconf_t* dconf);
+
+
+/***********************************************************************
+ * 7. DATA STREAM FUNCTIONS
+ *  Stream functions are responsible for managing the continuous collection
+ *  and streaming of data.  
+ ***********************************************************************/
 
 /* LC_STREAM_START
 Start a stream operation on the device pointed to by DCONF.
@@ -1421,21 +1476,20 @@ int lc_stream_read(lc_devconf_t* dconf, double **data,
 
 
 /* LC_STREAM_DOWNSAMPLE
- * 
- * If downsampling has been configured, LC_STREAM_DOWNSAMPLE() applies the
- * digital anti-aliasing filters to the analog channels before discarding 
- * DOWNSAMPLE (see LC_LOAD() DOWNSAMPLE parameter) measurements for every 
- * measurement kept, effectively reducing the sample frequency to 
- *      SAMPLEHZ / (DOWNSAMPLE+1)
- * Digital and extended feature channels are downsampled with no filtering.
- * 
- * After execution, the value in SAMPLES_PER_CHANNEL is modified to indicate
- * thea actual number of samples remaining in the data block.  
- * 
- * Returns LC_NOERR on normal operation
- * Returns LC_ERROR if downsampling was not configured no action is taken.
- * 
- */
+
+If downsampling has been configured, LC_STREAM_DOWNSAMPLE() applies the
+digital anti-aliasing filters to the analog channels before discarding 
+DOWNSAMPLE (see LC_LOAD() DOWNSAMPLE parameter) measurements for every 
+measurement kept, effectively reducing the sample frequency to 
+     SAMPLEHZ / (DOWNSAMPLE+1)
+Digital and extended feature channels are downsampled with no filtering.
+
+After execution, the value in SAMPLES_PER_CHANNEL is modified to indicate
+the actual number of samples remaining in the data block.  
+
+Returns LC_NOERR on normal operation
+Returns LC_ERROR if downsampling was not configured no action is taken. 
+*/
 int lc_stream_downsample(lc_devconf_t *dconf, double *data, 
         const unsigned int channels,
         unsigned int *samples_per_read);
@@ -1446,15 +1500,15 @@ Halt an active stream on device devnum.
 int lc_stream_stop(lc_devconf_t* dconf);
 
 
-/*
-.
-.   File Streaming - shifting data directly to a data file
-.
-*/
+/***********************************************************************
+ * 8. DATA FILE FUNCTIONS
+ *  These functions construct data files in compliance with the device
+ *  configuration.
+ ***********************************************************************/
 
 /*LC_DATAFILE_INIT
 Writes the configuration header and timestamp to a data file.  This should
-be called prior to write_data_file()
+be called prior to LC_DATAFILE_WRITE()
 */
 int lc_datafile_init(lc_devconf_t* dconf, FILE *FF);
 
