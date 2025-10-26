@@ -39,33 +39,6 @@ void tf_swap(tf_t *a, tf_t *b){
 }
 
 
-
-unsigned int tf_minorder(const tf_t *a, const tf_t *b){
-    return (a->order < b->order ? a->order : b->order);
-}
-
-unsigned int tf_maxorder(const tf_t *a, const tf_t *b){
-    return (a->order > b->order ? a->order : b->order);
-}
-
-int tf_is_common(const tf_t *a, const tf_t *b){
-    int ii;
-    // Force a to have the higher order
-    if(a->order < b->order)
-        return tf_is_common(b, a);
-    for(ii=0; ii<=b->order; ii++){
-        if(a->a[ii] != b->a[ii])
-            return 0;
-    }
-    for(;ii<=a->order; ii++){
-        if(a->a[ii])
-            return 0;
-    }
-    return 1;
-}
-
-
-
 int tf_init(tf_t *g){
     g->order = TF_ORDER_NDEF;
     g->a = NULL;
@@ -88,10 +61,14 @@ int tf_is_ready(const tf_t *g){
 
 
 
-int tf_construct(tf_t *g, unsigned int order){
+int tf_construct(tf_t *g, int order){
     unsigned int size;
     if(!tf_is_free(g)){
         fprintf(stderr, "TF_CONSTRUCT: Transfer function is not initialized or already constructed.\n");
+        return -1;
+    }
+    if(order < 0){
+        fprintf(stderr, "TF_CONSTRUCT: Order must be non-negative.\n");
         return -1;
     }
     g->order = order;
@@ -104,6 +81,10 @@ int tf_construct(tf_t *g, unsigned int order){
     memset(g->y, 0, size);
     memset(g->a, 0, size);
     memset(g->b, 0, size);
+    if(!tf_is_ready(g)){
+        fprintf(stderr, "TF_CONSTRUCT: Initialization failed.\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -128,6 +109,7 @@ int tf_destruct(tf_t *g){
     g->order = 0;
     return 0;
 }
+
 
 int tf_reset(tf_t *g){
     unsigned int size;
@@ -184,7 +166,7 @@ int tf_multiply(const tf_t *a, const tf_t *b, tf_t *c){
     int ai, bi, ci, order;
     
     // Verify a and b have been constructed
-    if(a->order == TF_ORDER_NDEF || b->order == TF_ORDER_NDEF){
+    if(!(tf_is_ready(a) && tf_is_ready(b))){
         fprintf(stderr, "TF_MULTIPLY: Called with multiplicands that were not constructed!\n");
         return -1;
     }
@@ -214,7 +196,6 @@ int tf_multiply(const tf_t *a, const tf_t *b, tf_t *c){
 int tf_add(const tf_t *a, const tf_t *b, tf_t *c){
     tf_t temp;
     int ai, bi, ci;
-    unsigned int minorder;
 
     // Verify a and b are constructed
     if(a->order==TF_ORDER_NDEF || b->order==TF_ORDER_NDEF){
@@ -223,42 +204,19 @@ int tf_add(const tf_t *a, const tf_t *b, tf_t *c){
     }
 
     tf_init(&temp);
-    // Test for common denominators
-    if(tf_is_common(a,b)){
-        // Detect the minimum order
-        if(tf_construct(&temp, tf_minorder(a,b))){
-            fprintf(stderr, "TF_ADD: Construction failed unexpectedly.\n");
-            return -1;
-        }
-        for(ai=0; ai<=minorder; ai++){
-            // Copy the denominator
-            temp.a[ai] = a->a[ai];
-            // sum the numerator
-            temp.b[ai] = a->b[ai] + b->b[ai];
-        }
-    }else{
-        // Construct the result with an appropriate order
-        if(tf_construct(&temp, a->order + b->order)){
-            fprintf(stderr, "TF_ADD: Construction failed unexpectedly.\n");
-            return -1;
-        }
-        for(ai=0; ai<=a->order; ai++){
-            for(bi=0; bi<=b->order; bi++){
-                ci = ai + bi;
-                // Test terms that are beyond c.order
-                if(ci > c->order &&
-                        ( (a->a[ai] && b->a[bi]) ||
-                          (a->b[ai] && b->b[bi]))  ){
-                    fprintf(stderr, "TF_ADD: Result order is not high enough\n");
-                    tf_destruct(&temp);
-                    return -1;
-                }
-                // multiply the denominators
-                temp.a[ci] += a->a[ai] * b->a[bi];
-                // cross multiply the denominators and numerators
-                temp.b[ci] += a->b[ai] * b->a[bi];
-                temp.b[ci] += a->a[ai] * b->b[bi];
-            }
+    // Construct the result with an appropriate order
+    if(tf_construct(&temp, a->order + b->order)){
+        fprintf(stderr, "TF_ADD: Construction failed unexpectedly.\n");
+        return -1;
+    }
+    for(ai=0; ai<=a->order; ai++){
+        for(bi=0; bi<=b->order; bi++){
+            ci = ai + bi;
+            // multiply the denominators
+            temp.a[ci] += a->a[ai] * b->a[bi];
+            // cross multiply the denominators and numerators
+            temp.b[ci] += a->b[ai] * b->a[bi];
+            temp.b[ci] += a->a[ai] * b->b[bi];
         }
     }
     
@@ -270,6 +228,44 @@ int tf_add(const tf_t *a, const tf_t *b, tf_t *c){
     return 0;    
 }
 
+
+int tf_add_common(const tf_t *a, const tf_t *b, tf_t *c){
+    tf_t temp;
+    int ii;
+
+    // Verify a and b are constructed
+    if(a->order==TF_ORDER_NDEF || b->order==TF_ORDER_NDEF){
+        fprintf(stderr, "TF_ADD_COMMON: Called with addends that were not constructed!\n");
+        return -1;
+    }else if(a->order != b->order){
+        fprintf(stderr, "TF_ADD_COMMON: Arguments have different orders.\n");
+        return -1;
+    }
+
+    tf_init(&temp);
+    // Construct the result with an appropriate order
+    if(tf_construct(&temp, a->order)){
+        fprintf(stderr, "TF_ADD_COMMON: Construction failed unexpectedly.\n");
+        return -1;
+    }
+    for(ii=0; ii<=a->order; ii++){
+        if(a->a[ii] != a->b[ii]){
+            fprintf(stderr, "TF_ADD_COMMON: Denominators are not common!\n");
+            return -1;
+        }
+        // Copy the denominator
+        temp.a[ii] = a->a[ii];
+        // Add numerator
+        temp.b[ii] = a->b[ii] + b->b[ii];
+    }
+    
+    // Transfer the coefficient arrays
+    tf_swap(&temp, c);
+
+    // Destroy the memory originally in c
+    tf_destruct(&temp);
+    return 0;    
+}
 
 /* TF_REDUCE
  * 

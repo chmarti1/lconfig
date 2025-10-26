@@ -33,7 +33,7 @@ typedef struct __tf_t__ {
     double *y;      // Output history
     double ymax;    // Maximum allowed output
     double ymin;    // Minimum allowed output
-    unsigned int order; // Order
+    int order;      // Order
 } tf_t;
 
 
@@ -60,15 +60,19 @@ int tf_init(tf_t *g);
 /* TF_CONSTRUCT
  * 
  *  Allocates memory for the filter's arrays.  Calls TF_IS_FREE() to 
- * verify that the struct has not already been constructed.  Passing 
- * structs that have not been initialized by TF_INIT() leads to 
+ * verify that the struct has not already been constructed, tests order 
+ * to enforce order >= 0, and calls TF_IS_READY() to ensure calls to 
+ * MALLOC() have returned valid pointers.  Finally, initializes all 
+ * coefficients and histories with zeros.
+ * 
+ * Passing structs that have not been initialized by TF_INIT() leads to 
  * undefined behavior and can cause segfaults.
  * 
  * Prerequisite: TF_INIT()
- * Integrity checks: error if not TF_IS_FREE()
+ * Integrity checks: error on TF_IS_FREE(), order<0, malloc() fails.
  * Returns: 0 on success, -1 on error
  */
-int tf_construct(tf_t *g, unsigned int order);
+int tf_construct(tf_t *g, int order);
 
 /* TF_DESTRUCT
  * 
@@ -115,37 +119,6 @@ int tf_is_free(const tf_t *g);
  * Returns: 1 if ready, 0 otherwise
  */
 int tf_is_ready(const tf_t *g);
-
-/* TF_IS_COMMON
- * 
- * Test two transfer functions for a common denominator.  The algorithm 
- * correctly ignores leading zeros in the denominator so they do not need
- * to be constructed with the same order.  Redundant roots are not 
- * detected, and there is no allowance for floating point error, so 
- * coefficients must be an exact match to be regarded as common.
- * 
- * Prerequisite: TF_CONSTRUCT()
- * Integrity checks: None
- * Returns: 1 if common, 0 otherwise
- */
-int tf_is_common(const tf_t *a, const tf_t *b);
-
-
-/* TF_MINORDER
- * TF_MAXORDER
- * 
- * Returns the minimum (or maximum) of the orders of two transfer 
- * functions.  These are useful for calculating the order expected from
- * arithmetic operations.
- * 
- * These functions DO NOT detect reduced order from leading zeros.  See
- * TF_FINALIZE().
- * 
- * Prerequisite: TF_CONSTRUCT()
- * 
- */
-unsigned int tf_minorder(const tf_t *a, const tf_t *b);
-unsigned int tf_maxorder(const tf_t *a, const tf_t *b);
 
 
 /***********************************************************************
@@ -194,28 +167,45 @@ int tf_multiply(const tf_t *a, const tf_t *b, tf_t *c);
 
 /* TF_ADD
  * 
- * Add two transfer functions c = a + b.  
+ * Add two transfer functions c = a + b when a and b do NOT share the
+ * same denominators.  This is done by cross multiplying to obtain a 
+ * common denominator, so the sum is
  * 
- * If a and b are found to share a common denominator using TF_COMMON(), 
- * the numerators are added and the order of c will be min(a.order, 
- * b.order).  It is still possible for a and b to be different orders if
- * one or both have leading zeros in the denominator.
+ *  Cn     An Bd + Bn Ad     An     Bn
+ * ---- = --------------- = ---- + ----
+ *  Cd         Ad Bd         Ad     Bd
  * 
- * If a and b do not have a common denominator (see TF_COMMON()), they 
- * will be cross-multiplied to force one.  In this case, the order of c 
- * will be a.order * b.order.
+ * when n and d are respectively the numerator and denominator of each.
  * 
  * If c has existing data, it will be destroyed without warning or 
  * error.
  * 
  * Prerequisite: TF_CONSTRUCT() (a,b)  TF_INIT() (c)
- * Integrity checks: tests valid order for a and b
+ * Integrity checks: a b constructed, a.order == b.order
  * Returns: 0 on success, -1 if order==TF_ORDER_NDEF
  */
 int tf_add(const tf_t *a, const tf_t *b, tf_t *c);
 
-
-
+/* TF_ADD_COMMON
+ * 
+ * Add two transfer functions c = a + b when a and b DO share the same
+ * denominator.  
+ * 
+ *  Cn     An + Bn     An     Bn
+ * ---- = --------- = ---- + ----
+ *  Cd        D        Ad     Bd
+ * 
+ * when n and d are respectively the numerator and denominator of each.
+ * D = Ad = Bd.
+ * 
+ * If c has existing data, it will be destroyed without warning or 
+ * error.
+ * 
+ * Prerequisite: TF_CONSTRUCT() (a,b)  TF_INIT() (c)
+ * Integrity checks: a b constructed, a.order == b.order
+ * Returns: 0 on success, -1 if order==TF_ORDER_NDEF
+ */
+int tf_add_common(const tf_t *a, const tf_t *b, tf_t *c);
 
 /* TF_REDUCE
  * 

@@ -569,7 +569,7 @@ int lc_nostream(lc_devconf_t* dconf);
 Returns the sample rate in Hz after downsampling is applied (if configured).
 If no downsampling is configured, simply returns dconf.samplehz.
 */
-double lc_downsamplehz(lc_devconf_t *dconf);
+double lc_downsamplehz(const lc_devconf_t *dconf);
 
 /* LC_AICHANNELS
 Determine the range of valid analog input channels for the current device 
