@@ -55,6 +55,10 @@ $(LCBURST_B): $(ALL_O) lcburst.c
 	gcc $(ALL_O) lcburst.c $(LINK) -o $(LCBURST_B)
 	chmod $(BIN_CHMOD) $(LCBURST_B)
 
+# Testing
+ftest: $(ALL_O) ftest.c
+	gcc $(ALL_O) ftest.c $(LINK) -o ftest
+
 binaries: $(ALL_B)
 
 clean:

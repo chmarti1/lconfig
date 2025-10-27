@@ -249,7 +249,7 @@ int tf_add_common(const tf_t *a, const tf_t *b, tf_t *c){
         return -1;
     }
     for(ii=0; ii<=a->order; ii++){
-        if(a->a[ii] != a->b[ii]){
+        if(a->a[ii] != b->a[ii]){
             fprintf(stderr, "TF_ADD_COMMON: Denominators are not common!\n");
             return -1;
         }

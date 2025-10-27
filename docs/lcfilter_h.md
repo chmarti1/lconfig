@@ -251,16 +251,16 @@ __Returns:__ 0 on success, -1 on error
 
 Butterworth filters have poles evenly spaced on a circle about the origin with a radius, $\omega_c$.  A filter with order, $n$, has poles
 $$
-p_k = \omega_c \exp\left( j \pi \frac{2k+n+1}{2n} \right)\ \forall k = 0,1,\ldots,n-1
+p_k = \omega_c \exp\left( j \pi \frac{2k+n-1}{2n} \right)\ \forall k = 1,2\ldots,n-1
 $$
 
 If there is an even number of poles, they may be grouped into complex conjugate pairs, $k$ and $n-1-k$, forming $n/2$ second-order groups,
 $$
-G(s) = \prod_k^{n/2} \frac{\omega_c{^2}}{s^2 + 2\omega_c \zeta_k s + \omega_c{^2} }
+G(s) = \prod_{k=1}^{n/2} \frac{\omega_c{^2}}{s^2 + 2\omega_c \zeta_k s + \omega_c{^2} }
 $$
 where 
 $$
-\zeta_k = \cos\left( \pi \frac{2k+1}{2n}  \right)
+\zeta_k = \cos\left( \pi \frac{2k-1}{2n}  \right)
 $$
 When the number of poles is odd, there are still $(n-1)/2$ complex conjugate pole pairs, with a single purely real pole.
 $$
